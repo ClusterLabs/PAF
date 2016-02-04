@@ -1,0 +1,123 @@
+#: {PGBIN=/usr/lib/postgresql/9.3/bin}
+CONFIG
+    Agent pgsqlms
+    AgentRoot /usr/lib/ocf/resource.d/heartbeat
+    HangTimeout 120
+
+VARIABLE
+    PGDATA=${PGDATA=/tmp/pgdata1}
+    PGBIN=${PGBIN=/usr/pgsql-9.3/bin}
+    RESOURCE_NAME=${RESOURCE_NAME=pgsqld}
+    PRIMARY_NODE=${PRIMARY_NODE=}
+    NODENAME=$(uname -n)
+
+CASE-BLOCK cleanup
+    sudo -iu postgres "$PGBIN"/pg_ctl -D "$PGDATA" -w -m immediate stop  &> /dev/null
+    rm -rf ${PGDATA:?}
+
+SETUP-AGENT
+    Include cleanup
+    echo "PGBIN: $PGBIN" >&2
+    sudo -iu postgres mkdir -p "$PGDATA"
+    sudo -iu postgres "$PGBIN"/initdb --nosync -D "$PGDATA" &> /dev/null 
+    cat <<-EOC>> "$PGDATA"/postgresql.conf
+	listen_addresses = '*'
+	wal_level = hot_standby
+	max_wal_senders = 5
+	hot_standby = on
+	hot_standby_feedback = on
+	wal_receiver_status_interval = 20s
+	EOC
+
+    cat <<-EOC > "$PGDATA"/recovery.conf.pcmk
+	standby_mode = 'on'
+	# Fake master conninfo!
+	primary_conninfo = 'user=postgres host=127.0.0.1 port=15432 application_name=$NODENAME'
+	recovery_target_timeline = 'latest'
+	EOC
+
+    cat <<-EOC>> "$PGDATA"/pg_hba.conf
+	host replication postgres 0.0.0.0/0 trust
+	EOC
+
+    sudo -iu postgres "$PGBIN"/pg_ctl -D "$PGDATA" -w start &> /dev/null
+    sudo -iu postgres "$PGBIN"/pg_ctl -D "$PGDATA" -w -m fast stop &> /dev/null
+
+CLEANUP-AGENT
+    Include cleanup
+
+CASE-BLOCK required_args
+    Env OCF_RESKEY_bindir=$PGBIN
+    Env OCF_RESKEY_pgdata=$PGDATA
+    Env OCF_RESOURCE_INSTANCE=$RESOURCE_NAME
+    Env OCF_RESKEY_primary_node=$PRIMARY_NODE
+
+CASE-BLOCK prepare
+    Include required_args
+    AgentRun stop
+
+CASE "check validate-all"
+    Include prepare
+    AgentRun validate-all OCF_SUCCESS
+
+CASE "check stopped monitor"
+    Include prepare
+    AgentRun monitor OCF_NOT_RUNNING
+
+CASE "check start"
+    Include prepare
+    AgentRun start OCF_SUCCESS
+
+CASE "check double start"
+    Include prepare
+    AgentRun start
+    AgentRun start OCF_SUCCESS
+
+CASE "check stop"
+    Include prepare
+    AgentRun start
+    AgentRun stop OCF_SUCCESS
+
+CASE "check double stop"
+    Include prepare
+    AgentRun start
+    AgentRun stop
+    AgentRun stop OCF_SUCCESS
+
+CASE "check slave monitor"
+    Include prepare
+    AgentRun start
+    AgentRun monitor OCF_SUCCESS
+
+CASE "check promote"
+    Include prepare
+    AgentRun start
+    AgentRun promote OCF_SUCCESS
+
+CASE "check double promote"
+    Include prepare
+    AgentRun start
+    AgentRun promote
+    AgentRun promote OCF_SUCCESS
+
+CASE "check master monitor"
+    Include prepare
+    AgentRun start
+    AgentRun promote
+    AgentRun monitor OCF_RUNNING_MASTER
+
+CASE "check demote"
+    Include prepare
+    AgentRun start
+    AgentRun promote
+    AgentRun demote
+    AgentRun monitor OCF_SUCCESS
+    
+CASE "check double demote"
+    Include prepare
+    AgentRun start
+    AgentRun promote
+    AgentRun demote
+    AgentRun demote
+    AgentRun monitor OCF_SUCCESS
+
