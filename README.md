@@ -1,9 +1,9 @@
-# PostgreSQL Automatic Failover
+#PostgreSQL Automatic Failover
 
-High-Availibility for Postgres, based industry references on Pacemaker and 
+High-Availibility for Postgres, based on industry references Pacemaker and
 Corosync.
 
-## Description
+##Description
 
 Pacemaker is nowadays the industry reference for High Availability. In the same
 fashion than for Systemd, all Linux distributions moved (or are moving) to this
@@ -31,9 +31,9 @@ elect the best of them (the closest one to the old master) and promote it as
 the new master. All of this thanks to the robust, feature-full and most
 importantly experienced project: Pacemaker.
 
-For information about how to install this agent, see``docs/INSTALL.md``.
+For information about how to install this agent, see `INSTALL.md`.
 
-## Setup and requirements
+##Setup and requirements
 
 PAF supports PostgreSQL 9.3 and higher. It has been extensively tested under
 CentOS 6 and 7 in various scenario.
@@ -45,28 +45,28 @@ will NOT edit your setup. It only requires you to follow these pre-requisites:
 
   * slave __must__ be in hot_standby (accept read-only connections)
   * you __must__ provide a template file on each node which will be copied as
-    the local ``recovery.conf`` when needed by the agent
-  * the recovery template file __must__ contain ``standby_mode = on``
-  * the recovery template file __must__ contain ``recovery_target_timeline = 'latest'``
-  * the ``primary_conninfo`` parameter in the recovery template file __must__
-    set the ``application_name`` to the node name as seen in Pacemaker
+    the local `recovery.conf` when needed by the agent
+  * the recovery template file __must__ contain `standby_mode = on`
+  * the recovery template file __must__ contain `recovery_target_timeline = 'latest'`
+  * the `primary_conninfo` parameter in the recovery template file __must__
+    set the `application_name` to the node name as seen in Pacemaker
     (usually, the hostname)
 
 When setting up the resource in Pacemaker, here are the available parameters you
 can set:
 
-  * ``bindir``: location of the PostgreSQL binaries (default: ``/usr/bin``)
-  * ``pgdata``: location of the PGDATA of your instance (default:
-    ``/var/lib/pgsql/data``)
-  * ``pghost``: the socket directory or IP address to use to connect to the
-    local instance (default: ``/tmp``)
-  * ``pgport``:  the port to connect to the local instance (default: ``5432``)
-  * ``recovery_tpl``: the local template that will be copied as the
-    ``PGDATA/recovery.conf`` file. This template file must exists on all node
-    (default: ``$PGDATA/recovery.conf.pcmk``)
-  * ``system_user``: the system owner of your instance's process (default:
-    ``postgres``)
+  * `bindir`: location of the PostgreSQL binaries (default: `/usr/bin`)
+  * `pgdata`: location of the PGDATA of your instance (default:
+    `/var/lib/pgsql/data`)
+  * `pghost`: the socket directory or IP address to use to connect to the
+    local instance (default: `/tmp`)
+  * `pgport`:  the port to connect to the local instance (default: `5432`)
+  * `recovery_tpl`: the local template that will be copied as the
+    `PGDATA/recovery.conf` file. This template file must exists on all node
+    (default: `$PGDATA/recovery.conf.pcmk`)
+  * `system_user`: the system owner of your instance's process (default:
+    `postgres`)
 
 For a demonstration about how to setup a cluster, see
-``docs/Quick_Start-CentOS-6.md`` or ``docs/Quick_Start-CentOS-7.md``.
+(http://dalibo.github.com/PAF/documentation.html)[http://dalibo.github.com/PAF/documentation.html].
 
