@@ -1,0 +1,6 @@
+name: PostgreSQL Automatic Failover
+markdown: redcarpet
+highlighter: pygments
+baseurl: /PAF
+safe: true
+lsi: false
