@@ -1,5 +1,5 @@
 name: PostgreSQL Automatic Failover
-markdown: redcarpet
+markdown: kramdown
 highlighter: pygments
 baseurl: /PAF
 safe: true
