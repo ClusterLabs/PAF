@@ -971,7 +971,7 @@ sub pgsql_stop {
         # Wait for the stop to finish.
         sleep 1 while ( $rc = pgsql_monitor() ) != $OCF_NOT_RUNNING ;
 
-        ocf_log( 'info', 'pgsql_stop: instance "%s" stopped',
+        ocf_log( 'info', sprintf 'pgsql_stop: instance "%s" stopped',
             $OCF_RESOURCE_INSTANCE );
         return $OCF_SUCCESS;
     }
