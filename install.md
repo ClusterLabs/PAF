@@ -73,4 +73,4 @@ They are usually not required as Build.PL should detect their location itself.
 
 ##Testing
 
-See `t/README` to learn more about ocft tests.
+See `t/README` in the source code to learn more about ocft tests.

@@ -60,5 +60,5 @@ and above.
 
 PAF is a free software licensed under the PostgreSQL License.
 
-[installation]: http://dalibo.github.io/PAF/install.html
+[installation]: {{ site.baseurl }}/install.html
 

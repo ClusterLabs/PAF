@@ -3,7 +3,7 @@ layout: default
 title: PostgreSQL Automatic Failover - Quick start CentOS 7
 ---
 
-#Quick Start
+#Quick Start CentOS 7
 
 This quick start tutorial is based on CentOS 7.2, using the `pcs` command.
 
@@ -102,7 +102,7 @@ Finally, we download and install the `pgsql-resource-agent` resource agent:
 ```
 cd /usr/local/src
 git clone https://github.com/dalibo/PAF.git
-cd pgsql-resource-agent/multistate
+cd PAF
 perl Build.PL
 ./Build
 sudo ./Build install
@@ -241,7 +241,9 @@ resources `fence_vm_xxx` are stonith resource: we create one stonith
 resource for each node. Each fencing resource will not be allowed to run on the
 node it is suppose to stop. We are using the fence_vm stonith agent, which is
 power fencing agent allowing to power on or off a virtual machine through the
-`virsh` command..
+`virsh` command. For more information about fencing, see documentation
+`docs/FENCING.md` in the source code or online:
+[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 
 First of all, let's create an empty CIB file and fill it with some basic setup.
 We will push to the cluster once we are completely done:

@@ -18,3 +18,9 @@ We currently provide the following quick starts:
 
   * [quick start using CentOS 6]({{ site.baseurl }}/Quick_Start-CentOS-6.html)
   * [quick start using CentOS 7]({{ site.baseurl }}/Quick_Start-CentOS-7.html)
+
+##Fencing
+
+We wrote a page about how badly you need to be able to fence your nodes in your
+cluster and how to do it. see:
+[How to fence your node]({{ site.baseurl }}/fencing.html)
