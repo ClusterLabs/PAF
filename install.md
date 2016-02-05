@@ -3,7 +3,7 @@ layout: default
 title: PostgreSQL Automatic Failover - Installation
 ---
 
-#Introduction
+# Introduction
 
 PostgreSQL Automatic Failover is a Pacemaker resource agent able to detect
 failure on a PostgreSQL master node and trigger failover to the best existing
@@ -16,9 +16,9 @@ scripts.
 This is the manual explaining what you need to install it correctly on your
 system.
 
-#Installation
+# Installation
 
-##Prerequisites
+## Prerequisites
 
 The perl popular method to install packages use Module::Build. Depending on the
 system, you might need to install a package:
@@ -31,7 +31,7 @@ resource agents. Under Debian, RHEL and their derivatives, you need the
 `pacemaker` and `resource-agents` packages.
 
 
-##Installation from the sources
+## Installation from the sources
 
 The lastest version of PostgreSQL Automatic Failover can be downloaded from
 [http://dalibo.github.io/PAF/downloads.html](http://dalibo.github.io/PAF/downloads.html).
@@ -61,7 +61,7 @@ config file in there. The ocft tool allows to run unit-tests on OCF resource
 agents. See `t/README` for more information about it.
 
 
-##Build arguments
+## Build arguments
 
 The script `Build.PL` you run at the first step of the installation process
 accepts two arguments:
@@ -71,6 +71,6 @@ accepts two arguments:
 
 They are usually not required as Build.PL should detect their location itself.
 
-##Testing
+## Testing
 
 See `t/README` in the source code to learn more about ocft tests.

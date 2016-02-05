@@ -3,12 +3,12 @@ layout: default
 title: PostgreSQL Automatic Failover - Quick start CentOS 7
 ---
 
-#Quick Start CentOS 7
+# Quick Start CentOS 7
 
 This quick start tutorial is based on CentOS 7.2, using the `pcs` command.
 
 
-##Network setup
+## Network setup
 
 The cluster we are about to build include three servers called `srv1`,
 `srv2` and `srv3`. Each of them have two network interfaces `ens3` and
@@ -108,7 +108,7 @@ perl Build.PL
 sudo ./Build install
 ```
 
-##PostgreSQL setup
+## PostgreSQL setup
 
 The resource agent requires the PostgreSQL instances to be already set up and
 ready to start. Moreover, it requires a `recovery.conf` template ready to use.
@@ -181,7 +181,7 @@ systemctl stop postgresql-9.3
 systemctl disable postgresql-9.3
 ```
 
-##Cluster setup
+## Cluster setup
 
 This guide use the cluster management pcsd provided by RHEL to ease the creation
 and setup of a cluster. It allows to create the cluster from command line,
@@ -229,7 +229,7 @@ pcs cluster start --all
 ```
 
 
-##Cluster resource creation and management
+## Cluster resource creation and management
 
 This setup create three different resources: `pgsql-ha`, `pgsql-master-ip`
 and `fence_vm_xxx`.

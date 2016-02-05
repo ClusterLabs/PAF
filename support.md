@@ -3,13 +3,13 @@ layout: default
 title: PostgreSQL Automatic Failover - Support
 ---
 
-#Support
+# Support
 
-##Problem Reports
+## Problem Reports
 
 Please use the issue system in the github project page: [https://github.com/dalibo/PAF/issues](https://github.com/dalibo/PAF/issues)
 
-##Commercial support
+## Commercial support
 
 Dalibo, as the sponsor of the project, can provide enterprise grade support services for PostgreSQL and PAF. See [http://www.dalibo.com](http://www.dalibo.com).
 

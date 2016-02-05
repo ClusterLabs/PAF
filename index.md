@@ -3,9 +3,9 @@ layout: default
 title: PostgreSQL Automatic Failover - Home
 ---
 
-#PostgreSQL Automatic Failover
+# PostgreSQL Automatic Failover
 
-##Intro
+## Intro
 
 Thanks to Pacemaker and Corosync, PostgreSQL Automatic Failover (aka. PAF) is
 able to:
@@ -25,7 +25,7 @@ tanks to :
   * resource group (eg. manage your resource IP for you!)
 
 
-##Details
+## Details
 
 Pacemaker is nowadays the industry reference for High Availability. In the same
 fashion than for Systemd, all Linux distributions moved (or are moving) to this

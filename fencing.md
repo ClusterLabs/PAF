@@ -3,7 +3,7 @@ layout: default
 title: PostgreSQL Automatic Failover - Fencing
 ---
 
-#How to fence your cluster nodes
+# How to fence your cluster nodes
 
 This tutorial aims to describe various fencing techniques.
 
@@ -41,7 +41,7 @@ Fencing agents are available for most Linux distribution as a package named
 to instruct your cluster how to use them. See the Quick start guides about this
 part.
 
-##Virtual fencing using libvirtd and virsh
+## Virtual fencing using libvirtd and virsh
 
 This is the easier fencing method when testing your cluster in a virtualized
 environment. It relies on the fencing agent called "fence_virsh". This tutorial
@@ -142,7 +142,7 @@ rtt min/avg/max/mdev = 1.548/1.548/1.548/0.000 ms
 ```
 
 
-##I/O fencing using SNMP
+## I/O fencing using SNMP
 
 The fencing method allows you to shutdown an ethernet port on a manageable
 switch using the SNMP protocol. This is useful to cut all accesses to the
