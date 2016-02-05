@@ -1,6 +1,6 @@
 name: PostgreSQL Automatic Failover
 markdown: kramdown
-highlighter: pygments
+highlighter: rouge
 baseurl: /PAF
 safe: true
 lsi: false
