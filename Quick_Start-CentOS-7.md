@@ -15,49 +15,18 @@ The cluster we are about to build include three servers called `srv1`,
 `ens8`. IP addresses of these servers are `192.168.122.5x/24` on the first
 interface, `192.168.123.5x/24` on the second one.
 
-Here is a how the IP setup has been done `srv1`:
-
-```
-# destroy any existing connection, eg.
-nmcli connection # returns ens3 and ens4
-nmcli connection delete ens4
-nmcli connection delete ens3
-
-# setup both interfaces
-# ens3
-nmcli connection add type ethernet con-name ens3 ifname ens3 save on ip4 192.168.122.52/24 gw4 192.168.122.1
-nmcli connection modify ens3 ipv4.dns "192.168.122.1 8.8.8.8"
-nmcli connection up ens3
-# ens8
-nmcli connection add type ethernet con-name ens8 ifname ens8 save on ip4 192.168.123.52/24 gw4 192.168.123.1
-nmcli connection modify ens8 ipv4.dns "192.168.123.1 8.8.8.8"
-nmcli connection up ens8
-```
-
-Adapt to each servers.
-
-Moreover, if needed, we need to set the zone to `internal` for each interfaces
-to allow icmp traffic between servers:
-
-```
-nmcli connection modify ens3 connection.zone internal
-nmcli connection modify ens8 connection.zone internal
-nmcli connection up ens3
-nmcli connection up ens8
-```
-
 Considering the firewall, we have to allow the network traffic related to the
 cluster and PostgreSQL to go through the firewalls:
 
 ```
-firewall-cmd --zone=internal --permanent --add-service=high-availability
-firewall-cmd --zone=internal --add-service=high-availability
-firewall-cmd --zone=internal --permanent --add-service=postgresql
-firewall-cmd --zone=internal --add-service=postgresql
+firewall-cmd --permanent --add-service=high-availability
+firewall-cmd --add-service=high-availability
+firewall-cmd --permanent --add-service=postgresql
+firewall-cmd --add-service=postgresql
 ```
 
 
-And finaly, During the cluster setup, we use the cluster name in various places,
+During the cluster setup, we use the cluster name in various places,
 make sure all your servers names can be resolved to the correct IPs. We usually
 set this in the `/etc/hosts` file:
 
