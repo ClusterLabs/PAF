@@ -144,7 +144,7 @@ rtt min/avg/max/mdev = 1.548/1.548/1.548/0.000 ms
 
 ## I/O fencing using SNMP
 
-The fencing method allows you to shutdown an ethernet port on a manageable
+This fencing method allows you to shutdown an ethernet port on a manageable
 switch using the SNMP protocol. This is useful to cut all accesses to the
 world to your node-to-fence or its iSCSI access to datas.
 
@@ -200,3 +200,50 @@ __Warning__: if you are fencing a node cutting its network accessed, take great
 care when you unfence it. While fenced, the node might get angry and try to
 fence other node when comming back. You better want some quorum setup to keep
 it under control, or switching off pacemaker before unfencing it.
+
+## Power fencing
+
+Power fencing allows you to shutdown a node by switching off its power outlet
+remotely.
+
+The following example is based on a PDU from APC, model AP7920,
+having 8 power outlets. This PDU allows you to control each outlet
+independently using a web interface, telnet, ssh, SNMP v1 or SNMPv3. Its IP
+address is `192.168.1.82`.
+
+To manage it using telnet or ssh, we use the fencing agent `fence_apc`:
+
+```
+root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --action=list-status
+1,Outlet 1,ON
+3,Outlet 3,ON
+2,Outlet 2,ON
+5,Outlet 5,ON
+4,Outlet 4,ON
+7,Outlet 7,ON
+6,Outlet 6,ON
+8,Outlet 8,ON
+
+root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
+Status: ON
+
+root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=off
+Success: Powered OFF
+
+root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
+Status: OFF
+```
+
+Just remove the `--ssh` to access your APC using telnet.
+
+To manage the same PDU using the SNMP protocol, we have to use the fence agent
+`fence_apc_snmp`, eg.:
+
+```
+root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
+Status: OFF
+root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=on
+Success: Powered ON
+root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
+Status: ON
+```
