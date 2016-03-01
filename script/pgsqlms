@@ -1393,9 +1393,7 @@ sub pgsql_promote {
 
     $rc = pgsql_monitor();
 
-    # FIXME why search for a recovery.conf file at this point ?
-    #   should this test be added to the monitor ?
-    if ( $rc == $OCF_RUNNING_MASTER and not -f "$pgdata/recovery.conf" ) {
+    if ( $rc == $OCF_RUNNING_MASTER ) {
         ocf_log( 'info', 'pgsql_promote: promote complete' );
 
         # Set the "primary_node" resource parameter to the promoted node name.
