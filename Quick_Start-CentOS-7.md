@@ -99,7 +99,7 @@ On the primary:
 
 /usr/pgsql-9.3/bin/postgresql93-setup initdb
 
-# As postgres
+su - postgres
 
 cd 9.3/data/
 cat <<EOP >> postgresql.conf
@@ -112,6 +112,11 @@ hot_standby_feedback = on
 EOP
 
 cat <<EOP >> pg_hba.conf
+# forbid self-replication
+host replication postgres 192.168.122.50/32 reject
+host replication postgres $(hostname -s) reject
+
+# allow any standby connection
 host replication postgres 0.0.0.0/0 trust
 EOP
 
@@ -121,15 +126,17 @@ primary_conninfo = 'host=192.168.122.50 application_name=$(hostname -s)'
 recovery_target_timeline = 'latest'
 EOP
 
-# As root
+exit
 
 systemctl start postgresql-9.3
+ip addr add 192.168.122.50/24 dev eth0
 ```
 
 Now, on each standby, clone the primary. E.g.:
 
 ```
-# As postgres
+su - postgres
+
 pg_basebackup -h srv1 -D ~postgres/9.3/data/ -X stream -P
 
 cd ~postgres/9.3/data/
@@ -139,6 +146,12 @@ standby_mode = on
 primary_conninfo = 'host=192.168.122.50 application_name=$(hostname -s)'
 recovery_target_timeline = 'latest'
 EOP
+
+exit
+
+cp recovery.conf.pcmk recovery.conf
+
+systemctl start postgresql-9.3
 ```
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
@@ -148,6 +161,12 @@ you:
 ```
 systemctl stop postgresql-9.3
 systemctl disable postgresql-9.3
+```
+
+And remove the master IP address from `srv1`:
+
+```
+ip addr del 192.168.122.50/24 dev eth0
 ```
 
 ## Cluster setup

@@ -4,7 +4,7 @@ title: PostgreSQL Automatic Failover - Quick start CentOS 7
 ---
 # Quick Start CentOS 6
 
-This quick start tutorial is based on CentOS 6.6, using the `pcs` command.
+This quick start tutorial is based on CentOS 6.7, using the `pcs` command.
 
 
 ## Network setup
@@ -23,12 +23,12 @@ all your servers names can be resolved to the correct IPs. We usually set this
 in the `/etc/hosts` file:
 
 ```
-192.168.1.51 srv1
-192.168.1.52 srv2
-192.168.1.53 srv3
-192.168.2.51 srv1-adm
-192.168.2.52 srv2-adm
-192.168.2.53 srv3-adm
+192.168.122.51 srv1
+192.168.122.52 srv2
+192.168.122.53 srv3
+192.168.123.51 srv1-alt
+192.168.123.52 srv2-alt
+192.168.123.53 srv3-alt
 ```
 
 Finally, we have to allow the network traffic related to the cluster and
@@ -98,10 +98,9 @@ Rely on the PostgreSQL documentation for a proper setup.
 On the primary:
 
 ```
-# As root
 service postgresql-9.3 initdb
 
-# As postgres
+su - postgres
 
 cd 9.3/data/
 cat <<EOP >> postgresql.conf
@@ -114,24 +113,46 @@ hot_standby_feedback = on
 EOP
 
 cat <<EOP >> pg_hba.conf
+# forbid self-replication
+host replication postgres 192.168.122.50/32 reject
+host replication postgres $(hostname -s) reject
+
+# allow any standby connection
 host replication postgres 0.0.0.0/0 trust
 EOP
 
 cat <<EOP > recovery.conf.pcmk
 standby_mode = on
-primary_conninfo = 'host=192.168.1.50'
+primary_conninfo = 'host=192.168.122.50 application_name=$(hostname -s)'
 recovery_target_timeline = 'latest'
 EOP
 
-# As root
+exit
 
 service postgresql-9.3 start
+ip addr add 192.168.122.50/24 dev eth0
 ```
 
 Now, on each standby, clone the primary. E.g.:
 
 ```
-pg_basebackup -h srv1 -D ~postgres/9.3/data/ -X stream -R -P
+su - postgres
+
+pg_basebackup -h srv1 -D ~postgres/9.3/data/ -X stream -P
+
+cd ~postgres/9.3/data/
+
+cat <<EOP > recovery.conf.pcmk
+standby_mode = on
+primary_conninfo = 'host=192.168.122.50 application_name=$(hostname -s)'
+recovery_target_timeline = 'latest'
+EOP
+
+cp recovery.conf.pcmk recovery.conf
+
+exit
+
+service postgresql-9.3 start
 ```
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
@@ -141,6 +162,12 @@ you:
 ```
 service postgresql-9.3 stop
 chkconfig postgresql-9.3 off
+```
+
+And remove the master IP address from `srv1`:
+
+```
+ip addr del 192.168.122.50/24 dev eth0
 ```
 
 ## Cluster setup
@@ -182,17 +209,17 @@ If you have alternative network available (this is highly recommended), you can
 use the following syntax:
 
 ```
-pcs cluster setup --name cluster_pgsql srv1,srv1-adm srv2,srv2-adm srv3,srv3-adm
+pcs cluster setup --name cluster_pgsql srv1,srv1-alt srv2,srv2-alt srv3,srv3-alt
 ```
 
-If your version of `pcs` does not support it, you can fallback on the old but
-useful `ccs`:
+If your version of `pcs` does not support it (ie. CentOS 6.6 and bellow), you
+can fallback on the old but useful `ccs`:
 
 ```
 pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
-ccs -f /etc/cluster/cluster.conf --addalt srv1 srv1-adm
-ccs -f /etc/cluster/cluster.conf --addalt srv2 srv2-adm
-ccs -f /etc/cluster/cluster.conf --addalt srv3 srv3-adm
+ccs -f /etc/cluster/cluster.conf --addalt srv1 srv1-alt
+ccs -f /etc/cluster/cluster.conf --addalt srv2 srv2-alt
+ccs -f /etc/cluster/cluster.conf --addalt srv3 srv3-alt
 pcs cluster sync
 ```
 
@@ -206,17 +233,17 @@ pcs cluster start --all
 ## Cluster resource creation and management
 
 This setup create three different resources: `pgsql-ha`, `pgsql-master-ip`
-and `fence_ifmib_xxx`.
+and `fence_vm_xxx`.
 
 The `pgsql-ha` resource represent all the PostgreSQL instances of your cluster
 and control where is the primary and who are the standbys. The
 `pgsql-master-ip` is located on the node hosting the postgres master. The last
-resources `fence_ifmib_xxx` are stonith resource: we create one stonith
+resources `fence_vm_xxx` are stonith resource: we create one stonith
 resource for each node. Each fencing resource will not be allowed to run on the
-node it is suppose to stop. We are using the fence_ifmib stonith agent, which is
-an I/O fencing agent allowing to control network switch through the SNMP
-protocol. For more information about fencing, see documentation
-`docs/FENCING.md` in the source code or online:
+node it is suppose to stop. We are using the `fence_virsh` stonith agent, which
+is able to shutdown or start a virtual machine remotely. For more information
+about fencing, see documentation `docs/FENCING.md` in the source code or
+online:
 [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 
 First of all, let's create an empty CIB file and fill it with some basic setup.
@@ -232,12 +259,12 @@ pcs -f cluster1.xml resource defaults resource-stickiness=INFINITY
 Then, we must start populating it with the stonith resources:
 
 ```
-pcs -f cluster1.xml stonith create fence_ifmib_srv1 fence_ifmib pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.1.4" port="11" community="private" action="off"
-pcs -f cluster1.xml stonith create fence_ifmib_srv2 fence_ifmib pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.1.4" port="12" community="private" action="off"
-pcs -f cluster1.xml stonith create fence_ifmib_srv3 fence_ifmib pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.1.4" port="13" community="private" action="off"
-pcs -f cluster1.xml constraint location fence_ifmib_srv1 avoids srv1=INFINITY
-pcs -f cluster1.xml constraint location fence_ifmib_srv2 avoids srv2=INFINITY
-pcs -f cluster1.xml constraint location fence_ifmib_srv3 avoids srv3=INFINITY
+pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="root" port="srv1-c6" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="root" port="srv2-c6" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="root" port="srv3-c6" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
+pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
+pcs -f cluster1.xml constraint location fence_vm_srv3 avoids srv3=INFINITY
 ```
 
 We add the PostgreSQL `pgsqld` resource and the multistate `pgsql-ha`
@@ -261,7 +288,7 @@ We add the IP addresse which should be started on the primary node:
 
 ```
 pcs -f cluster1.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
-    ip=192.168.1.50 cidr_netmask=24 op monitor interval=10s
+    ip=192.168.122.50 cidr_netmask=24 op monitor interval=10s
 ```
 
 We now define the collocation between `pgsql-ha` and `pgsql-master-ip`.
@@ -320,7 +347,7 @@ not supported:
 
 ```
 pcs cluster node add srv4
-ccs -f /etc/cluster/cluster.conf --addalt srv4 srv4-adm
+ccs -f /etc/cluster/cluster.conf --addalt srv4 srv4-alt
 pcs cluster sync
 ```
 
@@ -340,8 +367,9 @@ pcs resource meta pgsql-ha clone-max=4
 Add the stonith agent for the new node:
 
 ```
-pcs stonith create fence_ifmib_srv4 fence_ifmib pcmk_host_check="static-list" pcmk_host_list="srv4" ipaddr="192.168.1.4" port="14" community="private" action="off"
-pcs constraint location fence_ifmib_srv4 avoids srv4=INFINITY
+pcs stonith create fence_vm_srv4 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv4" ipaddr="192.168.122.1" login="root" port="srv4-c6" action="off" identity_file="/root/.ssh/id_rsa"
+
+pcs constraint location fence_vm_srv4 avoids srv4=INFINITY
 ```
 
 And you can now exit your maintenance mode:
