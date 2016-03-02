@@ -11,8 +11,8 @@ This quick start tutorial is based on CentOS 7.2, using the `pcs` command.
 ## Network setup
 
 The cluster we are about to build include three servers called `srv1`,
-`srv2` and `srv3`. Each of them have two network interfaces `ens3` and
-`ens8`. IP addresses of these servers are `192.168.122.5x/24` on the first
+`srv2` and `srv3`. Each of them have two network interfaces `eth0` and
+`eth1`. IP addresses of these servers are `192.168.122.5x/24` on the first
 interface, `192.168.123.5x/24` on the second one.
 
 Considering the firewall, we have to allow the network traffic related to the
@@ -90,8 +90,6 @@ Rely on the PostgreSQL documentation for a proper setup.
 On the primary:
 
 ```
-# As root
-
 /usr/pgsql-9.3/bin/postgresql93-setup initdb
 
 su - postgres
@@ -142,9 +140,9 @@ primary_conninfo = 'host=192.168.122.50 application_name=$(hostname -s)'
 recovery_target_timeline = 'latest'
 EOP
 
-exit
-
 cp recovery.conf.pcmk recovery.conf
+
+exit
 
 systemctl start postgresql-9.3
 ```
@@ -207,6 +205,7 @@ pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
 ```
 
 You can now start your cluster!
+
 ```
 pcs cluster start --all
 ```
@@ -241,9 +240,9 @@ pcs -f cluster1.xml resource defaults resource-stickiness=INFINITY
 Then, we must start populating it with the stonith resources:
 
 ```
-pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="root" port="srv1-centos7" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="root" port="srv2-centos7" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="root" port="srv3-centos7" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="root" port="srv1-c7" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="root" port="srv2-c7" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="root" port="srv3-c7" action="off" identity_file="/root/.ssh/id_rsa"
 pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv3 avoids srv3=INFINITY

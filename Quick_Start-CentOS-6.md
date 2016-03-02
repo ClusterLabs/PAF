@@ -66,7 +66,7 @@ and the PostgreSQL version you need.
 We can now install everything we need for our cluster:
 
 ```
-yum install -y corosync pacemaker postgresql93 postgresql93-contrib postgresql93-server resource-agents pcs pcsd cman
+yum install -y corosync pacemaker postgresql93 postgresql93-contrib postgresql93-server resource-agents pcs pcsd cman fence-agents-virsh
 ```
 
 Finally, we need to install the `pgsql-resource-agent` resource agent:
