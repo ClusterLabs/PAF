@@ -18,7 +18,7 @@ This is the manual explaining what you need to install it correctly on your
 system.
 
 
-## Using packages
+## Using packages
 
 A RPM file is available for each release. You should be able to find them on the
 release page of the project hosted on github:
