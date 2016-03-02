@@ -22,10 +22,11 @@ system.
 
 A RPM file is available for each release. You should be able to find them on the
 release page of the project hosted on github:
-https://github.com/dalibo/PAF/releases
+[https://github.com/dalibo/PAF/releases](https://github.com/dalibo/PAF/releases)
 
 To install the lastest version of PostgreSQL Automatic Failover, go to the
-following link: https://github.com/dalibo/PAF/releases/latest
+following link:
+[https://github.com/dalibo/PAF/releases/latest](https://github.com/dalibo/PAF/releases/latest)
 
 Copy the link to the associated RPM file, and feed it to `yum install`. As
 instances:
