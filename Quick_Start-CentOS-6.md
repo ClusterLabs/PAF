@@ -66,18 +66,13 @@ and the PostgreSQL version you need.
 We can now install everything we need for our cluster:
 
 ```
-yum install -y corosync pacemaker postgresql93 postgresql93-contrib postgresql93-server resource-agents pcs pcsd cman perl-Module-Build
+yum install -y corosync pacemaker postgresql93 postgresql93-contrib postgresql93-server resource-agents pcs pcsd cman
 ```
 
-Finally, we download and install the `pgsql-resource-agent` resource agent:
+Finally, we need to install the `pgsql-resource-agent` resource agent:
 
 ```
-cd /usr/local/src
-git clone https://github.com/dalibo/PAF.git
-cd pgsql-resource-agent/
-perl Build.PL
-./Build
-sudo ./Build install
+yum install -y https://github.com/dalibo/PAF/releases/download/v1.0.0/resource-agents-paf-1.0.0-1.noarch.rpm
 ```
 
 ## PostgreSQL setup
