@@ -15,6 +15,9 @@ The cluster we are about to build include three servers called `srv1`,
 `eth1`. IP addresses of these servers are `192.168.122.5x/24` on the first
 interface, `192.168.123.5x/24` on the second one.
 
+The IP address `192.168.122.50`, called `pgsql-ha` in this tutorial, will be set
+on the server hosting the master PostgreSQL intance.
+
 Considering the firewall, we have to allow the network traffic related to the
 cluster and PostgreSQL to go through the firewalls:
 
@@ -25,12 +28,12 @@ firewall-cmd --permanent --add-service=postgresql
 firewall-cmd --add-service=postgresql
 ```
 
-
 During the cluster setup, we use the cluster name in various places,
 make sure all your servers names can be resolved to the correct IPs. We usually
 set this in the `/etc/hosts` file:
 
 ```
+192.168.122.50 pgsql-ha
 192.168.122.51 srv1
 192.168.122.52 srv2
 192.168.122.53 srv3
@@ -130,15 +133,12 @@ Now, on each standby, clone the primary. E.g.:
 ```
 su - postgres
 
-pg_basebackup -h srv1 -D ~postgres/9.3/data/ -X stream -P
+pg_basebackup -h pgsql-ha -D ~postgres/9.3/data/ -X stream -P
 
 cd ~postgres/9.3/data/
 
-cat <<EOP > recovery.conf.pcmk
-standby_mode = on
-primary_conninfo = 'host=192.168.122.50 application_name=$(hostname -s)'
-recovery_target_timeline = 'latest'
-EOP
+sed -ri s/srv[0-9]+/$(hostname -s)/ pg_hba.conf
+sed -ri s/srv[0-9]+/$(hostname -s)/ recovery.conf.pcmk
 
 cp recovery.conf.pcmk recovery.conf
 
