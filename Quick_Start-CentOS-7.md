@@ -234,7 +234,7 @@ We will push to the cluster once we are completely done:
 pcs cluster cib cluster1.xml
 pcs -f cluster1.xml property set no-quorum-policy=ignore
 pcs -f cluster1.xml resource defaults migration-threshold=5
-pcs -f cluster1.xml resource defaults resource-stickiness=INFINITY
+pcs -f cluster1.xml resource defaults resource-stickiness=10
 ```
 
 Then, we must start populating it with the stonith resources:
