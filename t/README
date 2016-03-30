@@ -5,14 +5,18 @@
 
 2/ if needed, export the following environment variables:
 
-     PGDATA        (default is /tmp/pgdata1)
-     PGBIN         (default is /usr/pgsql-9.3/bin)
-     RESOURCE_NAME (default is pgsqld)
+     PGDATA        (default is /tmp/pgdata1) Where to create the PostrgeSQL
+                   instance used for the tests
+     PGBIN         (default is /usr/pgsql-9.3/bin) Location of the
+                   PostrgeSQL binaries
+     RESOURCE_NAME (default is pgsqld) The resource name used by the RA
+     PGHOST        (default is /tmp) Ip address or socket directory to
+                   connect to the server
 
    Warning, the instance in PGDATA is created for tests, then __destructed__.
 
-3/ you might need to create the HA_RSCTMP folder. Usually: 
-"/var/run/resource-agents/"
+3/ Make sure the HA_RSCTMP folder exists. On most Linux distribution it
+is located in "/var/run/resource-agents/".
 
 4/ to build the test scripts, run the following command as root:
 
