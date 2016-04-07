@@ -61,13 +61,15 @@ my $bindir_default      = "/usr/bin";
 my $pgdata_default      = "/var/lib/pgsql/data";
 my $pghost_default      = "/tmp";
 my $pgport_default      = 5432;
+my $start_opts_default  = "";
 
 # Set default values if not found in environment
-my $system_user = $ENV{'OCF_RESKEY_system_user'} || $system_user_default;
-my $bindir      = $ENV{'OCF_RESKEY_bindir'} || $bindir_default;
-my $pgdata      = $ENV{'OCF_RESKEY_pgdata'} || $pgdata_default;
-my $pghost      = $ENV{'OCF_RESKEY_pghost'} || $pghost_default;
-my $pgport      = $ENV{'OCF_RESKEY_pgport'} || $pgport_default;
+my $system_user  = $ENV{'OCF_RESKEY_system_user'} || $system_user_default;
+my $bindir       = $ENV{'OCF_RESKEY_bindir'} || $bindir_default;
+my $pgdata       = $ENV{'OCF_RESKEY_pgdata'} || $pgdata_default;
+my $pghost       = $ENV{'OCF_RESKEY_pghost'} || $pghost_default;
+my $pgport       = $ENV{'OCF_RESKEY_pgport'} || $pgport_default;
+my $start_opts   = $ENV{'OCF_RESKEY_start_opts'} || $start_opts_default;
 my $recovery_tpl = $ENV{'OCF_RESKEY_recovery_template'}
     || "$pgdata/recovery.conf.pcmk";
 
@@ -693,6 +695,17 @@ sub ocf_meta_data {
               <content type="string" default="PGDATA/recovery.conf.pcmk" />
             </parameter>
 
+            <parameter name="start_opts" unique="0" required="0">
+              <longdesc lang="en">
+                Additionnal arguments given to the postgres process on startup.
+                See "postgres --help" for available options. Usefull when the
+                postgresql.conf file is not in the data directory (PGDATA), eg.:
+                "-c config_file=/etc/postgresql/9.3/main/postgresql.conf".
+              </longdesc>
+              <shortdesc lang="en">Additionnal arguments given to the postgres process on startup.</shortdesc>
+              <content type="string" default="$start_opts_default" />
+            </parameter>
+
             <parameter name="primary_node" unique="0" required="0">
               <longdesc lang="en">
                 Name of the node hosting the current master state.
@@ -857,6 +870,7 @@ sub pgsql_start {
     my $rc;
     my $uid;
     my $gid;
+    my @cmd = ( $PGCTL, '-D', $pgdata, '-w', 'start' );
 
     $rc = pgsql_monitor();
     # Instance must be running as secondary or being stopped.
@@ -881,11 +895,14 @@ sub pgsql_start {
         'pgsql_start: instance "%s" is not running, starting it as a secondary',
         $OCF_RESOURCE_INSTANCE );
 
+    push @cmd => ( '-o', $start_opts )
+        if $start_opts ne '';
+
     # Create recovery.conf from the template file.
     _create_recovery_conf();
 
     # Start the instance as a secondary.
-    $rc = _runas( $PGCTL, '-D', $pgdata, '-w', 'start' );
+    $rc = _runas( @cmd );
 
     if ( $rc == 0 ) {
 
