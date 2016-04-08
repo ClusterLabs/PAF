@@ -4,7 +4,7 @@
 #
 # Copyright (C) 2016: Jehan-Guillaume de Rorthais and Mael Rimbault
 
-=head1 pgsqlms
+=head1 NAME
 
 pgsqlms - A PostgreSQL multi-state resource agent for Pacemaker
 
