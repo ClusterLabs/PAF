@@ -15,6 +15,15 @@ In `Build.PL`, search and edit the following line:
 dist_version       => '1.0.0'
 ```
 
+In `resource-agents-paf.spec`:
+  * update the tag in the `_tag` variable (first line)
+  * update the version in `Version:`
+  * edit the changelog
+
+In `debian/`:
+  * edit the `changelog` file
+  * update the package name in `files`
+
 ## Tagging and building tar file
 
 ```
@@ -44,6 +53,28 @@ spectool -R -g PAF/resource-agents-paf.spec
 rpmbuild -ba PAF/resource-agents-paf.spec
 ```
 
+## Building the deb file
+
+### Installation
+
+```
+apt-get install dh-make devscripts libmodule-build-perl resource-agents
+```
+
+
+### Building the package
+
+Package to install on your debian host to build the builder environment
+
+```
+VER=1.0.0
+wget "https://github.com/dalibo/PAF/releases/download/v${VER}/PAF-v${VER}.tgz" -O resource-agents-paf_${VER}.orig.tar.gz
+tar zxf resource-agents-paf_${VER}.orig.tar.gz
+mv PAF-v${VER}/ resource-agents-paf-${VER}
+cd resource-agents-paf-${VER}
+debuild -i -us -uc -b
+```
+
 ## Release on github
 
   - go to https://github.com/dalibo/PAF/tags
@@ -60,3 +91,4 @@ rpmbuild -ba PAF/resource-agents-paf.spec
       See http://dalibo.github.io/PAF/documentation.html
   - upload the tar file and the RPM file
   - save
+

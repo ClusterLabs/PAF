@@ -1,0 +1,5 @@
+resource-agents-paf (1.0.0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Fri, 08 Apr 2016 13:52:29 +0200
