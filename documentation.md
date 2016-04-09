@@ -18,6 +18,7 @@ We currently provide the following quick starts:
 
   * [quick start using CentOS 6]({{ site.baseurl }}/Quick_Start-CentOS-6.html)
   * [quick start using CentOS 7]({{ site.baseurl }}/Quick_Start-CentOS-7.html)
+  * [quick start using Debian 8]({{ site.baseurl }}/Quick_Start-Debian-8.html)
 
 ## Fencing
 
