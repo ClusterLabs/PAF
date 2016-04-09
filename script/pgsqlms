@@ -97,10 +97,17 @@ sub _runas {
     my $pid;
     my @cmd = @_;
     my $postgres_uid = getpwnam( $system_user );
+    my $postgres_gid = getgrnam( $system_user );
 
     $pid = fork;
 
     if ( $pid == 0 ) { # in child
+        $) = "$postgres_gid $postgres_gid";
+        while ( my ( undef, undef, $gid, $members ) = getgrent ) {
+            $) .= " $gid" if grep { $system_user eq $_ } split /\s+/, $members
+        }
+        $( = $postgres_gid;
+
         $< = $> = $postgres_uid;
 
         exec @cmd;
