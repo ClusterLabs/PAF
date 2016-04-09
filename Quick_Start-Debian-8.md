@@ -8,7 +8,7 @@ title: PostgreSQL Automatic Failover - Quick start Debian 8
 This quick start tutorial is based on Debian 8.4, using the `crm` cluster
 client.
 
-## Repository setup
+## Repository setup
 
 The Debian HA team missed the freeze time of Debian 8 (Jessie). They couldn't
 publish the Pacemaker, Corosync and related packages on time. They did publish
@@ -26,7 +26,7 @@ About PostgreSQL, this tutorial uses the PGDG repository maintained by the
 PostgreSQL community (and actually Debian maintainers). Here is how to add it:
 
 ```
-cat <<EOF >> /etc/apt/sources.list.d/pgdg.list 
+cat <<EOF >> /etc/apt/sources.list.d/pgdg.list
 deb http://apt.postgresql.org/pub/repos/apt/ jessie-pgdg main
 EOF
 ```
@@ -50,7 +50,7 @@ on the server hosting the master PostgreSQL instance.
 
 During the cluster setup, we use the node names in various places, make sure
 all your servers names can be resolved to the correct IPs. We usually set this
-in the `/etc/hosts` file: 
+in the `/etc/hosts` file:
 
 ```
 cat <<EOF >> /etc/hosts
@@ -178,7 +178,7 @@ ip addr del 192.168.122.100/24 dev eth0
 
 ## Cluster setup
 
-### Corosync
+### Corosync
 
 The cluster communications and quorum (votes) rely on Corosync to work. So this
 is the first service to setup to be able to build your cluster on top of it.
@@ -193,12 +193,12 @@ the cluster as we described it so far:
 ```
 totem {
   version: 2
-  
+
   crypto_cipher: none
   crypto_hash: none
 
   rrp_mode: passive
-  
+
   interface {
     ringnumber: 0
     bindnetaddr: 192.168.122.0
@@ -254,16 +254,15 @@ We can now start corosync:
 
 ```
 systemctl start corosync.service
-
 ```
 
 Here is a command to check everything is working correctly:
 
 ```
 root@srv1:~# corosync-cmapctl | grep 'members.*ip'
-runtime.totem.pg.mrp.srp.members.3232266853.ip (str) = r(0) ip(192.168.122.101) r(1) ip(192.168.123.101) 
-runtime.totem.pg.mrp.srp.members.3232266854.ip (str) = r(0) ip(192.168.122.102) r(1) ip(192.168.123.102) 
-runtime.totem.pg.mrp.srp.members.3232266855.ip (str) = r(0) ip(192.168.122.103) r(1) ip(192.168.123.103) 
+runtime.totem.pg.mrp.srp.members.3232266853.ip (str) = r(0) ip(192.168.122.101) r(1) ip(192.168.123.101)
+runtime.totem.pg.mrp.srp.members.3232266854.ip (str) = r(0) ip(192.168.122.102) r(1) ip(192.168.123.102)
+runtime.totem.pg.mrp.srp.members.3232266855.ip (str) = r(0) ip(192.168.122.103) r(1) ip(192.168.123.103)
 ```
 
 ### Pacemaker
@@ -272,13 +271,11 @@ It is advised to keep Pacemaker off on server boot. It helps the administrator
 to investigate after a node fencing before Pacemaker start and potentially
 enter in a death match as instance. Run this on all nodes:
 
-
 ```
 systemctl disable pacemaker
 ```
 
 We can now start it manually on all node:
-
 
 ```
 systemctl start pacemaker
@@ -326,7 +323,7 @@ EOC
 Then, we must start populating it with the stonith resources:
 
 ```
-crm conf<<EOC             
+crm conf<<EOC
 primitive fence_vm_srv1 stonith:fence_virsh                   \
   params pcmk_host_check="static-list" pcmk_host_list="srv1"  \
          ipaddr="192.168.122.1" login="ioguix"                \
@@ -355,6 +352,7 @@ EOC
 
 The following setup adds a bunch of resources and constraints all together in
 the same time:
+
   1. the PostgreSQL `pgsqld` resource
   2. the multistate `pgsql-ha` responsible to clone `pgsqld` everywhere and
      define the roles (master/slave) of each clone
