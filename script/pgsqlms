@@ -853,14 +853,16 @@ sub pgsql_validate_all {
 
     # require wal_level >= hot_standby
     my $status = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
-    $status =~ /^Current wal_level setting:\s+(.*?)\s*$/m;
-    unless ( defined $1 ) {
+    # NOTE: pg_controldata output changed with PostgreSQL 9.5, so we need to
+    # account for both syntaxes
+    $status =~ /^(Current )?wal_level setting:\s+(.*?)\s*$/m;
+    unless ( defined $2 ) {
         ocf_log( 'crit', sprintf
             'Could not read current wal_level setting "%s"', $pgdata );
         exit $OCF_ERR_INSTALLED;
     }
 
-    unless ( $1 eq 'hot_standby' or $1 eq 'logical' ) {
+    unless ( $2 eq 'hot_standby' or $2 eq 'logical' ) {
         ocf_log( 'crit', sprintf 'wal_level must be "hot_standby" or "logical"',
             $pgdata );
         exit $OCF_ERR_CONFIGURED;
