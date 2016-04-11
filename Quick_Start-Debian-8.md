@@ -316,7 +316,6 @@ First of all, let's start with some basic setup of the cluster:
 crm conf <<EOC
 property default-resource-stickiness=10
 property migration-limit=3
-property no-quorum-policy=ignore
 EOC
 ```
 
