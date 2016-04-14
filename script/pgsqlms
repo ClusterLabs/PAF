@@ -725,13 +725,15 @@ sub ocf_meta_data {
 
           </parameters>
           <actions>
-            <action name="start" timeout="120" />
-            <action name="stop" timeout="120" />
-            <action name="status" timeout="60" />
-            <action name="reload" timeout="60" />
-            <action name="promote" timeout="60" />
+            <action name="start" timeout="60" />
+            <action name="stop" timeout="60" />
+            <action name="status" timeout="20" />
+            <action name="reload" timeout="20" />
+            <action name="promote" timeout="30" />
             <action name="demote" timeout="120" />
-            <action name="monitor" depth="0" timeout="30" interval="30"/>
+            <action name="monitor" depth="0" timeout="10" interval="15"/>
+            <action name="monitor" depth="0" timeout="10" interval="15" role="Master"/>
+            <action name="monitor" depth="0" timeout="10" interval="16" role="Slave"/>
             <action name="notify" timeout="60" />
             <action name="meta-data" timeout="5" />
             <action name="validate-all" timeout="5" />
@@ -746,7 +748,6 @@ sub ocf_methods {
     print q{
         start
         stop
-        status
         reload
         promote
         demote
@@ -855,14 +856,14 @@ sub pgsql_validate_all {
     my $status = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
     # NOTE: pg_controldata output changed with PostgreSQL 9.5, so we need to
     # account for both syntaxes
-    $status =~ /^(Current )?wal_level setting:\s+(.*?)\s*$/m;
-    unless ( defined $2 ) {
+    $status =~ /^(?:Current )?wal_level setting:\s+(.*?)\s*$/m;
+    unless ( defined $1 ) {
         ocf_log( 'crit', sprintf
             'Could not read current wal_level setting "%s"', $pgdata );
         exit $OCF_ERR_INSTALLED;
     }
 
-    unless ( $2 eq 'hot_standby' or $2 eq 'logical' ) {
+    unless ( $1 eq 'hot_standby' or $1 eq 'logical' ) {
         ocf_log( 'crit', sprintf 'wal_level must be "hot_standby" or "logical"',
             $pgdata );
         exit $OCF_ERR_CONFIGURED;
