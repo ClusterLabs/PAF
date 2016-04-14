@@ -185,7 +185,7 @@ is the first service to setup to be able to build your cluster on top of it.
 
 The cluster configuration client `crm` is supposed to be able to take care of
 this, but this feature was broken when this tutorial was written (See
-https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=819545).
+[the related bug report] (https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=819545)).
 
 So here is the content of the `/etc/corosync/corosync.conf` file suitable to
 the cluster as we described it so far:
@@ -371,8 +371,16 @@ primitive pgsqld pgsqlms                                                      \
          pghost="/var/run/postgresql"                                         \
          recovery_template="/etc/postgresql/9.3/main/recovery.conf.pcmk"      \
          start_opts="-c config_file=/etc/postgresql/9.3/main/postgresql.conf" \
-  op monitor role="Master" interval=9s                                        \
-  op monitor role="Slave"  interval=10s
+  op start timeout=60s                                                        \
+  op stop timeout=60s                                                         \
+  op reload timeout=20s                                                       \
+  op promote timeout=30s                                                      \
+  op demote timeout=120s                                                      \
+  op monitor interval=15s timeout=10s role="Master"                           \
+  op monitor interval=16s timeout=10s role="Slave"                            \
+  op notify timeout=60s                                                       \
+  op meta-data timeout=5s                                                     \
+  op validate-all timeout=5s
 
 # 2. resource pgsql-ha
 ms pgsql-ha pgsqld                          \
@@ -400,6 +408,13 @@ location pgsql-ha_master-prefers-srv1 pgsql-ha role=Master 1: srv1
 
 EOC
 ```
+
+Note that the values for `timeout` and `interval` on each operation are based
+on the minimum suggested value for PAF Resource Agent.
+These values should be adapted depending on the context.
+
+
+
 
 About the collocation between `pgsql-ha` and `pgsql-master-ip`, note that the
 start/stop and promote/demote order for these resource is asymetrical: we

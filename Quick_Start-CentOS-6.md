@@ -270,14 +270,26 @@ clone:
 # pgsqld
 pcs -f cluster1.xml resource create pgsqld ocf:heartbeat:pgsqlms \
     bindir=/usr/pgsql-9.3/bin pgdata=/var/lib/pgsql/9.3/data     \
-    op monitor interval=9s role="Master"                         \
-    op monitor interval=10s role="Slave"
+    op start timeout=60s                                         \
+    op stop timeout=60s                                          \
+    op reload timeout=20s                                        \
+    op promote timeout=30s                                       \
+    op demote timeout=120s                                       \
+    op monitor interval=15s timeout=10s role="Master"            \
+    op monitor interval=16s timeout=10s role="Slave"             \
+    op notify timeout=60s                                        \
+    op meta-data timeout=5s                                      \
+    op validate-all timeout=5s                                   
 
 # pgsql-ha
 pcs -f cluster1.xml resource master pgsql-ha pgsqld \
     master-max=1 master-node-max=1                  \
     clone-max=3 clone-node-max=1 notify=true
 ```
+
+Note that the values for `timeout` and `interval` on each operation are based
+on the minimum suggested value for PAF Resource Agent.
+These values should be adapted depending on the context.
 
 We add the IP addresse which should be started on the primary node:
 
