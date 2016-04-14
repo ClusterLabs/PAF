@@ -184,8 +184,8 @@ The cluster communications and quorum (votes) rely on Corosync to work. So this
 is the first service to setup to be able to build your cluster on top of it.
 
 The cluster configuration client `crm` is supposed to be able to take care of
-this, but this feature was broken when this tutorial was written (See
-[the related bug report] (https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=819545)).
+this, but this feature was broken when this tutorial was written.
+See [the related bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=819545).
 
 So here is the content of the `/etc/corosync/corosync.conf` file suitable to
 the cluster as we described it so far:
