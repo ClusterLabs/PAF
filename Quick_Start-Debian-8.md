@@ -5,7 +5,7 @@ title: PostgreSQL Automatic Failover - Quick start Debian 8
 
 # Quick Start Debian 8
 
-This quick start tutorial is based on Debian 8.4, using the `crm` cluster
+This quick start tutorial is based on Debian 8.4, using the `crmsh` cluster
 client.
 
 ## Repository setup
@@ -74,7 +74,7 @@ apt-get install -t jessie-backports pacemaker crmsh
 apt-get install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3 git
 ```
 
-Finally, we need to install the `pgsql-resource-agent` resource agent:
+Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
 cd /usr/local/src
@@ -96,12 +96,13 @@ requirements are:
   * have `recovery_target_timeline = 'latest'`
   * a `primary_conninfo` with an `application_name` set to the node name
 
-Here are some quick steps to build your primary postgres instance and its
-standbies. As this is not the main subject here, they are
-__**quick and dirty**__. Rely on the PostgreSQL documentation for a proper
-setup.
+Here are some quick steps to build your primary PostgreSQL instance and its
+standbys. As this is not the main subject here, they are
+__**quick and dirty**__. Rely on the
+[PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
+for a proper setup.
 
-The next steps suppose the primary instance is on srv1.
+The next steps suppose the primary PostgreSQL instance is on `srv1`.
 
 On all nodes:
 
@@ -116,6 +117,7 @@ wal_level = hot_standby
 max_wal_senders = 10
 hot_standby = on
 hot_standby_feedback = on
+logging_collector = on
 EOP
 
 cat <<EOP >> pg_hba.conf
@@ -136,7 +138,7 @@ EOP
 exit
 ```
 
-On srv1, the master, restart the instance and give it the master IP address:
+On `srv1`, the master, restart the instance and give it the master IP address:
 
 ```
 systemctl restart postgresql@9.3-main
@@ -144,7 +146,7 @@ systemctl restart postgresql@9.3-main
 ip addr add 192.168.122.100/24 dev eth0
 ```
 
-Now, on each standby (srv2 and srv3 here), we have to cleanup the instance
+Now, on each standby (`srv2` and `srv3` here), we have to cleanup the instance
 created by the package and clone the primary. E.g.:
 
 ```
@@ -162,7 +164,7 @@ systemctl start postgresql@9.3-main
 ```
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
-disabling them, as Pacemaker will take care of starting/stopping everything for
+disable them, as Pacemaker will take care of starting/stopping everything for
 you. Start with your master:
 
 ```
@@ -183,7 +185,7 @@ ip addr del 192.168.122.100/24 dev eth0
 The cluster communications and quorum (votes) rely on Corosync to work. So this
 is the first service to setup to be able to build your cluster on top of it.
 
-The cluster configuration client `crm` is supposed to be able to take care of
+The cluster configuration client `crmsh` is supposed to be able to take care of
 this, but this feature was broken when this tutorial was written.
 See [the related bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=819545).
 
@@ -268,21 +270,23 @@ runtime.totem.pg.mrp.srp.members.3232266855.ip (str) = r(0) ip(192.168.122.103) 
 ### Pacemaker
 
 It is advised to keep Pacemaker off on server boot. It helps the administrator
-to investigate after a node fencing before Pacemaker start and potentially
-enter in a death match as instance. Run this on all nodes:
+to investigate after a node fencing before Pacemaker starts and potentially
+enters in a death match with the other nodes.
+
+Run this on all nodes:
 
 ```
 systemctl disable pacemaker
 ```
 
-We can now start it manually on all node:
+We can now start it manually on all nodes:
 
 ```
 systemctl start pacemaker
 ```
 
 After some seconds of startup and cluster membership stuff, you should be able
-to see your three node up in `crm_mon`:
+to see your three nodes up in `crm_mon`:
 
 ```
 root@srv1:~# crm_mon -n1D
@@ -291,23 +295,25 @@ Node srv2: online
 Node srv3: online
 ```
 
-We can now feed this cluster with some resource to keep available. This guide
-use the cluster client `crm` to setup everything.
+We can now feed this cluster with some resources to keep available. This guide
+use the cluster client `crmsh` to setup everything.
 
 ## Cluster resource creation and management
 
-This setup create three different resources: `pgsql-ha`, `pgsql-master-ip`
+This setup creates three different resources: `pgsql-ha`, `pgsql-master-ip`
 and `fence_vm_xxx`.
 
-The `pgsql-ha` resource represent all the PostgreSQL instances of your cluster
-and control where is the primary and who are the standbys. The
-`pgsql-master-ip` is located on the node hosting the postgres master. The last
-resources `fence_vm_xxx` are stonith resource: we create one stonith
-resource for each node. Each fencing resource will not be allowed to run on the
-node it is suppose to stop. We are using the fence_vm stonith agent, which is
-power fencing agent allowing to power on or off a virtual machine through the
-`virsh` command. For more information about fencing, see documentation
-`docs/FENCING.md` in the source code or online:
+The `pgsql-ha` resource represents all the PostgreSQL instances of your cluster
+and controls where is the primary and where are the standbys.
+The `pgsql-master-ip` is located on the node hosting the PostgreSQL master
+resource.
+The last resources `fence_vm_xxx` are STONITH resources, used to manage fencing.
+We create one STONITH resource for each node. Each fencing resource will not be
+allowed to run on the node it is supposed to stop. We are using the
+`fence_virsh` fencing agent, which is power fencing agent allowing to power on
+or off a virtual machine through the `virsh` command. For more information
+about fencing, see documentation `docs/FENCING.md` in the source code or
+online:
 [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 
 First of all, let's start with some basic setup of the cluster:
@@ -319,7 +325,9 @@ property migration-limit=3
 EOC
 ```
 
-Then, we must start populating it with the stonith resources:
+Then, we must start populating it with the STONITH resources (this setup is
+only provided as an example, and must be adapted to the fencing agent used in
+your configuration):
 
 ```
 crm conf<<EOC
@@ -355,11 +363,11 @@ the same time:
   1. the PostgreSQL `pgsqld` resource
   2. the multistate `pgsql-ha` responsible to clone `pgsqld` everywhere and
      define the roles (master/slave) of each clone
-  3. the IP address that must be start on the PostgreSQL master node
+  3. the IP address that must be started on the PostgreSQL master node
   4. the collocation of the master IP address with the PostgreSQL master
      instance
-  5. the preference about where the master should be start. As we defined
-     earlier, our master is supposed to be on srv1
+  5. the preference about where the master should be started. As we defined
+     earlier, our master is supposed to be on `srv1`
 
 ```
 crm conf <<EOC

@@ -10,7 +10,7 @@ This quick start tutorial is based on CentOS 7.2, using the `pcs` command.
 
 ## Network setup
 
-The cluster we are about to build include three servers called `srv1`,
+The cluster we are about to build includes three servers called `srv1`,
 `srv2` and `srv3`. Each of them have two network interfaces `eth0` and
 `eth1`. IP addresses of these servers are `192.168.122.5x/24` on the first
 interface, `192.168.123.5x/24` on the second one.
@@ -19,7 +19,7 @@ The IP address `192.168.122.50`, called `pgsql-ha` in this tutorial, will be set
 on the server hosting the master PostgreSQL intance.
 
 Considering the firewall, we have to allow the network traffic related to the
-cluster and PostgreSQL to go through the firewalls:
+cluster and PostgreSQL to go through:
 
 ```
 firewall-cmd --permanent --add-service=high-availability
@@ -29,7 +29,7 @@ firewall-cmd --add-service=postgresql
 ```
 
 During the cluster setup, we use the cluster name in various places,
-make sure all your servers names can be resolved to the correct IPs. We usually
+make sure all your server names can be resolved to the correct IPs. We usually
 set this in the `/etc/hosts` file:
 
 ```
@@ -51,7 +51,7 @@ root@srv1:~# for s in srv1 srv2 srv3; do ping -W1 -c1 $s; done| grep icmp_seq
 64 bytes from srv3 (192.168.122.53): icmp_seq=1 ttl=64 time=0.351 ms
 ```
 
-##PostgreSQL and Cluster stack installation
+## PostgreSQL and Cluster stack installation
 
 We are using the PostgreSQL packages from the PGDG repository. Here is how to
 install and set up this repository on your system:
@@ -69,7 +69,7 @@ We can now install everything we need for our cluster:
 yum install -y pacemaker postgresql93 postgresql93-contrib postgresql93-server resource-agents pcs fence-agents-all fence-agents-virsh
 ```
 
-Finally, we need to install the `pgsql-resource-agent` resource agent:
+Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
 yum install -y https://github.com/dalibo/PAF/releases/download/v1.0.0/resource-agents-paf-1.0.0-1.noarch.rpm
@@ -86,9 +86,11 @@ requirements are:
   * have `recovery_target_timeline = 'latest'`
   * a `primary_conninfo` with an `application_name` set to the node name
 
-Here are some quick steps to build your primary postgres instance and its
-standby. As this is not the main subject here, they are __**quick and dirty**__.
-Rely on the PostgreSQL documentation for a proper setup.
+Here are some quick steps to build your primary PostgreSQL instance and its
+standbys. As this is not the main subject here, they are
+__**quick and dirty**__. Rely on the
+[PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
+for a proper setup.
 
 On the primary:
 
@@ -148,7 +150,7 @@ systemctl start postgresql-9.3
 ```
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
-disabling them, as Pacemaker will take care of starting/stopping everything for
+disable them, as Pacemaker will take care of starting/stopping everything for
 you:
 
 ```
@@ -164,21 +166,21 @@ ip addr del 192.168.122.50/24 dev eth0
 
 ## Cluster setup
 
-This guide use the cluster management pcsd provided by RHEL to ease the creation
-and setup of a cluster. It allows to create the cluster from command line,
-without editing configuration files or XML by hands.
+This guide uses the cluster management tool `pcsd` provided by RHEL to ease the
+creation and setup of a cluster. It allows to create the cluster from command
+line, without editing configuration files or XML by hands.
 
-`pcsd` use the hacluster system user to work and communicate with other
+`pcsd` uses the hacluster system user to work and communicate with other
 members of the cluster. We need to set a password to this user so it can
 authenticate to other nodes easily. As cluster management commands can be run on
 any member of the cluster, it is recommended to set the same password everywhere
-to avoid confusions :
+to avoid confusions:
 
 ```
 passwd hacluster
 ```
 
-Enable and start the pcsd daemon on all the nodes:
+Enable and start the `pcsd` daemon on all the nodes:
 
 ```
 systemctl enable pcsd
@@ -213,18 +215,20 @@ pcs cluster start --all
 
 ## Cluster resource creation and management
 
-This setup create three different resources: `pgsql-ha`, `pgsql-master-ip`
+This setup creates three different resources: `pgsql-ha`, `pgsql-master-ip`
 and `fence_vm_xxx`.
 
-The `pgsql-ha` resource represent all the PostgreSQL instances of your cluster
-and control where is the primary and who are the standbys. The
-`pgsql-master-ip` is located on the node hosting the postgres master. The last
-resources `fence_vm_xxx` are stonith resource: we create one stonith
-resource for each node. Each fencing resource will not be allowed to run on the
-node it is suppose to stop. We are using the fence_vm stonith agent, which is
-power fencing agent allowing to power on or off a virtual machine through the
-`virsh` command. For more information about fencing, see documentation
-`docs/FENCING.md` in the source code or online:
+The `pgsql-ha` resource represents all the PostgreSQL instances of your cluster
+and controls where is the primary and where are the standbys.
+The `pgsql-master-ip` is located on the node hosting the PostgreSQL master
+resource.
+The last resources `fence_vm_xxx` are STONITH resources, used to manage fencing.
+We create one STONITH resource for each node. Each fencing resource will not be
+allowed to run on the node it is supposed to stop. We are using the
+`fence_virsh` fencing agent, which is power fencing agent allowing to power on
+or off a virtual machine through the `virsh` command. For more information
+about fencing, see documentation `docs/FENCING.md` in the source code or
+online:
 [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 
 First of all, let's create an empty CIB file and fill it with some basic setup.
@@ -236,7 +240,7 @@ pcs -f cluster1.xml resource defaults migration-threshold=5
 pcs -f cluster1.xml resource defaults resource-stickiness=10
 ```
 
-Then, we must start populating it with the stonith resources:
+Then, we must start populating it with the STONITH resources:
 
 ```
 pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="root" port="srv1-c7" action="off" identity_file="/root/.ssh/id_rsa"
@@ -276,7 +280,7 @@ Note that the values for `timeout` and `interval` on each operation are based
 on the minimum suggested value for PAF Resource Agent.
 These values should be adapted depending on the context.
 
-We add the IP addresse which should be started on the primary node:
+We add the IP address which should be started on the primary node:
 
 ```
 pcs -f cluster1.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
@@ -284,7 +288,7 @@ pcs -f cluster1.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
 ```
 
 We now define the collocation between `pgsql-ha` and `pgsql-master-ip`.
-Note that the start/stop and promote/demote order for these resource is
+Note that the start/stop and promote/demote order for these resources is
 asymetrical: we __must__ keep the master IP on the master during its demote
 process.
 

@@ -73,7 +73,7 @@ We can now install everything we need for our cluster:
 yum install -y corosync pacemaker postgresql93 postgresql93-contrib postgresql93-server resource-agents pcs pcsd cman fence-agents-virsh
 ```
 
-Finally, we need to install the `pgsql-resource-agent` resource agent:
+Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
 yum install -y https://github.com/dalibo/PAF/releases/download/v1.0.0/resource-agents-paf-1.0.0-1.noarch.rpm
@@ -90,9 +90,11 @@ requirements are:
   * have ``recovery_target_timeline = 'latest'``
   * a ``primary_conninfo`` with an ``application_name`` set to the node name
 
-Here are some quick steps to build your primary postgres instance and its
-standby. As this is not the main subject here, they are **quick and dirty**.
-Rely on the PostgreSQL documentation for a proper setup.
+Here are some quick steps to build your primary PostgreSQL instance and its
+standbys. As this is not the main subject here, they are
+__**quick and dirty**__. Rely on the
+[PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
+for a proper setup.
 
 On the primary:
 
@@ -168,15 +170,15 @@ ip addr del 192.168.122.50/24 dev eth0
 
 ## Cluster setup
 
-This guide use the cluster management pcsd provided by RHEL to ease the creation
-and setup of a cluster. It allows to create the cluster from command line,
-without editing configuration files or XML by hands.
+This guide uses the cluster management tool `pcsd` provided by RHEL to ease the
+creation and setup of a cluster. It allows to create the cluster from command
+line, without editing configuration files or XML by hands.
 
-`pcsd` use the hacluster system user to work and communicate with other
-members of the cluster. We need to set a password to this user so it can
+`pcsd` uses the hacluster system user to work and communicate with other
+members of the cluster. We need to set a password for this user so it can
 authenticate to other nodes easily. As cluster management commands can be run on
 any member of the cluster, it is recommended to set the same password everywhere
-to avoid confusions :
+to avoid confusions:
 
 ```
 passwd hacluster
@@ -201,15 +203,15 @@ We can now create our cluster!
 pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
 ```
 
-If you have alternative network available (this is highly recommended), you can
-use the following syntax:
+If you have an alternative network available (this is highly recommended), you
+can use the following syntax:
 
 ```
 pcs cluster setup --name cluster_pgsql srv1,srv1-alt srv2,srv2-alt srv3,srv3-alt
 ```
 
 If your version of `pcs` does not support it (ie. CentOS 6.6 and bellow), you
-can fallback on the old but useful `ccs`:
+can fallback on the old but useful `ccs` command:
 
 ```
 pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
@@ -228,16 +230,18 @@ pcs cluster start --all
 
 ## Cluster resource creation and management
 
-This setup create three different resources: `pgsql-ha`, `pgsql-master-ip`
+This setup creates three different resources: `pgsql-ha`, `pgsql-master-ip`
 and `fence_vm_xxx`.
 
-The `pgsql-ha` resource represent all the PostgreSQL instances of your cluster
-and control where is the primary and who are the standbys. The
-`pgsql-master-ip` is located on the node hosting the postgres master. The last
-resources `fence_vm_xxx` are stonith resource: we create one stonith
-resource for each node. Each fencing resource will not be allowed to run on the
-node it is suppose to stop. We are using the `fence_virsh` stonith agent, which
-is able to shutdown or start a virtual machine remotely. For more information
+The `pgsql-ha` resource represents all the PostgreSQL instances of your cluster
+and controls where is the primary and where are the standbys.
+The `pgsql-master-ip` is located on the node hosting the PostgreSQL master
+resource.
+The last resources `fence_vm_xxx` are STONITH resources, used to manage fencing.
+We create one STONITH resource for each node. Each fencing resource will not be
+allowed to run on the node it is supposed to stop. We are using the
+`fence_virsh` fencing agent, which is power fencing agent allowing to power on
+or off a virtual machine through the `virsh` command. For more information
 about fencing, see documentation `docs/FENCING.md` in the source code or
 online:
 [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
@@ -251,7 +255,9 @@ pcs -f cluster1.xml resource defaults migration-threshold=5
 pcs -f cluster1.xml resource defaults resource-stickiness=10
 ```
 
-Then, we must start populating it with the stonith resources:
+Then, we must start populating it with the STONITH resources (this setup is
+only provided as an example, and must be adapted to the fencing agent used in
+your configuration):
 
 ```
 pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="root" port="srv1-c6" action="off" identity_file="/root/.ssh/id_rsa"
@@ -291,7 +297,7 @@ Note that the values for `timeout` and `interval` on each operation are based
 on the minimum suggested value for PAF Resource Agent.
 These values should be adapted depending on the context.
 
-We add the IP addresse which should be started on the primary node:
+We add the IP address which should be started on the primary node:
 
 ```
 pcs -f cluster1.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
@@ -335,7 +341,7 @@ service pcsd start
 pcs cluster auth srv1 srv2 srv3 srv4 -u hacluster
 ```
 
-On all other node, authenticate to the new node:
+On all other nodes, authenticate to the new node:
 
 ```
 pcs cluster auth srv4 -u hacluster
@@ -346,7 +352,7 @@ does not move resources all over the place when the new node appears:
 
 ```
 pcs property set maintenance-mode=true
-pcs cluster node add srv4,srv41
+pcs cluster node add srv4,srv4-alt
 ```
 
 Or, using the old commands if the syntax of `pcs` with alternate interface is
@@ -358,20 +364,20 @@ ccs -f /etc/cluster/cluster.conf --addalt srv4 srv4-alt
 pcs cluster sync
 ```
 
-And reload the corosync configuration on all the nodes if needed (it just fail
+And reload the corosync configuration on all the nodes if needed (it just fails
 if not needed):
 
 ```
 pcs cluster reload corosync
 ```
 
-We now need to allow more clone in the cluster:
+We now need to allow one more clone in the cluster:
 
 ```
 pcs resource meta pgsql-ha clone-max=4
 ```
 
-Add the stonith agent for the new node:
+Add the STONITH agent for the new node:
 
 ```
 pcs stonith create fence_vm_srv4 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv4" ipaddr="192.168.122.1" login="root" port="srv4-c6" action="off" identity_file="/root/.ssh/id_rsa"
