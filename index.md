@@ -17,7 +17,7 @@ able to:
   * switchover roles in your cluster between your master and a standby
 
 Thanks to Pacemaker and Corsync, you can easily build a SAFE and ROBUST cluster
-tanks to :
+with:
 
   * proper fencing support
   * quorum support
@@ -53,12 +53,14 @@ elect the best of them (the closest one to the old master) and promote it as
 the new master. All of this thanks to the robust, feature-full and most
 importantly experienced project: Pacemaker.
 
-For information about how to install this agent, see the [installation] page.
+For information about how to install, configure and manage this agent, as well
+as several Quick starts to help you getting started, see the [documentation]
+page.
 
 PAF has been tested and works with PostgreSQL 9.3 and above,  Pacemaker 1.1.x
 and above. 
 
 PAF is a free software licensed under the PostgreSQL License.
 
-[installation]: {{ site.baseurl }}/install.html
+[documentation]: {{ site.baseurl }}/documentation.html
 
