@@ -79,7 +79,7 @@ Moreover, if the build process find an ocft configuration folder (usually
 configuration file in there. The ocft tool allows to run unit-tests on OCF
 resource agents. See `t/README` for more information about it.
 
-### Build arguments
+### Build arguments
 
 The script `Build.PL` you run at the first step of the installation process
 accepts two arguments:
