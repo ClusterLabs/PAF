@@ -27,6 +27,7 @@ please refer to the
 Moreover, it requires a `recovery.conf` template ready to use.
 You can create a `recovery.conf` file suitable to your needs, the only
 requirements are:
+
   * have `standby_mode = on`
   * have `recovery_target_timeline = 'latest'`
   * a `primary_conninfo` with an `application_name` set to the node name

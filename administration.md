@@ -74,6 +74,7 @@ around.
 Note that in these examples, we only ask for Pacemaker to move the "master"
 resource. That means that, based on your configuration, the following should
 happen:
+
   * the current master PostgreSQL resource is demoted
   * another PostgreSQL resource, running previously as a slave resource, will
     be promoted
@@ -89,6 +90,7 @@ happen:
 This command will set up an `INFINITY` score ont the target node for the master
 resource.
 This will force Pacemaker to trigger the switchover to the target node:
+
   * "demote" PostgreSQL resource on the current master node ("stop" the
     resource, and then "start" it as a "slave" resource)
   * "promote" PostgreSQL resource on the target node
@@ -165,6 +167,7 @@ If you find something that went wrong, fix it before moving to the next step.
 Finally, __you need to rebuild the PostgreSQL instance on the failed node__.
 That's right, as the PostgreSQL resource suffered a failover, it is very likely
 that the promoted PostgreSQL instance was late by a few transactions.
+
   * the first consequence is that you did lose several commited transactions,
     hopefully not that many
   * the second consequence is that your old primary is too advanced in the
@@ -223,6 +226,7 @@ configuration and the actions required to bring a failed node up.
 Here is a full example of a failover.
 
 Consider the following situation:
+
   * node `srv1` runs PAF master resource (primary PostgreSQL instance and
     Pacemaker's managed IP)
   * nodes `srv2` and `srv3` run PAF slave resources (standby PostgreSQL
@@ -233,6 +237,7 @@ firewall rules, so the node is still up, but not visible anymore to the
 cluster.
 
 Based on the quorum situation, Pacemaker triggers the following actions:
+
   * fence the `srv1` node (as you can imagine, in this situation your STONITH
     device should not try to connect to the node it has to fence, that's part
     of fencing's configuration good practices)
@@ -241,6 +246,7 @@ Based on the quorum situation, Pacemaker triggers the following actions:
     example).
 
 From this point, your cluster is in this situation:
+
   * node `srv1` is powered off, and marked as `offline` in the cluster
   * node `srv2` runs PAF master resource (primary PostgreSQL instance and
     Pacemaker's managed IP)
@@ -251,6 +257,7 @@ Only two nodes are now alive in the quorum, so the lost of any new member would
 bring the whole cluster down.
 You don't want things to stay that way too long, so you'll have to bring `srv1`
 up again:
+
   * you power it on
   * as Corosync, Pacemaker and PostgreSQL has been configured not to start
     automatically, they don't
@@ -267,6 +274,7 @@ member was to be up again :
 ```
 
 This should print something like this:
+
   * first, the actual cluster state:
 ```
     Current cluster status:
