@@ -9,9 +9,23 @@ title: PostgreSQL Automatic Failover - Documentation
 
 See the [Installation]({{ site.baseurl }}/install.html) page.
 
+## Configuration
+
+See the [Configuration]({{ site.baseurl }}/configuration.html) page.
+
+## Administration
+
+See the [Administration]({{ site.baseurl }}/administration.html) page.
+
+## Fencing
+
+We wrote a page about how badly you need to be able to fence your nodes in your
+cluster and how to do it. See:
+[How to fence your node]({{ site.baseurl }}/fencing.html)
+
 ## Quick starts
 
-Quick start are tutorials explaining how to install and setup a PostgreSQL
+Quick starts are tutorials explaining how to install and setup a PostgreSQL
 cluster in high availability using the PAF project.
 
 We currently provide the following quick starts:
@@ -20,8 +34,3 @@ We currently provide the following quick starts:
   * [quick start using CentOS 7]({{ site.baseurl }}/Quick_Start-CentOS-7.html)
   * [quick start using Debian 8]({{ site.baseurl }}/Quick_Start-Debian-8.html)
 
-## Fencing
-
-We wrote a page about how badly you need to be able to fence your nodes in your
-cluster and how to do it. see:
-[How to fence your node]({{ site.baseurl }}/fencing.html)
