@@ -276,6 +276,7 @@ member was to be up again :
 This should print something like this:
 
   * first, the actual cluster state:
+
 ```
     Current cluster status:
     Online: [ srv2 srv3 ]
@@ -292,6 +293,7 @@ This should print something like this:
 ```
 
   * then, the modifications you asked to be simulated, and the cluster reaction:
+
 ```
     Performing requested modifications
      + Bringing node srv1 online
@@ -302,6 +304,7 @@ This should print something like this:
 
   * then a more detailed list of the cluster actions we'll skip here, and at
     the end the expected final cluster state:
+
 ```
     Revised cluster status:
     Online: [ srv1 srv2 srv3 ]
