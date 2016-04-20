@@ -5,7 +5,7 @@ title: PostgreSQL Automatic Failover - Documentation
 
 # Documentation
 
-## Frenquently Asked Questions
+## Frenquently Asked Questions
 
 See the [FAQ]({{ site.baseurl }}/FAQ.html) page.
 
