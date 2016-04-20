@@ -1,3 +1,8 @@
+---
+layout: default
+title: PostgreSQL Automatic Failover - FAQ
+---
+
 # Frequently Asked Questions
 
 __Q: Why a new resource agent for PostgreSQL?__
@@ -27,9 +32,14 @@ much more flexible to the cluster topology.
 __Q: Why perl?__
 __A__:
 
+FIXME
 
 __Q: Why Pacemaker?__
 __A__:
 
+FIXME
+
 __Q: What versions__
 __A__:
+
+FIXME
