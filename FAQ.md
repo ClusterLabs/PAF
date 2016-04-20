@@ -32,9 +32,7 @@ much more flexible to the cluster topology.
 
 __Q: Why perl?__
 
-__A__:
-
-Let's answer "why not bash?" first
+__A__: Let's answer "why not bash?" first
 
 We started this project with bash. Bash can be a powerful language and it is
 possible to make clean code with it. This is the perfect language for sysadmin.
@@ -58,9 +56,7 @@ other arguments.
 
 __Q: But perl is heavier!__
 
-__A__:
-
-Just a bit more. Not that much. It's not 10x the memory usage by bash.
+__A__: Just a bit more. Not that much. It's not 10x the memory usage by bash.
 
 Oh wait, by the way, did you see a lot of fencing agent are written in python or
 perl? Amongs the `/usr/sbin/fence_*` scripts on my system, I can find:
