@@ -3,9 +3,10 @@ layout: default
 title: PostgreSQL Automatic Failover - FAQ
 ---
 
-# Frequently Asked Questions
+# Frequently Asked Questions
 
 __Q: Why a new resource agent for PostgreSQL?__
+
 __A__: The `resource-agents` project already have a PostgreSQL agent. This
 agent supports stateless and multi-state setup of your PostgreSQL cluster,
 which make its code large and complex and make it a bit confusing and complicated
@@ -30,16 +31,19 @@ This make the Pacemaker setup much simpler and the PostgreSQL configuration
 much more flexible to the cluster topology.
 
 __Q: Why perl?__
+
 __A__:
 
 FIXME
 
 __Q: Why Pacemaker?__
+
 __A__:
 
 FIXME
 
 __Q: What versions__
+
 __A__:
 
 FIXME
