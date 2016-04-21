@@ -115,6 +115,6 @@ cluster anymore, what should I do?__
 
 __A__: You need to rebuild your old master from the new primary instance first.
 
-See the "Failover" section in the [administration page]().
+See the "Failover" section in the [administration page]({{ site.baseurl }}/administration.html).
 
 
