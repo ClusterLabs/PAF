@@ -1,7 +1,7 @@
-%global _tag v1.0.0
+%global _tag v1.0.1
 %global _ocfroot /usr/lib/ocf
 Name: resource-agents-paf
-Version: 1.0.0
+Version: 1.0.1
 Release: 1
 Summary: PostgreSQL resource agent for Pacemaker
 License: PostgreSQL
@@ -41,6 +41,20 @@ rm -f "%{buildroot}"/usr/local/lib64/perl5/auto/PAF/.packlist
 %{_datadir}/resource-agents/ocft/configs/pgsqlms
 
 %changelog
+* Wed Apr 27 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 1.0.1-1
+- 1.0.1 minor release
+- fix: forbid the master to decrease its own score (gh #19)
+- fix: bad LSN decimal converstion (gh #20)
+- fix: support PostgreSQL 9.5 controldata output (gh #12)
+- fix: set group id of given system_user before executing commands (gh #11)
+- fix: use long argument of external commands when possible
+- fix: bad header leading to wrong manpage section
+- fix: OCF tests when PostgreSQL does not listen in /tmp
+- change: do not update score outside of a monitor action (gh #18)
+- new: add parameter 'start_opts', usefull for debian and derivated (gh #11)
+- new: add specific timeout for master and slave roles in meta-data (gh #14)
+- new: add debian packaging related files
+
 * Wed Mar 02 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> 1.0.0-1
 - Official 1.0.0 release
 
