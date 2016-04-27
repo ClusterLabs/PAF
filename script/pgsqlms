@@ -549,7 +549,7 @@ sub _confirm_role {
             # The instance is a primary.
             ocf_log( 'debug', "_confirm_role: instance $OCF_RESOURCE_INSTANCE is a primary");
             # Check lsn diff with current slaves if any
-            _check_locations();
+            _check_locations() if $OCF_ACTION eq 'monitor';
             return $OCF_RUNNING_MASTER;
         }
 
