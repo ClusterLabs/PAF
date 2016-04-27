@@ -35,26 +35,6 @@ my $OCF_RESOURCE_INSTANCE = $ENV{'OCF_RESOURCE_INSTANCE'};
 my $OCF_ACTION            = $ARGV[0];
 my $OCF_PRIMARY_NODE      = $ENV{'OCF_RESKEY_primary_node'} || '';
 
-my $OCF_notify_type           = $ENV{'OCF_RESKEY_CRM_meta_notify_type'}              || '';
-my $OCF_notify_operation      = $ENV{'OCF_RESKEY_CRM_meta_notify_operation'}         || '';
-my $OCF_notify_active_rsc     = $ENV{'OCF_RESKEY_CRM_meta_notify_active_resource'}   || '';
-my $OCF_notify_inactive_rsc   = $ENV{'OCF_RESKEY_CRM_meta_notify_inactive_resource'} || '';
-my $OCF_notify_master_rsc     = $ENV{'OCF_RESKEY_CRM_meta_notify_master_resource'}   || '';
-my $OCF_notify_slave_rsc      = $ENV{'OCF_RESKEY_CRM_meta_notify_slave_resource'}    || '';
-my $OCF_notify_start_rsc      = $ENV{'OCF_RESKEY_CRM_meta_notify_start_resource'}    || '';
-my $OCF_notify_stop_rsc       = $ENV{'OCF_RESKEY_CRM_meta_notify_stop_resource'}     || '';
-my $OCF_notify_promote_rsc    = $ENV{'OCF_RESKEY_CRM_meta_notify_promote_resource'}  || '';
-my $OCF_notify_demote_rsc     = $ENV{'OCF_RESKEY_CRM_meta_notify_demote_resource'}   || '';
-my $OCF_notify_start_uname    = $ENV{'OCF_RESKEY_CRM_meta_notify_start_uname'}       || '';
-my $OCF_notify_stop_uname     = $ENV{'OCF_RESKEY_CRM_meta_notify_stop_uname'}        || '';
-my $OCF_notify_promote_uname  = $ENV{'OCF_RESKEY_CRM_meta_notify_promote_uname'}     || '';
-my $OCF_notify_demote_uname   = $ENV{'OCF_RESKEY_CRM_meta_notify_demote_uname'}      || '';
-my $OCF_notify_active_uname   = $ENV{'OCF_RESKEY_CRM_meta_notify_active_uname'}      || '';
-my $OCF_notify_inactive_uname = $ENV{'OCF_RESKEY_CRM_meta_notify_inactive_uname'}    || '';
-my $OCF_notify_master_uname   = $ENV{'OCF_RESKEY_CRM_meta_notify_master_uname'}      || '';
-my $OCF_notify_slave_uname    = $ENV{'OCF_RESKEY_CRM_meta_notify_slave_uname'}       || '';
-my $OCF_notify_type_op        = "$OCF_notify_type-$OCF_notify_operation";
-
 # Default parameters values
 my $system_user_default = "postgres";
 my $bindir_default      = "/usr/bin";
@@ -517,7 +497,8 @@ sub _check_locations {
     }
 
     # Finally set the master score if not already done
-    $node_score = qx{ $CRM_MASTER --quiet --query };
+    ## WARNING, 201604-27: --query is not supported by crm_master!
+    $node_score = qx{ $CRM_MASTER --quiet -G };
     chomp $node_score;
     qx{ $CRM_MASTER --update 1001 } if $node_score != 1001;
 
@@ -1452,33 +1433,25 @@ sub pgsql_promote {
 # (post) other actions, like promote, start, ...
 #
 sub pgsql_notify {
-    ocf_log( 'debug', "pgsql_notify: Received $OCF_notify_type_op notification");
-    ocf_log( 'debug', "pgsql_notify: active_resource: $OCF_notify_active_rsc");
-    ocf_log( 'debug', "pgsql_notify: inactive_resource: $OCF_notify_inactive_rsc");
-    ocf_log( 'debug', "pgsql_notify: master_resource: $OCF_notify_master_rsc");
-    ocf_log( 'debug', "pgsql_notify: slave_resource: $OCF_notify_slave_rsc");
-    ocf_log( 'debug', "pgsql_notify: start_resource: $OCF_notify_start_rsc");
-    ocf_log( 'debug', "pgsql_notify: stop_resource: $OCF_notify_stop_rsc");
-    ocf_log( 'debug', "pgsql_notify: promote_resource: $OCF_notify_promote_rsc");
-    ocf_log( 'debug', "pgsql_notify: demote_resource: $OCF_notify_demote_rsc");
-    ocf_log( 'debug', "pgsql_notify: start_uname: $OCF_notify_start_uname");
-    ocf_log( 'debug', "pgsql_notify: stop_uname: $OCF_notify_stop_uname");
-    ocf_log( 'debug', "pgsql_notify: promote_uname: $OCF_notify_promote_uname");
-    ocf_log( 'debug', "pgsql_notify: demote_uname: $OCF_notify_demote_uname");
-    ocf_log( 'debug', "pgsql_notify: active_uname: $OCF_notify_active_uname");
-    ocf_log( 'debug', "pgsql_notify: inactive_uname: $OCF_notify_inactive_uname");
-    ocf_log( 'debug', "pgsql_notify: master_uname: $OCF_notify_master_uname");
-    ocf_log( 'debug', "pgsql_notify: slave_uname: $OCF_notify_slave_uname");
+    my %notify_env = ocf_notify_env();
+    my $type_op;
+
+    ocf_log( 'debug', sprintf "pgsql_notify: environment variables: %s",
+        Data::Dumper->new( [ \%notify_env ] )->Sortkeys(1)->Terse(1)->Dump );
+
+    return unless %notify_env;
+
+    $type_op = "$notify_env{'type'}-$notify_env{'operation'}";
 
     # This action is called when a failing master has been considered
     # unreclaimable, which triggers a promotion.
     # As every "notify" action, it is executed simultaneously on all available
     # nodes.
-    if ( $OCF_notify_type_op eq 'pre-promote' ) {
+    if ( $type_op eq 'pre-promote' ) {
 
         ocf_log( 'info', sprintf
             'pgsql_notify: promoting instance on node "%s"',
-            $OCF_notify_promote_uname );
+            $notify_env{'promote'}[0]{'uname'} );
 
         # record the current LSN location.
         # During the following promote action, pgsql_promote will use this
@@ -1519,10 +1492,10 @@ sub pgsql_notify {
     }
 
     # This action is called after a promote action succeeded.
-    elsif ( $OCF_notify_type_op eq 'post-promote' ) {
+    elsif ( $type_op eq 'post-promote' ) {
         ocf_log( 'info',
             sprintf'pgsql_notify: instance on node "%s" has been promoted',
-            $OCF_notify_promote_uname );
+            $notify_env{'promote'}[0]{'uname'} );
         # We have a new master (or the previous one recovered).
         # Delete "lsn_location" values on all nodes
         qx{ $CRM_ATTRIBUTE --node "$nodename" --name lsn_location --delete };
