@@ -106,6 +106,7 @@ BEGIN {
         ocf_ver_complete_level
         ocf_version_cmp
         ocf_local_nodename
+        ocf_notify_env
     );
     our @EXPORT_OK = ( @EXPORT );
 }
@@ -437,6 +438,61 @@ sub ocf_local_nodename {
     return $nodename;
 }
 
+# Parse and returns the notify environment variables in a convenient structure
+# Returns undef if the action is not a notify
+# Returns undef if the resource is neither a clone or a multistate one
+sub ocf_notify_env {
+    my $i;
+    my %notify_env;
+
+    return undef unless $__OCF_ACTION eq 'notify';
+
+    return undef unless ocf_is_clone() or ocf_is_ms();
+
+    %notify_env = (
+        'type'       => $ENV{'OCF_RESKEY_CRM_meta_notify_type'}      || '',
+        'operation'  => $ENV{'OCF_RESKEY_CRM_meta_notify_operation'} || '',
+        'active'     => [ ],
+        'inactive'   => [ ],
+        'start'      => [ ],
+        'stop'       => [ ],
+    );
+
+    for my $action ( qw{ active inactive start stop } ) {
+        next unless
+                defined $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_resource"}
+            and defined $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
+
+        $i = 0;
+        $notify_env{ $action }[$i++]{'rsc'} = $_ foreach split /\s+/ =>
+            $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_resource"};
+
+        $i = 0;
+        $notify_env{ $action }[$i++]{'uname'} = $_ foreach split /\s+/ =>
+            $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
+    }
+
+    # exit if the resource is not a mutistate one
+    return %notify_env unless ocf_is_ms();
+
+    for my $action ( qw{ master slave promote demote } ) {
+        $notify_env{ $action } = [ ];
+
+        next unless
+                defined $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_resource"}
+            and defined $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
+
+        $i = 0;
+        $notify_env{ $action }[$i++]{'rsc'} = $_ foreach split /\s+/ =>
+            $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_resource"};
+
+        $i = 0;
+        $notify_env{ $action }[$i++]{'uname'} = $_ foreach split /\s+/ =>
+            $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
+    }
+
+    return %notify_env;
+}
 
 $__OCF_ACTION = $ARGV[0];
 
