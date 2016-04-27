@@ -33,7 +33,6 @@ our $PROGRAM = 'pgsqlms';
 # OCF environment
 my $OCF_RESOURCE_INSTANCE = $ENV{'OCF_RESOURCE_INSTANCE'};
 my $OCF_ACTION            = $ARGV[0];
-my $OCF_PRIMARY_NODE      = $ENV{'OCF_RESKEY_primary_node'} || '';
 
 # Default parameters values
 my $system_user_default = "postgres";
@@ -386,16 +385,6 @@ sub _check_locations {
     # point.
     my $partition_nodes = qx{ $CRM_NODE --partition };
 
-    # If the primary node attribute has not been set, then no promotion has
-    # occurred yet, so we do not need to check locations yet.
-    if ( $OCF_PRIMARY_NODE eq '' ) {
-        ocf_log( 'debug',
-            '_check_locations: primary_node attribute not set, there was probably no promotion yet'
-        );
-
-        return $OCF_SUCCESS;
-    }
-
     # We check locations of connected standbies by querying the
     # "pg_stat_replication" view.
     # The row_number applies on the result set ordered on write_location ASC so
@@ -722,16 +711,6 @@ sub ocf_meta_data {
               <content type="string" default="$start_opts_default" />
             </parameter>
 
-            <parameter name="primary_node" unique="0" required="0">
-              <longdesc lang="en">
-                Name of the node hosting the current master state.
-                This parameter is for internal use only, do not configure it
-                during cluster setup.
-              </longdesc>
-              <shortdesc lang="en">Internal use only</shortdesc>
-              <content type="string" default="" />
-            </parameter>
-
           </parameters>
           <actions>
             <action name="start" timeout="60" />
@@ -931,20 +910,10 @@ sub pgsql_start {
             ocf_log( 'info',  sprintf'pgsql_start: instance "%s" started',
                 $OCF_RESOURCE_INSTANCE );
 
-            # If the action is actually a start, set the promotion score to 1
-            # so one node can be promoted at cluster startup.
-            # HINT: use a location preference in your conf!
-            if ( $OCF_ACTION eq "start" ) {
-                # In case of recovery for a primary, some versions of Pacemaker
-                # do a demote->stop->start->promote sequence. We do not want
-                # the recovered primary to decrease its score to 1 in this
-                # scenario.
-                unless ( $nodename eq $OCF_PRIMARY_NODE ) {
-                    # Set master score to 1 so the node can be promoted.
-                    ocf_log( 'debug', "pgsql_start: instance started as a secondary, set master score to 1.");
-                    qx{ $CRM_MASTER --update 1 };
-                }
-            }
+            # TODO: When starting the cluster for the very first time, no
+            # instance has a promotion score. We should probably set a score
+            # either or during post-start so the cluster can elect one of slaves
+            # if the cluster setup has no location constraint for the master.
 
             return $OCF_SUCCESS;
         }
@@ -1289,13 +1258,10 @@ sub pgsql_promote {
     # At this point, the instance **MUST** be started as a secondary.
     #
 
-    # If "primary_node" resource attribute has not been set, the cluster is
-    # starting up, no need to compare secondaries.
-    #
-    # If the "primary_node" parameter is the current node being promoted, this
-    # is a recover action trying to get back the old master. In this case, we
-    # do not want to compare its LSN with the other secondary instances.
-    unless ( $OCF_PRIMARY_NODE eq '' or $OCF_PRIMARY_NODE eq $nodename ) {
+    # Do not check for a better candidate if we try to recover the master
+    # Recover of a master is detected during the pre-promote action. It sets the
+    # private attribute 'recover_master' to '1' if this is a master recover.
+    unless ( _get_priv_attrd_value( 'recover_master' ) eq '1' ) {
 
         # The promotion is occurring on the best known candidate (highest
         # master score), as chosen by pacemaker during the last working monitor
@@ -1413,35 +1379,15 @@ sub pgsql_promote {
 
     # The instance promotion is asynchronous, so we need to wait for this
     # process to complete.
-    while ( ( $rc = pgsql_monitor() ) != $OCF_RUNNING_MASTER ) {
+    while ( pgsql_monitor() != $OCF_RUNNING_MASTER ) {
         ocf_log( 'debug',
             'pgsql_promote: waiting for the promote to complete' );
         sleep 1;
     }
 
-    ocf_log( 'debug',
-        'pgsql_promote: promote completed according to the monitor return code' );
+    ocf_log( 'info', 'pgsql_promote: promote complete' );
 
-    $rc = pgsql_monitor();
-
-    if ( $rc == $OCF_RUNNING_MASTER ) {
-        ocf_log( 'info', 'pgsql_promote: promote complete' );
-
-        # Set the "primary_node" resource parameter to the promoted node name.
-        qx{ $CRM_RESOURCE --resource $OCF_RESOURCE_INSTANCE \\
-            --set-parameter primary_node --parameter-value "$nodename" };
-        ocf_log( 'debug', 'pgsql_promote: primary_node set' );
-
-        # Set master score to 1001 for this node so it sticks to this role.
-        qx{ $CRM_MASTER --update 1001 };
-
-        ocf_log( 'debug', 'pgsql_promote: crm_master to 1001 done' );
-
-        return $OCF_SUCCESS;
-    }
-
-    ocf_log( 'err', 'pgsql_promote: error while promoting' );
-    return $OCF_ERR_GENERIC;
+    return $OCF_SUCCESS;
 }
 
 # Notify type actions, called on all available nodes before (pre) and after
@@ -1459,50 +1405,58 @@ sub pgsql_notify {
     $type_op = "$notify_env{'type'}-$notify_env{'operation'}";
 
     # This action is called when a failing master has been considered
-    # unreclaimable, which triggers a promotion.
+    # unreclaimable or a master new master must be promoted (switchover or
+    # first start) which triggers a promotion.
     # As every "notify" action, it is executed simultaneously on all available
     # nodes.
     if ( $type_op eq 'pre-promote' ) {
+        my @rs;
+        my $rc;
+        my $node_lsn;
 
         ocf_log( 'info', sprintf
             'pgsql_notify: promoting instance on node "%s"',
             $notify_env{'promote'}[0]{'uname'} );
 
-        # record the current LSN location.
+        # Environment cleanup!
+        qx{ $ATTRD_PRIV --name lsn_location --delete };
+        qx{ $ATTRD_PRIV --name recover_master --delete };
+
+        # Keep track of the current LSN location in private attribute
+        # lsn_location.
+        #
         # During the following promote action, pgsql_promote will use this
         # information to check if the instance to be promoted is the best one,
         # so we can avoid a race condition between the last successful monitor
         # on the previous master and the current promotion.
 
-        # If this is the first promotion, "OCF_PRIMARY_NODE" will not be set,
-        # thus there is no point to record locations.
-        if ( $OCF_PRIMARY_NODE ne '' ) {
-            my @rs;
-            my $rc;
-            my $node_lsn;
 
-            $rc = _query( 'SELECT pg_last_xlog_receive_location()', \@rs );
+        $rc = _query( 'SELECT pg_last_xlog_receive_location()', \@rs );
 
-            unless ( $rc == 0 ) {
-                ocf_log( 'warning',
-                    'pgsql_notify: could not query the current node LSN' );
-                # FIXME we should specify the return code at this point, OCF_SUCCESS ?
-                return;
-            }
-
-            $node_lsn = $rs[0][0];
-
-            ocf_log( 'info', sprintf 'pgsql_notify: current node LSN: %s',
-                $node_lsn );
-
-            # Set the "lsn_location" attribute value for this node so we can use it
-            # during the following "promote" action.
-            qx{ $ATTRD_PRIV --name lsn_location --update "$node_lsn" };
-
-            ocf_log( 'warning', sprintf
-                'pgsql_notify: could not set the current node LSN' )
-                if $? != 0 ;
+        unless ( $rc == 0 ) {
+            ocf_log( 'warning',
+                'pgsql_notify: could not query the current node LSN' );
+            # Return code are ignored during notifications...
+            return $OCF_SUCCESS;
         }
+
+        $node_lsn = $rs[0][0];
+
+        ocf_log( 'info', sprintf 'pgsql_notify: current node LSN: %s',
+            $node_lsn );
+
+        # Set the "lsn_location" attribute value for this node so we can use it
+        # during the following "promote" action.
+        qx{ $ATTRD_PRIV --name lsn_location --update "$node_lsn" };
+
+        ocf_log( 'warning', sprintf
+            'pgsql_notify: could not set the current node LSN' )
+            if $? != 0 ;
+
+        # check if this is a recover of the master
+        qx{ $ATTRD_PRIV --name recover_master --update 1 } if
+            grep { $_->{'uname'} eq $nodename } @{ $notify_env{'master'} }
+            and grep { $_->{'uname'} eq $nodename } @{ $notify_env{'promote'} };
     }
 
     # This action is called after a promote action succeeded.
@@ -1511,8 +1465,9 @@ sub pgsql_notify {
             sprintf'pgsql_notify: instance on node "%s" has been promoted',
             $notify_env{'promote'}[0]{'uname'} );
         # We have a new master (or the previous one recovered).
-        # Delete "lsn_location" values on all nodes
+        # Environment cleanup!
         qx{ $ATTRD_PRIV --name lsn_location --delete };
+        qx{ $ATTRD_PRIV --name recover_master --delete };
     }
 
     return $OCF_SUCCESS;
