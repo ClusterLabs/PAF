@@ -1342,7 +1342,7 @@ sub pgsql_promote {
 
         # convert location to decimal
         ($wal_num, $wal_off) = split m@/@ => $max_lsn;
-        $max_lsn_dec = (hex('ff000000') * hex($wal_num)) + hex($wal_off);
+        $max_lsn_dec = ( 4294967296 * hex( $wal_num ) ) + hex( $wal_off );
 
         ocf_log( 'debug', sprintf
             'pgsql_promote: current node lsn location: %s(%s)',
@@ -1370,7 +1370,7 @@ sub pgsql_promote {
 
             # convert location to decimal
             ($wal_num, $wal_off) = split m@/@ => $node_lsn;
-            $node_lsn_dec = (hex('ff000000') * hex($wal_num)) + hex($wal_off);
+            $node_lsn_dec = ( 4294967296 * hex( $wal_num ) ) + hex( $wal_off );
 
             ocf_log( 'debug', sprintf
                 'pgsql_promote: comparing with "%s": lsn is %s(%s)',
