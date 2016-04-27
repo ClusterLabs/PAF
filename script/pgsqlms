@@ -376,6 +376,7 @@ sub _query {
 #
 sub _check_locations {
     my $best_candidate;
+    my $node_score;
     my $row_num;
     my $row;
     my $query;
@@ -438,11 +439,16 @@ sub _check_locations {
     # rule: the first known node/application, with the highest priority and
     # with an acceptable state.
     while ( $row = shift @rs ) {
-        my $node_score;
 
         if ( $partition_nodes !~ /$row->[0]/ ) {
             ocf_log( 'info', sprintf
                 '_check_locations: ignoring unknown application_name/node "%s"', $row->[0] );
+            next;
+        }
+
+        if ( $row->[0] eq $nodename ) {
+            ocf_log( 'warning', sprintf
+                '_check_locations: streaming replication with myself!' );
             next;
         }
 
@@ -510,6 +516,10 @@ sub _check_locations {
         qx{ $CRM_MASTER --node "$node" --update 0 };
     }
 
+    # Finally set the master score if not already done
+    $node_score = qx{ $CRM_MASTER --quiet --query };
+    chomp $node_score;
+    qx{ $CRM_MASTER --update 1001 } if $node_score != 1001;
     return $OCF_SUCCESS;
 }
 
