@@ -59,15 +59,34 @@ my $PGPSQL     = "$bindir/psql";
 my $PGCTRLDATA = "$bindir/pg_controldata";
 my $PGISREADY  = "$bindir/pg_isready";
 
-# crm* commands path
+# pacemaker commands path
 my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime reboot";
 my $CRM_ATTRIBUTE = "$HA_SBIN_DIR/crm_attribute --lifetime reboot --type status";
 my $CRM_NODE      = "$HA_SBIN_DIR/crm_node";
 my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
+my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
 
 # Global vars
 my $nodename;
 my $exit_code = 0;
+
+# Get, parse and return the value of the given private attribute name
+# Returns an empty string if not found.
+sub _get_priv_attrd_value {
+    my ( $name, $node ) = @_;
+    my $ans;
+
+    $node = '' unless defined $node;
+    $node = "--node $node" if $node ne '';
+
+    $ans = qx{ $ATTRD_PRIV --name $name $node --query };
+
+    $ans =~ m/^name=".*" host=".*" value="(.*)"$/;
+
+    return $1 if defined $1;
+
+    return '';
+}
 
 # Run the given command as the "system_user" given as parameter.
 # It basically forks and seteuid/setuid away from root.
@@ -1306,10 +1325,9 @@ sub pgsql_promote {
         # Get the "lsn_location" attribute value for the current node, as set
         # during the "pre-promote" action.
         # It should be the greatest among the secondary instances.
-        $max_lsn = qx{ $CRM_ATTRIBUTE -q --node $nodename \\
-            --quiet --query --name lsn_location };
+        $max_lsn = _get_priv_attrd_value( 'lsn_location' );
 
-        if ( $? != 0 or not $max_lsn ) {
+        if ( $max_lsn eq '' ) {
             # This should not happen as the "lsn_location" attribute should have
             # been updated during the "pre-promote" action.
             ocf_log( 'crit',
@@ -1317,9 +1335,8 @@ sub pgsql_promote {
             return $OCF_ERR_GENERIC;
         }
 
-        chomp $max_lsn;
-
         # convert location to decimal
+        chomp $max_lsn;
         ($wal_num, $wal_off) = split m@/@ => $max_lsn;
         $max_lsn_dec = ( 4294967296 * hex( $wal_num ) ) + hex( $wal_off );
 
@@ -1334,10 +1351,9 @@ sub pgsql_promote {
 
             # Get the "lsn_location" attribute value for the node, as set during
             # the "pre-promote" action.
-            $node_lsn = qx{ $CRM_ATTRIBUTE -q --node "$node" \\
-                --query --name lsn_location };
+            $node_lsn = _get_priv_attrd_value( 'lsn_location', $node );
             
-            if ( $? != 0 or not $node_lsn ) {
+            if ( $node_lsn eq '' ) {
                 # This should not happen as the "lsn_location" attribute should
                 # have been updated during the "pre-promote" action.
                 ocf_log( 'crit',
@@ -1345,9 +1361,8 @@ sub pgsql_promote {
                 return $OCF_ERR_GENERIC;
             }
 
-            chomp $node_lsn;
-
             # convert location to decimal
+            chomp $node_lsn;
             ($wal_num, $wal_off) = split m@/@ => $node_lsn;
             $node_lsn_dec = ( 4294967296 * hex( $wal_num ) ) + hex( $wal_off );
 
@@ -1482,8 +1497,7 @@ sub pgsql_notify {
 
             # Set the "lsn_location" attribute value for this node so we can use it
             # during the following "promote" action.
-            qx{ $CRM_ATTRIBUTE --node "$nodename" \\
-                --name lsn_location --update "$node_lsn" };
+            qx{ $ATTRD_PRIV --name lsn_location --update "$node_lsn" };
 
             ocf_log( 'warning', sprintf
                 'pgsql_notify: could not set the current node LSN' )
@@ -1498,7 +1512,7 @@ sub pgsql_notify {
             $notify_env{'promote'}[0]{'uname'} );
         # We have a new master (or the previous one recovered).
         # Delete "lsn_location" values on all nodes
-        qx{ $CRM_ATTRIBUTE --node "$nodename" --name lsn_location --delete };
+        qx{ $ATTRD_PRIV --name lsn_location --delete };
     }
 
     return $OCF_SUCCESS;
