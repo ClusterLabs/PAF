@@ -80,8 +80,8 @@ my $PGCTRLDATA = "$bindir/pg_controldata";
 my $PGISREADY  = "$bindir/pg_isready";
 
 # crm* commands path
-my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master -l reboot";
-my $CRM_ATTRIBUTE = "$HA_SBIN_DIR/crm_attribute -l reboot -t status";
+my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime reboot";
+my $CRM_ATTRIBUTE = "$HA_SBIN_DIR/crm_attribute --lifetime reboot --type status";
 my $CRM_NODE      = "$HA_SBIN_DIR/crm_node";
 my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
 
