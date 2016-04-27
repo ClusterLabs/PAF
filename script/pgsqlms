@@ -520,6 +520,7 @@ sub _check_locations {
     $node_score = qx{ $CRM_MASTER --quiet --query };
     chomp $node_score;
     qx{ $CRM_MASTER --update 1001 } if $node_score != 1001;
+
     return $OCF_SUCCESS;
 }
 
@@ -535,8 +536,6 @@ sub _confirm_role {
     $rc = _query( "SELECT pg_is_in_recovery()", \@rs );
 
     $is_in_recovery = $rs[0][0];
-
-    ocf_log( 'debug', "_confirm_role: hard checking $is_in_recovery $rc");
 
     if ( $rc == 0 ) {
         # The query was executed, check the result.
@@ -778,7 +777,6 @@ sub pgsql_validate_all {
     my $PGVERSION;
     my $PGVERNUM;
     my @content;
-    my $nodename = ocf_local_nodename();
 
     # check binaries
     exit $OCF_ERR_INSTALLED unless -x $PGCTL and -x $PGPSQL
