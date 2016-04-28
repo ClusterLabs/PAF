@@ -1279,7 +1279,7 @@ sub pgsql_promote {
 
         # Exclude nodes that are known to be unavailable (not in the current
         # partition) using the "crm_node" command
-        my @partition_nodes = split /\s/ => qx{ $CRM_NODE --partition };
+        my @active_nodes    = split /\s+/ => _get_priv_attrd_value( 'nodes' );
         my $node_to_promote = '';
         my $max_lsn;
         my $node_lsn;
@@ -1311,7 +1311,7 @@ sub pgsql_promote {
             $max_lsn, $max_lsn_dec );
 
         # Now we compare with the other available nodes.
-        foreach my $node ( @partition_nodes ) {
+        foreach my $node ( @active_nodes ) {
             # We exclude the current node from the check.
             next if $node eq $nodename;
 
@@ -1413,6 +1413,8 @@ sub pgsql_notify {
         my @rs;
         my $rc;
         my $node_lsn;
+        my %active_nodes;
+        my $attr_nodes;
 
         ocf_log( 'info', sprintf
             'pgsql_notify: promoting instance on node "%s"',
@@ -1421,6 +1423,7 @@ sub pgsql_notify {
         # Environment cleanup!
         qx{ $ATTRD_PRIV --name lsn_location --delete };
         qx{ $ATTRD_PRIV --name recover_master --delete };
+        qx{ $ATTRD_PRIV --name nodes --delete };
 
         # Keep track of the current LSN location in private attribute
         # lsn_location.
@@ -1457,6 +1460,23 @@ sub pgsql_notify {
         qx{ $ATTRD_PRIV --name recover_master --update 1 } if
             grep { $_->{'uname'} eq $nodename } @{ $notify_env{'master'} }
             and grep { $_->{'uname'} eq $nodename } @{ $notify_env{'promote'} };
+
+        # If this node is the future master, keep track of the slaves that
+        # received the same notification to compare our LSN with them during
+        # promotion
+        if ( $notify_env{'promote'}[0]{'uname'} eq $nodename ) {
+            # build the list of active nodes:
+            #   master + slave + start - stop
+            $active_nodes{ $_->{'uname'} }++ foreach @{ $notify_env{'master'} };
+            $active_nodes{ $_->{'uname'} }++ foreach @{ $notify_env{'slave'} };
+            $active_nodes{ $_->{'uname'} }++ foreach @{ $notify_env{'start'} };
+            $active_nodes{ $_->{'uname'} }-- foreach @{ $notify_env{'stop'} };
+
+            $attr_nodes = join " "
+                => grep { $active_nodes{$_} > 0 } keys %active_nodes;
+
+            qx{ $ATTRD_PRIV --name nodes --update "$attr_nodes" };
+        }
     }
 
     # This action is called after a promote action succeeded.
@@ -1468,6 +1488,7 @@ sub pgsql_notify {
         # Environment cleanup!
         qx{ $ATTRD_PRIV --name lsn_location --delete };
         qx{ $ATTRD_PRIV --name recover_master --delete };
+        qx{ $ATTRD_PRIV --name nodes --delete };
     }
 
     return $OCF_SUCCESS;
