@@ -33,6 +33,7 @@ our $PROGRAM = 'pgsqlms';
 # OCF environment
 my $OCF_RESOURCE_INSTANCE = $ENV{'OCF_RESOURCE_INSTANCE'};
 my $OCF_ACTION            = $ARGV[0];
+my $OCF_RUNNING_SLAVE     = $OCF_SUCCESS;
 
 # Default parameters values
 my $system_user_default = "postgres";
@@ -85,6 +86,22 @@ sub _get_priv_attrd_value {
     return $1 if defined $1;
 
     return '';
+}
+
+# Check if the current transiation is a recover of a master clone on given node.
+sub _is_master_recover {
+    my ( $node, %notify_env ) = @_;
+
+    return grep { $_->{'uname'} eq $node } @{ $notify_env{'master'}  }
+       and grep { $_->{'uname'} eq $node } @{ $notify_env{'promote'} };
+}
+
+# Check if the current transiation is a recover of a slave clone on given node.
+sub _is_slave_recover {
+    my ( $node, %notify_env ) = @_;
+
+    return grep { $_->{'uname'} eq $node } @{ $notify_env{'slave'}  }
+       and grep { $_->{'uname'} eq $node } @{ $notify_env{'start'} };
 }
 
 # Run the given command as the "system_user" given as parameter.
@@ -146,6 +163,20 @@ sub _pg_ctl_status {
     #   3: postmaster.pid file does not exist OR it does but the process
     #      with the PID found in the file is not alive
     return $rc;
+}
+
+# Start the local instance using pg_ctl
+#
+sub _pg_ctl_start {
+    # wait for 24h for the server to start.
+    # this is probably too much, but starting a master in recovery
+    # might take some time depending on the server setup.
+    my @cmd = ( $PGCTL, '-D', $pgdata, '-w', '--timeout', 86400, 'start' );
+
+    push @cmd => ( '-o', $start_opts )
+        if $start_opts ne '';
+
+    return _runas( @cmd );
 }
 
 # Parse and return the current status of the local PostgreSQL instance as
@@ -863,13 +894,8 @@ sub pgsql_validate_all {
 # Start the PostgreSQL instance as a *secondary*
 #
 sub pgsql_start {
-    my $fh;
-    my $rc;
-    my $uid;
-    my $gid;
-    my @cmd = ( $PGCTL, '-D', $pgdata, '-w', 'start' );
+    my $rc = pgsql_monitor();
 
-    $rc = pgsql_monitor();
     # Instance must be running as secondary or being stopped.
     # Anything else is an error.
     if ( $rc == $OCF_SUCCESS ) {
@@ -892,14 +918,11 @@ sub pgsql_start {
         'pgsql_start: instance "%s" is not running, starting it as a secondary',
         $OCF_RESOURCE_INSTANCE );
 
-    push @cmd => ( '-o', $start_opts )
-        if $start_opts ne '';
-
     # Create recovery.conf from the template file.
     _create_recovery_conf();
 
     # Start the instance as a secondary.
-    $rc = _runas( @cmd );
+    $rc = _pg_ctl_start();
 
     if ( $rc == 0 ) {
 
@@ -1457,9 +1480,8 @@ sub pgsql_notify {
             if $? != 0 ;
 
         # check if this is a recover of the master
-        qx{ $ATTRD_PRIV --name recover_master --update 1 } if
-            grep { $_->{'uname'} eq $nodename } @{ $notify_env{'master'} }
-            and grep { $_->{'uname'} eq $nodename } @{ $notify_env{'promote'} };
+        qx{ $ATTRD_PRIV --name recover_master --update 1 }
+            if _is_master_recover( $nodename, %notify_env );
 
         # If this node is the future master, keep track of the slaves that
         # received the same notification to compare our LSN with them during
@@ -1479,7 +1501,7 @@ sub pgsql_notify {
         }
     }
 
-    # This action is called after a promote action succeeded.
+    # This action is called after a promote action.
     elsif ( $type_op eq 'post-promote' ) {
         ocf_log( 'info',
             sprintf'pgsql_notify: instance on node "%s" has been promoted',
@@ -1489,6 +1511,87 @@ sub pgsql_notify {
         qx{ $ATTRD_PRIV --name lsn_location --delete };
         qx{ $ATTRD_PRIV --name recover_master --delete };
         qx{ $ATTRD_PRIV --name nodes --delete };
+    }
+
+    # This is called before a demote occurs.
+    elsif ( $type_op eq 'pre-demote' ) {
+        my $rc;
+
+        # do nothing if the local node will not be demoted
+        return $OCF_SUCCESS unless
+            grep { $_->{'uname'} eq $nodename } @{ $notify_env{'demote'} };
+
+        $rc = pgsql_monitor();
+
+        # do nothing if this is not a master recovery
+        return $OCF_SUCCESS unless _is_master_recover( $nodename, %notify_env )
+                               and $rc == $OCF_FAILED_MASTER;
+
+        # in case of master crash, we need to detect if the CRM tries to recover
+        # the master clone. The usual transition is to do:
+        #   demote->stop->start->promote
+        #
+        # There are multiple flaws with this transition:
+        #  * the 1st and 2nd actions will fail because the instance is in
+        #    OCF_FAILED_MASTER step
+        #  * the usual start action is dangerous as the instance will start with
+        #    a recovery.conf instead of entering a normal recovery process
+        #
+        # To avoid this, we try to start the instance in recovery from here.
+        # If it success, at least it will be demoted correctly with a normal
+        # status. If it fails, it will be catched up in next steps.
+
+        ocf_log( 'info',  sprintf
+            'pgsql_notify: trying to start failing master "%s"...',
+            $OCF_RESOURCE_INSTANCE );
+
+        # Either the instance managed to start or it couldn't.
+        # We rely on the pg_ctk '-w' switch to take care of this. If it couldn't
+        # start, this error will be catched up later during the various checks
+        _pg_ctl_start();
+
+        ocf_log( 'info', sprintf
+            'pgsql_notify: state is "%s" after recovery attempt',
+            _controldata_state() );
+    }
+
+    # This is called before a stop occurs.
+    elsif ( $type_op eq 'pre-stop' ) {
+        my $rc;
+
+        # do nothing if the local node will not be stopped
+        return $OCF_SUCCESS unless
+            grep { $_->{'uname'} eq $nodename } @{ $notify_env{'stop'} };
+
+        $rc = _controldata();
+
+        # do nothing if this is not a slave recovery
+        return $OCF_SUCCESS unless _is_slave_recover( $nodename, %notify_env )
+                               and $rc == $OCF_RUNNING_SLAVE;
+
+        # in case of slave crash, we need to detect if the CRM tries to recover
+        # the slaveclone. The usual transition is to do: stop->start
+        #
+        # This transition can no twork because the instance is in
+        # OCF_ERR_GENERIC step. So the stop action will fail, leading most
+        # probably to fencing action.
+        #
+        # To avoid this, we try to start the instance in recovery from here.
+        # If it success, at least it will be stopped correctly with a normal
+        # status. If it fails, it will be catched up in next steps.
+
+        ocf_log( 'info',  sprintf
+            'pgsql_notify: trying to start failing slave "%s"...',
+            $OCF_RESOURCE_INSTANCE );
+
+        # Either the instance managed to start or it couldn't.
+        # We rely on the pg_ctk '-w' switch to take care of this. If it couldn't
+        # start, this error will be catched up later during the various checks
+        _pg_ctl_start();
+
+        ocf_log( 'info', sprintf
+            'pgsql_notify: state is "%s" after recovery attempt',
+            _controldata_state() );
     }
 
     return $OCF_SUCCESS;
