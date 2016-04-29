@@ -59,12 +59,14 @@ my $PGCTL      = "$bindir/pg_ctl";
 my $PGPSQL     = "$bindir/psql";
 my $PGCTRLDATA = "$bindir/pg_controldata";
 my $PGISREADY  = "$bindir/pg_isready";
+my $PGXLOGDUMP = "$bindir/pg_xlogdump";
 
 # pacemaker commands path
 my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime reboot";
 my $CRM_ATTRIBUTE = "$HA_SBIN_DIR/crm_attribute --lifetime reboot --type status";
 my $CRM_NODE      = "$HA_SBIN_DIR/crm_node";
 my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
+my $CRM_FAILCOUNT = "$HA_SBIN_DIR/crm_failcount";
 my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
 
 # Global vars
@@ -106,6 +108,23 @@ sub _is_slave_recover {
     return (
             scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'slave'} }
         and scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'start'} }
+    );
+}
+
+# check if th current transition is a switchover to the given node.
+sub _is_switchover {
+    my ( $n ) = @_;
+    my $old = $OCF_NOTIFY_ENV{'master'}[0]{'uname'};
+
+    return 0 if scalar @{ $OCF_NOTIFY_ENV{'master'} }  != 1
+             or scalar @{ $OCF_NOTIFY_ENV{'demote'} }  != 1
+             or scalar @{ $OCF_NOTIFY_ENV{'promote'} } != 1;
+
+    return (
+           scalar grep { $_->{'uname'} eq $old } @{ $OCF_NOTIFY_ENV{'demote'} }
+       and scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'slave'} }
+       and scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'promote'} }
+       and not scalar grep { $_->{'uname'} eq $old } @{ $OCF_NOTIFY_ENV{'stop'} }
     );
 }
 
@@ -364,7 +383,6 @@ sub _query {
     # parent
     $> = $oldeuid;
 
-    
     {
         local $/;
         $ans = <$KID>;
@@ -373,7 +391,7 @@ sub _query {
     close $KID;
     $rc = $? >> 8;
 
-    ocf_log( 'debug',  sprintf'_query: psql return code: %d', $rc);
+    ocf_log( 'debug',  sprintf '_query: psql return code: %d', $rc );
 
     if ( defined $ans ) {
         chop $ans;
@@ -999,7 +1017,6 @@ sub pgsql_stop {
         '-m', 'fast', 'stop' );
 
     if ( $rc == 0 ) {
-
         # Wait for the stop to finish.
         sleep 1 while ( $rc = pgsql_monitor() ) != $OCF_NOT_RUNNING ;
 
@@ -1293,6 +1310,15 @@ sub pgsql_promote {
         ocf_log( 'info',
             'pgsql_promote: recovering old master, no election needed');
     }
+    elsif ( _get_priv_attrd_value('cancel_switchover') eq '1' ) {
+        ocf_log( 'err',  sprintf
+            'pgsql_promote: switchover has been canceled from pre-promote action',
+        );
+
+        qx{ $ATTRD_PRIV --name cancel_switchover --delete };
+
+        return $OCF_ERR_GENERIC;
+    }
     else {
 
         # The promotion is occurring on the best known candidate (highest
@@ -1449,6 +1475,110 @@ sub pgsql_notify_pre_promote {
         return $OCF_SUCCESS;
     }
 
+    # Environment cleanup!
+    qx{ $ATTRD_PRIV --name lsn_location --delete };
+    qx{ $ATTRD_PRIV --name recover_master --delete };
+    qx{ $ATTRD_PRIV --name nodes --delete };
+    qx{ $ATTRD_PRIV --name cancel_switchover --delete };
+
+    # check for the last received entry of WAL from the master if we are
+    # the designated slave to promote
+    if ( _is_switchover( $nodename ) and scalar
+         grep { $_->{'uname'} eq $nodename } @{ $OCF_NOTIFY_ENV{'promote'} }
+    ) {
+        my $has_sht_chk = 0;
+        my $last_chk;
+        my $last_lsn;
+        my $ans;
+        my $tl;
+        my @rs;
+
+        ocf_log( 'info', sprintf
+            'pgsql_notify: switchover in progress from "%s" to "%s".'
+            .' Need to check the last record in WAL',
+            $OCF_NOTIFY_ENV{'demote'}[0]{'uname'}, $nodename );
+
+        # Force a checpoint to make sure the controldata shows the very last TL
+        _query( q{ CHECKPOINT }, {} );
+
+        # check if we received the shutdown checkpoint of the master during its
+        # demote process.
+        # We need the last local checkpoint LSN and the last received LSN from
+        # master to check in the WAL between these adresses if we have a
+        # "checkpoint shutdown" using pg_xlogdump.
+        $ans = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
+
+        # Get the latest known TL
+        $ans =~ m{^Latest checkpoint's TimeLineID:\s+(\d+)\s*$}m;
+        $tl  = $1 if defined $1;
+
+        # Get the latest local checkpoint
+        $ans =~ m{^Latest checkpoint's REDO location:\s+([0-9A-F/]+)\s*$}m;
+        $last_chk = $1 if defined $1;
+
+        # Get the last received LSN from master
+        $rc = _query( q{ SELECT pg_last_xlog_receive_location() }, \@rs );
+
+        if ( $rc != 0 ) {
+            ocf_log( 'err', sprintf
+                'pgsql_notify: could not query last_xlog_receive_location (%d)',
+                $rc );
+        }
+
+        $last_lsn = $rs[0][0] if defined $rs[0][0];
+
+        unless ( defined $tl and defined $last_chk and defined $last_lsn ) {
+            ocf_log( 'crit',
+                'pgsql_notify: could not read last checkpoint and timeline from controldata file!',
+            );
+
+            ocf_log( 'debug', sprintf
+                'pgsql_notify: XLOGDUMP parameters: pgdata:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
+                $pgdata, $last_chk, $tl, $last_lsn
+            );
+
+            # This is an extreme mesure, it shouldn't happen.
+            qx{ $CRM_FAILCOUNT --resource "$OCF_RESOURCE_INSTANCE" -v 1000000 };
+            return $OCF_ERR_INSTALLED;
+        }
+
+        # force a checkpoint on the slave to flush the master's
+        # shutdown checkpoint in the WAL
+
+        $ans = qx{ $PGXLOGDUMP --path "$pgdata" --timeline "$tl" \\
+                   --start "$last_chk" --end "$last_lsn" 2>&1 };
+        $rc = $?;
+
+        ocf_log( 'debug', sprintf
+            'pgsql_notify: XLOGDUMP rc: "%s", tl: "%s", last_chk: %s, last_lsn: %s, output: "%s"',
+            $rc, $tl, $last_chk, $last_lsn, $ans
+        );
+
+        if ( $rc == 0 and
+             $ans =~ m{^rmgr: XLOG.*desc: checkpoint: redo [0-9A-F/]+; tli $tl;.*; shutdown$}m
+        ) {
+            ocf_log( 'info', sprintf
+                'pgsql_notify: slave received the shutdown checkpoint',
+                _controldata_state() );
+
+            # No return here. On success keep going with the election
+            # process in case the switchover was instruct to the wrong node.
+            # FIXME: should we allow a switchover to a lagging slave?
+        }
+        else {
+            qx{ $ATTRD_PRIV --name cancel_switchover --update 1 };
+
+            ocf_log( 'info', sprintf
+                'pgsql_notify: did not received the shutdown checkpoint from the old master!',
+                $?, $ans
+            );
+
+            # Shortcut the election process as the switchover will be
+            # canceled
+            return $OCF_SUCCESS;
+        }
+    }
+
 
     # We need to trigger an election between existing slaves to promote the best
     # one based on its current LSN location. We keep track of the current LSN
@@ -1458,11 +1588,6 @@ sub pgsql_notify_pre_promote {
     # information to check if the instance to be promoted is the best one,
     # so we can avoid a race condition between the last successful monitor
     # on the previous master and the current promotion.
-
-    # Environment cleanup!
-    qx{ $ATTRD_PRIV --name lsn_location --delete };
-    qx{ $ATTRD_PRIV --name recover_master --delete };
-    qx{ $ATTRD_PRIV --name nodes --delete };
 
     $rc = _query( 'SELECT pg_last_xlog_receive_location()', \@rs );
 
@@ -1514,6 +1639,7 @@ sub pgsql_notify_post_promote {
     qx{ $ATTRD_PRIV --name lsn_location --delete };
     qx{ $ATTRD_PRIV --name recover_master --delete };
     qx{ $ATTRD_PRIV --name nodes --delete };
+    qx{ $ATTRD_PRIV --name cancel_switchover --delete };
 
     return $OCF_SUCCESS;
 }
@@ -1617,10 +1743,10 @@ sub pgsql_notify {
     $type_op = "$OCF_NOTIFY_ENV{'type'}-$OCF_NOTIFY_ENV{'operation'}";
 
     for ( $type_op ) {
-        if    ( /^pre-promote$/  ) { pgsql_notify_pre_promote()  }
-        elsif ( /^post-promote$/ ) { pgsql_notify_post_promote() }
-        elsif ( /^pre-demote$/   ) { pgsql_notify_pre_demote()   }
-        elsif ( /^pre-stop$/     ) { pgsql_notify_pre_stop()     }
+        if    ( /^pre-promote$/  ) { return pgsql_notify_pre_promote()  }
+        elsif ( /^post-promote$/ ) { return pgsql_notify_post_promote() }
+        elsif ( /^pre-demote$/   ) { return pgsql_notify_pre_demote()   }
+        elsif ( /^pre-stop$/     ) { return pgsql_notify_pre_stop()     }
     }
 
     return $OCF_SUCCESS;
