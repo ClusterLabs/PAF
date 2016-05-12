@@ -499,7 +499,7 @@ sub _check_locations {
     # Finally set the master score if not already done
     $node_score = qx{ $CRM_MASTER --quiet --get-value };
     chomp $node_score;
-    qx{ $CRM_MASTER --update 1001 } if $node_score != 1001;
+    qx{ $CRM_MASTER --update 1001 } if $node_score eq '' or $node_score != 1001;
 
     return $OCF_SUCCESS;
 }
