@@ -1509,10 +1509,6 @@ sub pgsql_notify_pre_promote {
 # This action is called after a promote action.
 sub pgsql_notify_post_promote {
 
-    ocf_log( 'info',
-        sprintf'pgsql_notify: instance on node "%s" has been promoted',
-        $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} );
-
     # We have a new master (or the previous one recovered).
     # Environment cleanup!
     qx{ $ATTRD_PRIV --name lsn_location --delete };
