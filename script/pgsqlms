@@ -75,20 +75,54 @@ my $exit_code = 0;
 
 # Get, parse and return the value of the given private attribute name
 # Returns an empty string if not found.
-sub _get_priv_attrd_value {
+sub _get_priv_attr {
     my ( $name, $node ) = @_;
     my $ans;
 
     $node = '' unless defined $node;
     $node = "--node $node" if $node ne '';
 
-    $ans = qx{ $ATTRD_PRIV --name $name $node --query };
+    $ans = qx{ $ATTRD_PRIV --name "$name" $node --query };
 
     $ans =~ m/^name=".*" host=".*" value="(.*)"$/;
 
     return $1 if defined $1;
 
     return '';
+}
+
+# Set the given private attribute name to the given value
+# As setting an attribute is asynchronous, this will return as soon as the
+# attribute is really set by attrd and available.
+sub _set_priv_attr {
+    my ( $name, $val ) = @_;
+
+    qx{ $ATTRD_PRIV --name "$name" --update "$val" };
+
+    while ( _get_priv_attr( $name ) ne $val ) {
+        ocf_log( 'debug', sprintf '_set_priv_attr: waiting to set "%s"...',
+            $name );
+        select(undef, undef, undef, 0.1);
+    }
+
+    return;
+}
+
+# Delete the given private attribute.
+# As setting an attribute is asynchronous, this will return as soon as the
+# attribute is really deleted by attrd.
+sub _delete_priv_attr {
+    my ( $name ) = @_;
+
+    qx{ $ATTRD_PRIV --name "$name" --delete };
+
+    while ( _get_priv_attr( $name ) ne '' ) {
+        ocf_log( 'debug', sprintf '_delete_priv_attr: waiting to delete "%s"...',
+            $name );
+        select(undef, undef, undef, 0.1);
+    }
+
+    return;
 }
 
 # Check if the current transiation is a recover of a master clone on given node.
@@ -1306,16 +1340,16 @@ sub pgsql_promote {
     # Do not check for a better candidate if we try to recover the master
     # Recover of a master is detected during the pre-promote action. It sets the
     # private attribute 'recover_master' to '1' if this is a master recover.
-    if ( _get_priv_attrd_value( 'recover_master' ) eq '1' ) {
+    if ( _get_priv_attr( 'recover_master' ) eq '1' ) {
         ocf_log( 'info',
             'pgsql_promote: recovering old master, no election needed');
     }
-    elsif ( _get_priv_attrd_value('cancel_switchover') eq '1' ) {
+    elsif ( _get_priv_attr('cancel_switchover') eq '1' ) {
         ocf_log( 'err',  sprintf
             'pgsql_promote: switchover has been canceled from pre-promote action',
         );
 
-        qx{ $ATTRD_PRIV --name cancel_switchover --delete };
+        _delete_priv_attr( 'cancel_switchover' );
 
         return $OCF_ERR_GENERIC;
     }
@@ -1337,7 +1371,7 @@ sub pgsql_promote {
 
         # Exclude nodes that are known to be unavailable (not in the current
         # partition) using the "crm_node" command
-        my @active_nodes    = split /\s+/ => _get_priv_attrd_value( 'nodes' );
+        my @active_nodes    = split /\s+/ => _get_priv_attr( 'nodes' );
         my $node_to_promote = '';
         my $max_lsn;
         my $node_lsn;
@@ -1349,7 +1383,7 @@ sub pgsql_promote {
         # Get the "lsn_location" attribute value for the current node, as set
         # during the "pre-promote" action.
         # It should be the greatest among the secondary instances.
-        $max_lsn = _get_priv_attrd_value( 'lsn_location' );
+        $max_lsn = _get_priv_attr( 'lsn_location' );
 
         if ( $max_lsn eq '' ) {
             # This should not happen as the "lsn_location" attribute should have
@@ -1375,7 +1409,7 @@ sub pgsql_promote {
 
             # Get the "lsn_location" attribute value for the node, as set during
             # the "pre-promote" action.
-            $node_lsn = _get_priv_attrd_value( 'lsn_location', $node );
+            $node_lsn = _get_priv_attr( 'lsn_location', $node );
             
             if ( $node_lsn eq '' ) {
                 # This should not happen as the "lsn_location" attribute should
@@ -1469,17 +1503,17 @@ sub pgsql_notify_pre_promote {
         ocf_log( 'warning',
             'pgsql_notify: This is a master recovery!' );
 
-        qx{ $ATTRD_PRIV --name recover_master --update 1 }
+        _set_priv_attr( 'recover_master', '1' )
             if $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} eq $nodename;
 
         return $OCF_SUCCESS;
     }
 
     # Environment cleanup!
-    qx{ $ATTRD_PRIV --name lsn_location --delete };
-    qx{ $ATTRD_PRIV --name recover_master --delete };
-    qx{ $ATTRD_PRIV --name nodes --delete };
-    qx{ $ATTRD_PRIV --name cancel_switchover --delete };
+    _delete_priv_attr( 'lsn_location'      );
+    _delete_priv_attr( 'recover_master'    );
+    _delete_priv_attr( 'nodes'             );
+    _delete_priv_attr( 'cancel_switchover' );
 
     # check for the last received entry of WAL from the master if we are
     # the designated slave to promote
@@ -1566,7 +1600,7 @@ sub pgsql_notify_pre_promote {
             # FIXME: should we allow a switchover to a lagging slave?
         }
         else {
-            qx{ $ATTRD_PRIV --name cancel_switchover --update 1 };
+            _set_priv_attr( 'cancel_switchover', '1' );
 
             ocf_log( 'info', sprintf
                 'pgsql_notify: did not received the shutdown checkpoint from the old master!',
@@ -1605,7 +1639,7 @@ sub pgsql_notify_pre_promote {
 
     # Set the "lsn_location" attribute value for this node so we can use it
     # during the following "promote" action.
-    qx{ $ATTRD_PRIV --name lsn_location --update "$node_lsn" };
+    _set_priv_attr( 'lsn_location', $node_lsn );
 
     ocf_log( 'warning', sprintf
         'pgsql_notify: could not set the current node LSN' )
@@ -1625,7 +1659,7 @@ sub pgsql_notify_pre_promote {
         $attr_nodes = join " "
             => grep { $active_nodes{$_} > 0 } keys %active_nodes;
 
-        qx{ $ATTRD_PRIV --name nodes --update "$attr_nodes" };
+        _set_priv_attr( 'nodes', $attr_nodes );
     }
 
     return $OCF_SUCCESS;
@@ -1636,10 +1670,10 @@ sub pgsql_notify_post_promote {
 
     # We have a new master (or the previous one recovered).
     # Environment cleanup!
-    qx{ $ATTRD_PRIV --name lsn_location --delete };
-    qx{ $ATTRD_PRIV --name recover_master --delete };
-    qx{ $ATTRD_PRIV --name nodes --delete };
-    qx{ $ATTRD_PRIV --name cancel_switchover --delete };
+    _delete_priv_attr( 'lsn_location'      );
+    _delete_priv_attr( 'recover_master'    );
+    _delete_priv_attr( 'nodes'             );
+    _delete_priv_attr( 'cancel_switchover' );
 
     return $OCF_SUCCESS;
 }
