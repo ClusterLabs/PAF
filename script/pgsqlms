@@ -1492,9 +1492,6 @@ sub pgsql_notify {
 
     # This action is called after a promote action succeeded.
     elsif ( $type_op eq 'post-promote' ) {
-        ocf_log( 'info',
-            sprintf'pgsql_notify: instance on node "%s" has been promoted',
-            $notify_env{'promote'}[0]{'uname'} );
         # We have a new master (or the previous one recovered).
         # Delete "lsn_location" values on all nodes
         qx{ $CRM_ATTRIBUTE --node "$nodename" --name lsn_location --delete };
