@@ -601,6 +601,104 @@ sub _check_locations {
     return $OCF_SUCCESS;
 }
 
+# _check_switchover
+# check if the pgsql switchover to the localnode is safe.
+# This is supposed to be called **after** the master has been stopped or demote.
+# This sub check if the local standby received the shutdown checkpoint from the
+# old master to make sure it can take over the master role and the old master
+# will be able to catchup as a standby after.
+#
+# Returns 0 if switchover is safe
+# Returns 1 if swithcover is not safe
+# Returns 2 for internal error
+sub _check_switchover {
+    my $has_sht_chk = 0;
+    my $last_chk;
+    my $last_lsn;
+    my $ans;
+    my $rc;
+    my $tl;
+    my @rs;
+
+    ocf_log( 'info', sprintf
+        '_check_switchover: switchover in progress from "%s" to "%s".'
+        .' Need to check the last record in WAL',
+        $OCF_NOTIFY_ENV{'demote'}[0]{'uname'}, $nodename );
+
+    # Force a checpoint to make sure the controldata shows the very last TL
+    _query( q{ CHECKPOINT }, {} );
+
+    # check if we received the shutdown checkpoint of the master during its
+    # demote process.
+    # We need the last local checkpoint LSN and the last received LSN from
+    # master to check in the WAL between these adresses if we have a
+    # "checkpoint shutdown" using pg_xlogdump.
+    $ans = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
+
+    # Get the latest known TL
+    $ans =~ m{^Latest checkpoint's TimeLineID:\s+(\d+)\s*$}m;
+    $tl  = $1 if defined $1;
+
+    # Get the latest local checkpoint
+    $ans =~ m{^Latest checkpoint's REDO location:\s+([0-9A-F/]+)\s*$}m;
+    $last_chk = $1 if defined $1;
+
+    # Get the last received LSN from master
+    $rc = _query( q{ SELECT pg_last_xlog_receive_location() }, \@rs );
+
+    if ( $rc != 0 ) {
+        ocf_log( 'err', sprintf
+            '_check_switchover: could not query last_xlog_receive_location (%d)',
+            $rc );
+        return 2;
+    }
+
+    $last_lsn = $rs[0][0] if defined $rs[0][0];
+
+    unless ( defined $tl and defined $last_chk and defined $last_lsn ) {
+        ocf_log( 'crit',
+            '_check_switchover: could not read last checkpoint and timeline from controldata file!',
+        );
+
+        ocf_log( 'debug', sprintf
+            '_check_switchover: XLOGDUMP parameters: pgdata:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
+            $pgdata, $last_chk, $tl, $last_lsn
+        );
+
+        return 2;
+    }
+
+    # force a checkpoint on the slave to flush the master's
+    # shutdown checkpoint in the WAL
+
+    $ans = qx{ $PGXLOGDUMP --path "$pgdata" --timeline "$tl" \\
+               --start "$last_chk" --end "$last_lsn" 2>&1 };
+    $rc = $?;
+
+    ocf_log( 'debug', sprintf
+        '_check_switchover: XLOGDUMP rc: "%s", tl: "%s", last_chk: %s, last_lsn: %s, output: "%s"',
+        $rc, $tl, $last_chk, $last_lsn, $ans
+    );
+
+    if ( $rc == 0 and
+         $ans =~ m{^rmgr: XLOG.*desc: checkpoint: redo [0-9A-F/]+; tli $tl;.*; shutdown$}m
+    ) {
+        ocf_log( 'info', sprintf
+            '_check_switchover: slave received the shutdown checkpoint',
+            _controldata_state() );
+
+        return 0;
+    }
+
+    _set_priv_attr( 'cancel_switchover', '1' );
+
+    ocf_log( 'info', sprintf
+        'pgsql_notify: did not received the shutdown checkpoint from the old master!',
+        $?, $ans
+    );
+
+    return 1;
+}
 
 # Check to confirm if the instance is really started as _pg_isready stated and
 # check if the instance is primary or secondary.
@@ -1337,14 +1435,9 @@ sub pgsql_promote {
     # At this point, the instance **MUST** be started as a secondary.
     #
 
-    # Do not check for a better candidate if we try to recover the master
-    # Recover of a master is detected during the pre-promote action. It sets the
-    # private attribute 'recover_master' to '1' if this is a master recover.
-    if ( _get_priv_attr( 'recover_master' ) eq '1' ) {
-        ocf_log( 'info',
-            'pgsql_promote: recovering old master, no election needed');
-    }
-    elsif ( _get_priv_attr('cancel_switchover') eq '1' ) {
+    # Cancel the switchover if it has been considered not safe during the
+    # pre-promote action
+    if ( _get_priv_attr('cancel_switchover') eq '1' ) {
         ocf_log( 'err',  sprintf
             'pgsql_promote: switchover has been canceled from pre-promote action',
         );
@@ -1352,6 +1445,14 @@ sub pgsql_promote {
         _delete_priv_attr( 'cancel_switchover' );
 
         return $OCF_ERR_GENERIC;
+    }
+
+    # Do not check for a better candidate if we try to recover the master
+    # Recover of a master is detected during the pre-promote action. It sets the
+    # private attribute 'recover_master' to '1' if this is a master recover.
+    if ( _get_priv_attr( 'recover_master' ) eq '1' ) {
+        ocf_log( 'info',
+            'pgsql_promote: recovering old master, no election needed');
     }
     else {
 
@@ -1520,103 +1621,29 @@ sub pgsql_notify_pre_promote {
     if ( _is_switchover( $nodename ) and scalar
          grep { $_->{'uname'} eq $nodename } @{ $OCF_NOTIFY_ENV{'promote'} }
     ) {
-        my $has_sht_chk = 0;
-        my $last_chk;
-        my $last_lsn;
-        my $ans;
-        my $tl;
-        my @rs;
+        $rc = _check_switchover();
 
-        ocf_log( 'info', sprintf
-            'pgsql_notify: switchover in progress from "%s" to "%s".'
-            .' Need to check the last record in WAL',
-            $OCF_NOTIFY_ENV{'demote'}[0]{'uname'}, $nodename );
-
-        # Force a checpoint to make sure the controldata shows the very last TL
-        _query( q{ CHECKPOINT }, {} );
-
-        # check if we received the shutdown checkpoint of the master during its
-        # demote process.
-        # We need the last local checkpoint LSN and the last received LSN from
-        # master to check in the WAL between these adresses if we have a
-        # "checkpoint shutdown" using pg_xlogdump.
-        $ans = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
-
-        # Get the latest known TL
-        $ans =~ m{^Latest checkpoint's TimeLineID:\s+(\d+)\s*$}m;
-        $tl  = $1 if defined $1;
-
-        # Get the latest local checkpoint
-        $ans =~ m{^Latest checkpoint's REDO location:\s+([0-9A-F/]+)\s*$}m;
-        $last_chk = $1 if defined $1;
-
-        # Get the last received LSN from master
-        $rc = _query( q{ SELECT pg_last_xlog_receive_location() }, \@rs );
-
-        if ( $rc != 0 ) {
-            ocf_log( 'err', sprintf
-                'pgsql_notify: could not query last_xlog_receive_location (%d)',
-                $rc );
+        if ( $rc == 1 ) {
+            # Shortcut the election process as the switchover will be
+            # canceled
+            return $OCF_SUCCESS;
         }
-
-        $last_lsn = $rs[0][0] if defined $rs[0][0];
-
-        unless ( defined $tl and defined $last_chk and defined $last_lsn ) {
-            ocf_log( 'crit',
-                'pgsql_notify: could not read last checkpoint and timeline from controldata file!',
-            );
-
-            ocf_log( 'debug', sprintf
-                'pgsql_notify: XLOGDUMP parameters: pgdata:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
-                $pgdata, $last_chk, $tl, $last_lsn
-            );
-
+        elsif ( $rc != 0 ) {
             # This is an extreme mesure, it shouldn't happen.
             qx{ $CRM_FAILCOUNT --resource "$OCF_RESOURCE_INSTANCE" -v 1000000 };
             return $OCF_ERR_INSTALLED;
         }
 
-        # force a checkpoint on the slave to flush the master's
-        # shutdown checkpoint in the WAL
-
-        $ans = qx{ $PGXLOGDUMP --path "$pgdata" --timeline "$tl" \\
-                   --start "$last_chk" --end "$last_lsn" 2>&1 };
-        $rc = $?;
-
-        ocf_log( 'debug', sprintf
-            'pgsql_notify: XLOGDUMP rc: "%s", tl: "%s", last_chk: %s, last_lsn: %s, output: "%s"',
-            $rc, $tl, $last_chk, $last_lsn, $ans
-        );
-
-        if ( $rc == 0 and
-             $ans =~ m{^rmgr: XLOG.*desc: checkpoint: redo [0-9A-F/]+; tli $tl;.*; shutdown$}m
-        ) {
-            ocf_log( 'info', sprintf
-                'pgsql_notify: slave received the shutdown checkpoint',
-                _controldata_state() );
-
-            # No return here. On success keep going with the election
-            # process in case the switchover was instruct to the wrong node.
-            # FIXME: should we allow a switchover to a lagging slave?
-        }
-        else {
-            _set_priv_attr( 'cancel_switchover', '1' );
-
-            ocf_log( 'info', sprintf
-                'pgsql_notify: did not received the shutdown checkpoint from the old master!',
-                $?, $ans
-            );
-
-            # Shortcut the election process as the switchover will be
-            # canceled
-            return $OCF_SUCCESS;
-        }
+        # If the sub keeps going, that means the switchover is safe.
+        # Keep going with the election process in case the switchover was
+        # instruct to the wrong node.
+        # FIXME: should we allow a switchover to a lagging slave?
     }
 
-
     # We need to trigger an election between existing slaves to promote the best
-    # one based on its current LSN location. We keep track of the current LSN
-    # location in the private attribute "lsn_location".
+    # one based on its current LSN location. The designated standby for
+    # promotion is responsible to connect to each available nodes to check their
+    # "lsn_location".
     #
     # During the following promote action, pgsql_promote will use this
     # information to check if the instance to be promoted is the best one,
