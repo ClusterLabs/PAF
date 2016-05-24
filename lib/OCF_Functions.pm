@@ -66,7 +66,7 @@ Here are the subroutines ported from ocf-shellfuncs and exported by this module:
 
 =back
 
-Here a the subroutines only existing in the perl module but not in the
+Here are the subroutines only existing in the perl module but not in the
 ocf-shellfuncs script:
 
 =over
