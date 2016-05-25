@@ -34,6 +34,7 @@ our $PROGRAM = 'pgsqlms';
 my $OCF_RESOURCE_INSTANCE = $ENV{'OCF_RESOURCE_INSTANCE'};
 my $OCF_ACTION            = $ARGV[0];
 my $OCF_PRIMARY_NODE      = $ENV{'OCF_RESKEY_primary_node'} || '';
+my %OCF_NOTIFY_ENV        = ocf_notify_env() if $OCF_ACTION eq 'notify';
 
 # Default parameters values
 my $system_user_default = "postgres";
@@ -79,9 +80,9 @@ sub _get_attr {
     $node = '' unless defined $node;
     $node = "--node $node" if $node ne '';
 
-    $ans = qx{ $CRM_ATTRIBUTE --quiet --name "$name" $node --get-value };
+    $ans = qx{ $CRM_ATTRIBUTE --quiet --name "$name" $node --get-value 2> /dev/null };
 
-    return undef unless $? == 0;
+    return '' unless $? == 0;
 
     $ans = '' unless defined $ans;
 
@@ -120,6 +121,89 @@ sub _delete_attr {
     }
 
     return;
+}
+
+# Check if the current transition is a recover of a master clone on given node.
+sub _is_master_recover {
+    my ( $n ) = @_;
+
+    return (
+            scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'master'} }
+        and scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'promote'} }
+    );
+}
+
+# Check if the current transition is a recover of a slave clone on given node.
+sub _is_slave_recover {
+    my ( $n ) = @_;
+
+    return (
+            scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'slave'} }
+        and scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'start'} }
+    );
+}
+
+# check if th current transition is a switchover to the given node.
+sub _is_switchover {
+    my ( $n ) = @_;
+    my $old = $OCF_NOTIFY_ENV{'master'}[0]{'uname'};
+
+    return 0 if scalar @{ $OCF_NOTIFY_ENV{'master'} }  != 1
+             or scalar @{ $OCF_NOTIFY_ENV{'demote'} }  != 1
+             or scalar @{ $OCF_NOTIFY_ENV{'promote'} } != 1;
+
+    return (
+           scalar grep { $_->{'uname'} eq $old } @{ $OCF_NOTIFY_ENV{'demote'} }
+       and scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'slave'} }
+       and scalar grep { $_->{'uname'} eq $n } @{ $OCF_NOTIFY_ENV{'promote'} }
+       and not scalar grep { $_->{'uname'} eq $old } @{ $OCF_NOTIFY_ENV{'stop'} }
+    );
+}
+
+# create an empty file with given name in $HA_RSCTMP folder. Usefull to stamp
+# a status for futur check in next actions.
+# Note: this is a workaround for older HA stacks where private attributes are
+# not supported.
+#
+# Returns undef on failure
+# Returns nonzero on success
+sub _stamp {
+    my ( $name ) = @_;
+    my $rc;
+
+    $rc = open my $fd, ">", "$HA_RSCTMP/$name";
+
+    return undef unless defined $rc;
+
+    close $fd;
+
+    return $rc;
+}
+
+# check if the stamp of given name exists
+sub _is_stampped {
+    my ( $name ) = @_;
+    my $rc;
+
+    return -e "$HA_RSCTMP/$name";
+}
+
+# remove stamp of given name
+sub _rm_stamp {
+    my ( $name ) = @_;
+    my $rc;
+
+    $rc = unlink( "$HA_RSCTMP/$name" );
+
+    return $rc;
+}
+
+# asynchronous environment cleanup to run during monitor action.
+sub _env_cleanup {
+    return unless $OCF_ACTION eq 'monitor';
+
+    _delete_attr( 'lsn_location' ) if _get_attr( 'lsn_location' );
+    _rm_stamp( 'recover_master' );
 }
 
 # Run the given command as the "system_user" given as parameter.
@@ -181,6 +265,20 @@ sub _pg_ctl_status {
     #   3: postmaster.pid file does not exist OR it does but the process
     #      with the PID found in the file is not alive
     return $rc;
+}
+
+# Start the local instance using pg_ctl
+#
+sub _pg_ctl_start {
+    # wait for 24h for the server to start.
+    # this is probably too much, but starting a master in recovery
+    # might take some time depending on the server setup.
+    my @cmd = ( $PGCTL, '-D', $pgdata, '-w', '--timeout', 86400, 'start' );
+
+    push @cmd => ( '-o', $start_opts )
+        if $start_opts ne '';
+
+    return _runas( @cmd );
 }
 
 # Parse and return the current status of the local PostgreSQL instance as
@@ -921,7 +1019,6 @@ sub pgsql_start {
     my $rc;
     my $uid;
     my $gid;
-    my @cmd = ( $PGCTL, '-D', $pgdata, '-w', 'start' );
 
     $rc = pgsql_monitor();
     # Instance must be running as secondary or being stopped.
@@ -946,14 +1043,11 @@ sub pgsql_start {
         'pgsql_start: instance "%s" is not running, starting it as a secondary',
         $OCF_RESOURCE_INSTANCE );
 
-    push @cmd => ( '-o', $start_opts )
-        if $start_opts ne '';
-
     # Create recovery.conf from the template file.
     _create_recovery_conf();
 
     # Start the instance as a secondary.
-    $rc = _runas( @cmd );
+    $rc = _pg_ctl_start();
 
     if ( $rc == 0 ) {
 
@@ -963,21 +1057,6 @@ sub pgsql_start {
         if ( $rc == $OCF_SUCCESS ) {
             ocf_log( 'info',  sprintf'pgsql_start: instance "%s" started',
                 $OCF_RESOURCE_INSTANCE );
-
-            # If the action is actually a start, set the promotion score to 1
-            # so one node can be promoted at cluster startup.
-            # HINT: use a location preference in your conf!
-            if ( $OCF_ACTION eq "start" ) {
-                # In case of recovery for a primary, some versions of Pacemaker
-                # do a demote->stop->start->promote sequence. We do not want
-                # the recovered primary to decrease its score to 1 in this
-                # scenario.
-                unless ( $nodename eq $OCF_PRIMARY_NODE ) {
-                    # Set master score to 1 so the node can be promoted.
-                    ocf_log( 'debug', "pgsql_start: instance started as a secondary, set master score to 1.");
-                    qx{ $CRM_MASTER --update 1 };
-                }
-            }
 
             return $OCF_SUCCESS;
         }
@@ -1056,6 +1135,8 @@ sub pgsql_monitor {
     my $controldata_rc;
 
     ocf_log( 'debug', "pgsql_monitor: monitor is a probe" ) if ocf_is_probe();
+
+    _env_cleanup;
 
     # First check, verify if the instance is listening.
     $pgisready_rc = _pg_isready();
@@ -1322,13 +1403,21 @@ sub pgsql_promote {
     # At this point, the instance **MUST** be started as a secondary.
     #
 
+
+    # Do not check for a better candidate if we try to recover the master
+    # Recover of a master is detected during the pre-promote action. It stampped
+    # 'recover_master' so we can avoid the election here.
+    if (_is_stampped( 'recover_master' ) ) {
+        ocf_log( 'info',
+            'pgsql_promote: recovering old master, no election needed');
+    }
     # If "primary_node" resource attribute has not been set, the cluster is
-    # starting up, no need to compare secondaries.
-    #
-    # If the "primary_node" parameter is the current node being promoted, this
-    # is a recover action trying to get back the old master. In this case, we
-    # do not want to compare its LSN with the other secondary instances.
-    unless ( $OCF_PRIMARY_NODE eq '' or $OCF_PRIMARY_NODE eq $nodename ) {
+    # starting up for the first time, no need to compare secondaries.
+    elsif ( $OCF_PRIMARY_NODE eq '' ) {
+        ocf_log( 'info',
+            'pgsql_promote: starting for the very first time. No election needed');
+    }
+    else {
 
         # The promotion is occurring on the best known candidate (highest
         # master score), as chosen by pacemaker during the last working monitor
@@ -1479,72 +1568,141 @@ sub pgsql_promote {
     return $OCF_ERR_GENERIC;
 }
 
+# This is called before a demote occurs.
+sub pgsql_notify_pre_demote {
+    my $rc;
+
+    # do nothing if the local node will not be demoted
+    return $OCF_SUCCESS unless scalar
+        grep { $_->{'uname'} eq $nodename } @{ $OCF_NOTIFY_ENV{'demote'} };
+
+    $rc = pgsql_monitor();
+
+    # do nothing if this is not a master recovery
+    return $OCF_SUCCESS unless _is_master_recover( $nodename )
+                           and $rc == $OCF_FAILED_MASTER;
+
+    # in case of master crash, we need to detect if the CRM tries to recover
+    # the master clone. The usual transition is to do:
+    #   demote->stop->start->promote
+    #
+    # There are multiple flaws with this transition:
+    #  * the 1st and 2nd actions will fail because the instance is in
+    #    OCF_FAILED_MASTER step
+    #  * the usual start action is dangerous as the instance will start with
+    #    a recovery.conf instead of entering a normal recovery process
+    #
+    # To avoid this, we try to start the instance in recovery from here.
+    # If it success, at least it will be demoted correctly with a normal
+    # status. If it fails, it will be catched up in next steps.
+
+    ocf_log( 'info',  sprintf
+        'pgsql_notify: trying to start failing master "%s"...',
+        $OCF_RESOURCE_INSTANCE );
+
+    # Either the instance managed to start or it couldn't.
+    # We rely on the pg_ctk '-w' switch to take care of this. If it couldn't
+    # start, this error will be catched up later during the various checks
+    _pg_ctl_start();
+
+    ocf_log( 'info', sprintf
+        'pgsql_notify: state is "%s" after recovery attempt',
+        _controldata_state() );
+
+    return $OCF_SUCCESS;
+}
+
+# This action is called **before** the actual promotion when a failing master is
+# considered unreclaimable, recoverable or a new master must be promoted
+# (switchover or first start).
+# As every "notify" action, it is executed almost simultaneously on all
+# available nodes.
+sub pgsql_notify_pre_promote {
+    my @rs;
+    my $rc;
+    my $node_lsn;
+
+    ocf_log( 'info', sprintf
+        'pgsql_notify: promoting instance on node "%s"',
+        $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} );
+
+    # record the current LSN location.
+    # During the following promote action, pgsql_promote will use this
+    # information to check if the instance to be promoted is the best one,
+    # so we can avoid a race condition between the last successful monitor
+    # on the previous master and the current promotion.
+
+    # If this is the first promotion, "OCF_PRIMARY_NODE" will not be set,
+    # thus there is no point to record locations.
+    unless ( $OCF_PRIMARY_NODE ne '' ) {
+        ocf_log( 'info',
+            'pgsql_notify: It looks like a the very first promotion. No election needed.'
+        );
+        return $OCF_SUCCESS;
+    }
+
+    # No need to do an election between slaves if this is recovery of the master
+    if ( _is_master_recover( $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} ) ) {
+        ocf_log( 'warning', 'pgsql_notify: This is a master recovery!' );
+
+        _stamp( 'recover_master' )
+            if $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} eq $nodename;
+
+        return $OCF_SUCCESS;
+    }
+
+    # Environment cleanup!
+    _rm_stamp( 'recover_master' );
+
+    $rc = _query( 'SELECT pg_last_xlog_receive_location()', \@rs );
+
+    unless ( $rc == 0 ) {
+        ocf_log( 'warning',
+            'pgsql_notify: could not query the current node LSN' );
+        return $OCF_SUCCESS ;
+    }
+
+    $node_lsn = $rs[0][0];
+
+    ocf_log( 'info', sprintf 'pgsql_notify: current node LSN: %s',
+        $node_lsn );
+
+    # Set the "lsn_location" attribute value for this node so we can use it
+    # during the following "promote" action.
+    _set_attr( 'lsn_location', $node_lsn );
+
+    ocf_log( 'warning', sprintf
+        'pgsql_notify: could not set the current node LSN' )
+        if $? != 0 ;
+}
+
+# This action is called after a promote action.
+sub pgsql_notify_post_promote {
+    # We have a new master (or the previous one recovered).
+    # environment cleanup!
+    # _delete_attr( 'lsn_location' );
+    # _rm_stamp( 'recover_master' );
+
+    return $OCF_SUCCESS;
+}
+
 # Notify type actions, called on all available nodes before (pre) and after
 # (post) other actions, like promote, start, ...
 #
 sub pgsql_notify {
-    my %notify_env = ocf_notify_env();
     my $type_op;
 
     ocf_log( 'debug', sprintf "pgsql_notify: environment variables: %s",
-        Data::Dumper->new( [ \%notify_env ] )->Sortkeys(1)->Terse(1)->Dump );
+        Data::Dumper->new( [ \%OCF_NOTIFY_ENV ] )->Sortkeys(1)->Terse(1)->Dump );
 
-    return unless %notify_env;
+    return $OCF_SUCCESS unless %OCF_NOTIFY_ENV;
 
-    $type_op = "$notify_env{'type'}-$notify_env{'operation'}";
+    $type_op = "$OCF_NOTIFY_ENV{'type'}-$OCF_NOTIFY_ENV{'operation'}";
 
-    # This action is called when a failing master has been considered
-    # unreclaimable, which triggers a promotion.
-    # As every "notify" action, it is executed simultaneously on all available
-    # nodes.
-    if ( $type_op eq 'pre-promote' ) {
-
-        ocf_log( 'info', sprintf
-            'pgsql_notify: promoting instance on node "%s"',
-            $notify_env{'promote'}[0]{'uname'} );
-
-        # record the current LSN location.
-        # During the following promote action, pgsql_promote will use this
-        # information to check if the instance to be promoted is the best one,
-        # so we can avoid a race condition between the last successful monitor
-        # on the previous master and the current promotion.
-
-        # If this is the first promotion, "OCF_PRIMARY_NODE" will not be set,
-        # thus there is no point to record locations.
-        if ( $OCF_PRIMARY_NODE ne '' ) {
-            my @rs;
-            my $rc;
-            my $node_lsn;
-
-            $rc = _query( 'SELECT pg_last_xlog_receive_location()', \@rs );
-
-            unless ( $rc == 0 ) {
-                ocf_log( 'warning',
-                    'pgsql_notify: could not query the current node LSN' );
-                # FIXME we should specify the return code at this point, OCF_SUCCESS ?
-                return;
-            }
-
-            $node_lsn = $rs[0][0];
-
-            ocf_log( 'info', sprintf 'pgsql_notify: current node LSN: %s',
-                $node_lsn );
-
-            # Set the "lsn_location" attribute value for this node so we can use it
-            # during the following "promote" action.
-            _set_attr( 'lsn_location', $node_lsn );
-
-            ocf_log( 'warning', sprintf
-                'pgsql_notify: could not set the current node LSN' )
-                if $? != 0 ;
-        }
-    }
-
-    # This action is called after a promote action succeeded.
-    elsif ( $type_op eq 'post-promote' ) {
-        # We have a new master (or the previous one recovered).
-        # Delete "lsn_location" values on all nodes
-        _delete_attr( 'lsn_location' );
+    for ( $type_op ) {
+        if    ( /^pre-promote$/  ) { return pgsql_notify_pre_promote()  }
+        elsif ( /^post-promote$/ ) { return pgsql_notify_post_promote() }
+        elsif ( /^pre-demote$/   ) { return pgsql_notify_pre_demote()   }
     }
 
     return $OCF_SUCCESS;
