@@ -33,6 +33,7 @@ our $PROGRAM = 'pgsqlms';
 # OCF environment
 my $OCF_RESOURCE_INSTANCE = $ENV{'OCF_RESOURCE_INSTANCE'};
 my $OCF_ACTION            = $ARGV[0];
+my $OCF_RUNNING_SLAVE     = $OCF_SUCCESS;
 my $OCF_PRIMARY_NODE      = $ENV{'OCF_RESKEY_primary_node'} || '';
 my %OCF_NOTIFY_ENV        = ocf_notify_env() if $OCF_ACTION eq 'notify';
 
@@ -84,6 +85,8 @@ sub _get_attr {
 
     return '' unless $? == 0;
 
+    chomp $ans;
+
     $ans = '' unless defined $ans;
 
     return $ans;
@@ -94,12 +97,13 @@ sub _get_attr {
 # attribute is really set by attrd and available everywhere.
 sub _set_attr {
     my ( $name, $val ) = @_;
+    my $tmp;
 
     qx{ $CRM_ATTRIBUTE --name "$name" --update "$val" };
 
-    while ( _get_attr( $name ) ne $val ) {
-        ocf_log( 'debug', sprintf '_set_attr: waiting to set "%s"...',
-            $name );
+    while ( ( $tmp = _get_attr( $name ) ) ne $val ) {
+        ocf_log( 'debug', sprintf '_set_attr: waiting to set "%s=%s" (currently "%s")...',
+            $name, $val, $tmp );
         select(undef, undef, undef, 0.1);
     }
 
@@ -1015,10 +1019,7 @@ sub pgsql_validate_all {
 # Start the PostgreSQL instance as a *secondary*
 #
 sub pgsql_start {
-    my $fh;
     my $rc;
-    my $uid;
-    my $gid;
 
     $rc = pgsql_monitor();
     # Instance must be running as secondary or being stopped.
@@ -1556,11 +1557,6 @@ sub pgsql_promote {
             --set-parameter primary_node --parameter-value "$nodename" };
         ocf_log( 'debug', 'pgsql_promote: primary_node set' );
 
-        # Set master score to 1001 for this node so it sticks to this role.
-        qx{ $CRM_MASTER --update 1001 };
-
-        ocf_log( 'debug', 'pgsql_promote: crm_master to 1001 done' );
-
         return $OCF_SUCCESS;
     }
 
@@ -1686,6 +1682,47 @@ sub pgsql_notify_post_promote {
     return $OCF_SUCCESS;
 }
 
+# This is called before a stop occurs.
+sub pgsql_notify_pre_stop {
+    my $rc;
+
+    # do nothing if the local node will not be stopped
+    return $OCF_SUCCESS unless scalar
+        grep { $_->{'uname'} eq $nodename } @{ $OCF_NOTIFY_ENV{'stop'} };
+
+    $rc = _controldata();
+
+    # do nothing if this is not a slave recovery
+    return $OCF_SUCCESS unless _is_slave_recover( $nodename )
+                           and $rc == $OCF_RUNNING_SLAVE;
+
+    # in case of slave crash, we need to detect if the CRM tries to recover
+    # the slave clone. The usual transition is to do: stop->start
+    #
+    # This transition can not work because the instance is in
+    # OCF_ERR_GENERIC step. So the stop action will fail, leading most
+    # probably to fencing action.
+    #
+    # To avoid this, we try to start the instance in recovery from here.
+    # If it success, at least it will be stopped correctly with a normal
+    # status. If it fails, it will be catched up in next steps.
+
+    ocf_log( 'info',  sprintf
+        'pgsql_notify: trying to start failing slave "%s"...',
+        $OCF_RESOURCE_INSTANCE );
+
+    # Either the instance managed to start or it couldn't.
+    # We rely on the pg_ctk '-w' switch to take care of this. If it couldn't
+    # start, this error will be catched up later during the various checks
+    _pg_ctl_start();
+
+    ocf_log( 'info', sprintf
+        'pgsql_notify: state is "%s" after recovery attempt',
+        _controldata_state() );
+
+    return $OCF_SUCCESS;
+}
+
 # Notify type actions, called on all available nodes before (pre) and after
 # (post) other actions, like promote, start, ...
 #
@@ -1703,6 +1740,7 @@ sub pgsql_notify {
         if    ( /^pre-promote$/  ) { return pgsql_notify_pre_promote()  }
         elsif ( /^post-promote$/ ) { return pgsql_notify_post_promote() }
         elsif ( /^pre-demote$/   ) { return pgsql_notify_pre_demote()   }
+        elsif ( /^pre-stop$/     ) { return pgsql_notify_pre_stop()   }
     }
 
     return $OCF_SUCCESS;
