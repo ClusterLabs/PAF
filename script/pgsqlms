@@ -27,7 +27,7 @@ use OCF_ReturnCodes;
 use OCF_Directories;
 use OCF_Functions;
 
-our $VERSION = 'v1.0.2';
+our $VERSION = 'v1.1_dev';
 our $PROGRAM = 'pgsqlms';
 
 # OCF environment
@@ -68,6 +68,59 @@ my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
 # Global vars
 my $nodename;
 my $exit_code = 0;
+
+# Get, parse and return the value of the given attribute name.
+# Returns an empty string if not found.
+# Returns undef crm_attribute call on error
+sub _get_attr {
+    my ( $name, $node ) = @_;
+    my $ans;
+
+    $node = '' unless defined $node;
+    $node = "--node $node" if $node ne '';
+
+    $ans = qx{ $CRM_ATTRIBUTE --quiet --name "$name" $node --get-value };
+
+    return undef unless $? == 0;
+
+    $ans = '' unless defined $ans;
+
+    return $ans;
+}
+
+# Set the given attribute name to the given value.
+# As setting an attribute is asynchronous, this will return as soon as the
+# attribute is really set by attrd and available everywhere.
+sub _set_attr {
+    my ( $name, $val ) = @_;
+
+    qx{ $CRM_ATTRIBUTE --name "$name" --update "$val" };
+
+    while ( _get_attr( $name ) ne $val ) {
+        ocf_log( 'debug', sprintf '_set_attr: waiting to set "%s"...',
+            $name );
+        select(undef, undef, undef, 0.1);
+    }
+
+    return;
+}
+
+# Delete the given attribute.
+# As setting an attribute is asynchronous, this will return as soon as the
+# attribute is really deleted by attrd.
+sub _delete_attr {
+    my ( $name ) = @_;
+
+    qx{ $CRM_ATTRIBUTE --name "$name" --delete };
+
+    while ( _get_attr( $name ) ne '' ) {
+        ocf_log( 'debug', sprintf '_delete_priv_attr: waiting to delete "%s"...',
+            $name );
+        select(undef, undef, undef, 0.1);
+    }
+
+    return;
+}
 
 # Run the given command as the "system_user" given as parameter.
 # It basically forks and seteuid/setuid away from root.
@@ -1305,10 +1358,9 @@ sub pgsql_promote {
         # Get the "lsn_location" attribute value for the current node, as set
         # during the "pre-promote" action.
         # It should be the greatest among the secondary instances.
-        $max_lsn = qx{ $CRM_ATTRIBUTE -q --node $nodename \\
-            --quiet --query --name lsn_location };
+        $max_lsn = _get_attr( 'lsn_location' );
 
-        if ( $? != 0 or not $max_lsn ) {
+        if ( not defined $max_lsn or not $max_lsn ) {
             # This should not happen as the "lsn_location" attribute should have
             # been updated during the "pre-promote" action.
             ocf_log( 'crit',
@@ -1333,10 +1385,9 @@ sub pgsql_promote {
 
             # Get the "lsn_location" attribute value for the node, as set during
             # the "pre-promote" action.
-            $node_lsn = qx{ $CRM_ATTRIBUTE -q --node "$node" \\
-                --query --name lsn_location };
+            $node_lsn = _get_attr( 'lsn_location', $node);
             
-            if ( $? != 0 or not $node_lsn ) {
+            if ( not defined $node_lsn or not $node_lsn ) {
                 # This should not happen as the "lsn_location" attribute should
                 # have been updated during the "pre-promote" action.
                 ocf_log( 'crit',
@@ -1481,8 +1532,7 @@ sub pgsql_notify {
 
             # Set the "lsn_location" attribute value for this node so we can use it
             # during the following "promote" action.
-            qx{ $CRM_ATTRIBUTE --node "$nodename" \\
-                --name lsn_location --update "$node_lsn" };
+            _set_attr( 'lsn_location', $node_lsn );
 
             ocf_log( 'warning', sprintf
                 'pgsql_notify: could not set the current node LSN' )
@@ -1494,7 +1544,7 @@ sub pgsql_notify {
     elsif ( $type_op eq 'post-promote' ) {
         # We have a new master (or the previous one recovered).
         # Delete "lsn_location" values on all nodes
-        qx{ $CRM_ATTRIBUTE --node "$nodename" --name lsn_location --delete };
+        _delete_attr( 'lsn_location' );
     }
 
     return $OCF_SUCCESS;
