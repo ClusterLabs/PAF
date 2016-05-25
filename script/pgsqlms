@@ -18,6 +18,7 @@ use POSIX qw(locale_h);
 use File::Spec;
 use File::Temp;
 use Data::Dumper;
+use Storable qw(lock_store lock_retrieve);
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib/";
@@ -202,12 +203,59 @@ sub _rm_stamp {
     return $rc;
 }
 
+# set variable local to the node, non visible to other nodes.
+sub _set_local_var {
+    my ( $name, $val ) = @_;
+    my $storage        = "$HA_RSCTMP/$ENV{'OCF_RESOURCE_INSTANCE'}.bin";
+    my $all            = {};
+    my $rc;
+
+    $all = lock_retrieve($storage) if -r $storage;
+
+    $all->{$name} = $val;
+
+    lock_store( $all, $storage )
+        or die "Can't store data in '$storage'!\n";
+}
+
+# get variable local to the node.
+# Returns the local variable value on success
+# Returns '' on failure
+sub _get_local_var {
+    my ( $name ) = @_;
+    my $storage  = "$HA_RSCTMP/$ENV{'OCF_RESOURCE_INSTANCE'}.bin";
+    my $all      = {};
+    my $rc;
+
+    $all = lock_retrieve($storage) if -r $storage;
+
+    return $all->{$name} if exists $all->{$name};
+
+    return '';
+
+    lock_store( $all, $storage )
+        or die "Can't store data in '$storage'!\n";
+}
+
+# remove variable local to the node.
+sub _rm_local_var {
+    my ( $name ) = @_;
+    my $storage  = "$HA_RSCTMP/$ENV{'OCF_RESOURCE_INSTANCE'}.bin";
+    my $all      = {};
+    my $rc;
+
+    $all = lock_retrieve($storage) if -r $storage;
+
+    delete $all->{$name};
+}
+
 # asynchronous environment cleanup to run during monitor action.
 sub _env_cleanup {
     return unless $OCF_ACTION eq 'monitor';
 
     _delete_attr( 'lsn_location' ) if _get_attr( 'lsn_location' );
     _rm_stamp( 'recover_master' );
+    _rm_local_var( 'nodes' );
 }
 
 # Run the given command as the "system_user" given as parameter.
@@ -683,7 +731,8 @@ sub _confirm_role {
             # The instance is a primary.
             ocf_log( 'debug', "_confirm_role: instance $OCF_RESOURCE_INSTANCE is a primary");
             # Check lsn diff with current slaves if any
-            _check_locations() if $OCF_ACTION eq 'monitor';
+            _check_locations() if $OCF_ACTION eq 'monitor'
+                and not ocf_is_probe();
             return $OCF_RUNNING_MASTER;
         }
 
@@ -1434,9 +1483,9 @@ sub pgsql_promote {
         ocf_log( 'debug',
             'pgsql_promote: checking if current node is the best candidate for promotion');
 
-        # Exclude nodes that are known to be unavailable (not in the current
-        # partition) using the "crm_node" command
-        my @partition_nodes = split /\s/ => qx{ $CRM_NODE --partition };
+        # Only query node that are available as set in local var 'nodes' during
+        # pre-promote action
+        my @active_nodes = split /\s/ => _get_local_var( 'nodes' );
         my $node_to_promote = '';
         my $max_lsn;
         my $node_lsn;
@@ -1469,7 +1518,7 @@ sub pgsql_promote {
             $max_lsn, $max_lsn_dec );
 
         # Now we compare with the other available nodes.
-        foreach my $node ( @partition_nodes ) {
+        foreach my $node ( @active_nodes ) {
             # We exclude the current node from the check.
             next if $node eq $nodename;
 
@@ -1617,6 +1666,7 @@ sub pgsql_notify_pre_promote {
     my @rs;
     my $rc;
     my $node_lsn;
+    my %active_nodes;
 
     ocf_log( 'info', sprintf
         'pgsql_notify: promoting instance on node "%s"',
@@ -1670,6 +1720,25 @@ sub pgsql_notify_pre_promote {
     ocf_log( 'warning', sprintf
         'pgsql_notify: could not set the current node LSN' )
         if $? != 0 ;
+
+    # If this node is the future master, keep track of the slaves that
+    # received the same notification to compare our LSN with them during
+    # promotion
+    if ( $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} eq $nodename ) {
+        my $attr_nodes;
+
+        # build the list of active nodes:
+        #   master + slave + start - stop
+        $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'master'} };
+        $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'slave'} };
+        $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'start'} };
+        $active_nodes{ $_->{'uname'} }-- foreach @{ $OCF_NOTIFY_ENV{'stop'} };
+
+        $attr_nodes = join " "
+            => grep { $active_nodes{$_} > 0 } keys %active_nodes;
+
+        _set_local_var( 'nodes', $attr_nodes );
+    }
 }
 
 # This action is called after a promote action.
