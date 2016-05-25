@@ -558,7 +558,6 @@ sub _query {
 # This sub is supposed to be executed from a master monitor action.
 #
 sub _check_locations {
-    my $best_candidate;
     my $node_score;
     my $row_num;
     my $row;
@@ -591,8 +590,12 @@ sub _check_locations {
       SELECT application_name, priority, location, state
       FROM (
         SELECT application_name,
-          row_number() OVER (ORDER BY write_location ASC, application_name DESC)
-            AS priority,
+          1000 - (
+            row_number() OVER (
+              PARTITION BY state IN ('startup', 'backup')
+              ORDER BY write_location ASC, application_name ASC
+            ) - 1
+          ) * 10 AS priority,
           write_location AS location, state
         FROM (
           SELECT application_name, write_location, state
@@ -653,31 +656,16 @@ sub _check_locations {
                 '_check_locations: checking "%s" promotion ability (current_score: %s, priority: %s, location: %s).',
                 $row->[0], $node_score, $row->[1], $row->[2] );
 
-            # Because the result set is sorted by priority, the very first node
-            # processed here is the best candidate and receives the highest score
-            if ( not defined $best_candidate ) {
-                $best_candidate = $row->[0];
-
-                if ( $node_score != 1000 ) {
-                    ocf_log( 'info', sprintf
-                        '_check_locations: "%s" is the best candidate to promotion, set score to 1000',
-                        $row->[0] );
-                    qx{ $CRM_MASTER --node "$row->[0]" --update 1000 };
-                }
-                else {
-                    ocf_log( 'debug', sprintf
-                        '_check_locations: "%s" is still the best candidate to promotion',
-                        $row->[0] );
-                }
-            }
-            elsif ( $node_score != 1 ) {
-                # The other nodes all receive the same score
-                # FIXME adapt this so each node receives a score based on their
-                #   rownum.
+            if ( $node_score != $row->[1] ) {
                 ocf_log( 'info', sprintf
-                    '_check_locations: "%s" is not a candidate to promotion, set score to 1',
-                    $row->[0] );
-                qx{ $CRM_MASTER --node "$row->[0]" --update 1 };
+                    '_check_locations: update score of "%s" from %s to %s',
+                    $row->[0], $node_score, $row->[1] );
+                qx{ $CRM_MASTER --node "$row->[0]" --update "$row->[1]" };
+            }
+            else {
+                ocf_log( 'debug', sprintf
+                    '_check_locations: "%s" keeps its current score of %s',
+                    $row->[0], $row->[1] );
             }
         }
 
