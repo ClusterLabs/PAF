@@ -1,7 +1,7 @@
-%global _tag v1.0.1
+%global _tag v1.0.2
 %global _ocfroot /usr/lib/ocf
 Name: resource-agents-paf
-Version: 1.0.1
+Version: 1.0.2
 Release: 1
 Summary: PostgreSQL resource agent for Pacemaker
 License: PostgreSQL
@@ -41,6 +41,12 @@ rm -f "%{buildroot}"/usr/local/lib64/perl5/auto/PAF/.packlist
 %{_datadir}/resource-agents/ocft/configs/pgsqlms
 
 %changelog
+* Wed May 25 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 1.0.2-1
+- 1.0.2 minor release
+- fix: unknown argument --query when calling crm_master
+- fix: perl warning when master score has never been set on the master
+- change: remove misleading message in log file
+
 * Wed Apr 27 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 1.0.1-1
 - 1.0.1 minor release
 - fix: forbid the master to decrease its own score (gh #19)

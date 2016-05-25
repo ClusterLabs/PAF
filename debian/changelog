@@ -1,3 +1,12 @@
+resource-agents-paf (1.0.2-1) unstable; urgency=low
+
+  * 1.0.2 minor release
+  * fix: unknown argument --query when calling crm_master
+  * fix: perl warning when master score has never been set on the master
+  * change: remove misleading message in log file
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Wed, 25 May 2016 11:13:05 +0200
+
 resource-agents-paf (1.0.1-1) unstable; urgency=low
 
   * 1.0.1 minor release
