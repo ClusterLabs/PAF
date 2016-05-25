@@ -19,6 +19,7 @@ In `resource-agents-paf.spec`:
   * update the tag in the `_tag` variable (first line)
   * update the version in `Version:`
   * edit the changelog
+    * date format: `LC_TIME=C date +"%a %b %d %Y"`
 
 In `debian/`:
   * edit the `changelog` file
