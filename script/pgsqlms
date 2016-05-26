@@ -410,8 +410,9 @@ sub _query {
     $pid = open(my $KID, "-|");
 
     if ( $pid == 0 ) { # child
-        exec $PGPSQL, '--set', 'ON_ERROR_STOP=1', '-qXAtf', "$tmpfile",
-            '-R', "$RS", '-F', "$FS", "$connstr";
+        exec $PGPSQL, '--set', 'ON_ERROR_STOP=1', '-qXAtf', $tmpfile,
+            '-R', $RS, '-F', $FS, '--port', $pgport, '--host', $pghost,
+            $connstr;
     }
 
     # parent
