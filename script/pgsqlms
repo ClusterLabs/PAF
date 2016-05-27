@@ -73,6 +73,23 @@ my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
 my $nodename;
 my $exit_code = 0;
 
+# _master_score_exists
+# This subroutine checks if a master score is set for one of the relative clones
+# in the cluster and the score is greater or equal of 0.
+# Returns 1 if at least one master score >= 0 is found.
+# Returns 0 otherwise
+sub _master_score_exists {
+    my @partition_nodes = split /\s+/ => qx{ $CRM_NODE --partition };
+
+    foreach my $node ( @partition_nodes ) {
+        my $score = _get_master_score( $node );
+
+        return 1 if defined $score and $score ne '' and $score > -1;
+    }
+
+    return 0;
+}
+
 # Get, parse and return the value of the given private attribute name
 # Returns an empty string if not found.
 sub _get_priv_attr {
@@ -618,9 +635,9 @@ sub _check_locations {
         next if $node eq $nodename;
 
         ocf_log( 'warning', sprintf
-            '_check_locations: "%s" is not connected to the primary, set score to 0',
+            '_check_locations: "%s" is not connected to the primary, set score to -1000',
             $node );
-        _set_master_score( 0, $node );
+        _set_master_score( -1000, $node );
     }
 
     # Finally set the master score if not already done
@@ -1080,6 +1097,7 @@ sub pgsql_validate_all {
 #
 sub pgsql_start {
     my $rc = pgsql_monitor();
+    my $prev_state = _controldata_state;
 
     # Instance must be running as secondary or being stopped.
     # Anything else is an error.
@@ -1115,13 +1133,26 @@ sub pgsql_start {
         sleep 1 while ( $rc = pgsql_monitor() ) == $OCF_NOT_RUNNING;
 
         if ( $rc == $OCF_SUCCESS ) {
-            ocf_log( 'info',  sprintf'pgsql_start: instance "%s" started',
+            ocf_log( 'info',  sprintf 'pgsql_start: instance "%s" started',
                 $OCF_RESOURCE_INSTANCE );
 
-            # TODO: When starting the cluster for the very first time, no
-            # instance has a promotion score. We should probably set a score
-            # either or during post-start so the cluster can elect one of slaves
-            # if the cluster setup has no location constraint for the master.
+            # Check if a master score exists in the cluster.
+            # During the very first start of the cluster, no master score will
+            # exists on any of the existing slaves, unless an admin designated
+            # one of them using crm_master. If no master exists the cluster will
+            # not promote a master among the slaves.
+            # To solve this situation, we check if there is at least one master
+            # score existing on one node in the cluster. Do nothing if at least
+            # one master score is found among the clones of the resource. If no
+            # master score exists, set a score of 1 only if the resource was a
+            # shut downed master before the start.
+            unless ( _master_score_exists() ) {
+                ocf_log( 'info',  sprintf
+                    'pgsql_start: No master score around. Set mine to 1.',
+                    $OCF_RESOURCE_INSTANCE );
+
+                _set_master_score( 1 ) if $prev_state eq "shut down";
+            }
 
             return $OCF_SUCCESS;
         }
