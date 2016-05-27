@@ -1576,30 +1576,20 @@ sub pgsql_promote {
 
     # The instance promotion is asynchronous, so we need to wait for this
     # process to complete.
-    while ( ( $rc = pgsql_monitor() ) != $OCF_RUNNING_MASTER ) {
+    while ( pgsql_monitor() != $OCF_RUNNING_MASTER ) {
         ocf_log( 'debug',
             'pgsql_promote: waiting for the promote to complete' );
         sleep 1;
     }
 
-    ocf_log( 'debug',
-        'pgsql_promote: promote completed according to the monitor return code' );
+    ocf_log( 'info', 'pgsql_promote: promote complete' );
 
-    $rc = pgsql_monitor();
+    # Set the "primary_node" resource parameter to the promoted node name.
+    qx{ $CRM_RESOURCE --resource $OCF_RESOURCE_INSTANCE \\
+        --set-parameter primary_node --parameter-value "$nodename" };
+    ocf_log( 'debug', 'pgsql_promote: primary_node set' );
 
-    if ( $rc == $OCF_RUNNING_MASTER ) {
-        ocf_log( 'info', 'pgsql_promote: promote complete' );
-
-        # Set the "primary_node" resource parameter to the promoted node name.
-        qx{ $CRM_RESOURCE --resource $OCF_RESOURCE_INSTANCE \\
-            --set-parameter primary_node --parameter-value "$nodename" };
-        ocf_log( 'debug', 'pgsql_promote: primary_node set' );
-
-        return $OCF_SUCCESS;
-    }
-
-    ocf_log( 'err', 'pgsql_promote: error while promoting' );
-    return $OCF_ERR_GENERIC;
+    return $OCF_SUCCESS;
 }
 
 # This is called before a demote occurs.
