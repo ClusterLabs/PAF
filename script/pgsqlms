@@ -60,7 +60,7 @@ my $PGCTRLDATA = "$bindir/pg_controldata";
 my $PGISREADY  = "$bindir/pg_isready";
 
 # crm* commands path
-my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime reboot";
+my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime forever";
 my $CRM_ATTRIBUTE = "$HA_SBIN_DIR/crm_attribute --lifetime reboot --type status";
 my $CRM_NODE      = "$HA_SBIN_DIR/crm_node";
 my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
@@ -80,6 +80,8 @@ sub _get_attr {
     $node = "--node $node" if $node ne '';
 
     $ans = qx{ $CRM_ATTRIBUTE --quiet --name "$name" $node --get-value };
+
+    chomp $ans;
 
     return undef unless $? == 0;
 
@@ -121,6 +123,49 @@ sub _delete_attr {
 
     return;
 }
+
+# Get, parse and return the resource master score on given node.
+# Returns an empty string if not found.
+# Returns undef on crm_master call on error
+sub _get_master_score {
+    my ( $node ) = @_;
+    my $node_arg = '';
+    my $score;
+
+    $node_arg = sprintf '--node "%s"', $node if defined $node and $node ne '';
+
+    $score = qx{ $CRM_MASTER --quiet --get-value $node_arg 2> /dev/null };
+
+    return '' unless $? == 0;
+
+    chomp $score;
+
+    $score = '' unless defined $score;
+
+    return $score;
+}
+
+# Set the given attribute name to the given value.
+# As setting an attribute is asynchronous, this will return as soon as the
+# attribute is really set by attrd and available everywhere.
+sub _set_master_score {
+    my ( $score, $node ) = @_;
+    my $node_arg = '';
+    my $tmp;
+
+    $node_arg = sprintf '--node "%s"', $node if defined $node and $node ne '';
+
+    qx{ $CRM_MASTER $node_arg --quiet --update "$score" };
+
+    while ( ( $tmp = _get_master_score( $node ) ) ne $score ) {
+        ocf_log( 'debug', sprintf '_set_master_score: waiting to set score to "%s" (currently "%s")...',
+            $score, $tmp );
+        select(undef, undef, undef, 0.1);
+    }
+
+    return;
+}
+
 
 # Run the given command as the "system_user" given as parameter.
 # It basically forks and seteuid/setuid away from root.
@@ -486,8 +531,7 @@ sub _check_locations {
             next;
         }
 
-        $node_score = qx{ $CRM_MASTER --node "$row->[0]" --quiet -G };
-        chomp $node_score;
+        $node_score = _get_master_score( $row->[0] );
 
         if ( $row->[3] =~ /^\s*(?:startup|backup)\s*$/ ) {
             # We exclude any standby being in state backup (pg_basebackup) or
@@ -496,8 +540,7 @@ sub _check_locations {
                 '_check_locations: forbid promotion on "%s" in state "%s", set score to -1',
                 $row->[0], $row->[3] );
 
-            qx{ $CRM_MASTER --node "$row->[0]" --update -1 }
-                if $node_score != -1;
+            _set_master_score( -1, $row->[0] ) if $node_score != -1;
         }
         else {
             ocf_log( 'debug', sprintf
@@ -513,7 +556,7 @@ sub _check_locations {
                     ocf_log( 'info', sprintf
                         '_check_locations: "%s" is the best candidate to promotion, set score to 1000',
                         $row->[0] );
-                    qx{ $CRM_MASTER --node "$row->[0]" --update 1000 };
+                    _set_master_score( 1000, $row->[0] );
                 }
                 else {
                     ocf_log( 'debug', sprintf
@@ -528,7 +571,7 @@ sub _check_locations {
                 ocf_log( 'info', sprintf
                     '_check_locations: "%s" is not a candidate to promotion, set score to 1',
                     $row->[0] );
-                qx{ $CRM_MASTER --node "$row->[0]" --update 1 };
+                _set_master_score( 1, $row->[0] );
             }
         }
 
@@ -547,13 +590,12 @@ sub _check_locations {
         ocf_log( 'warning', sprintf
             '_check_locations: "%s" is not connected to the primary, set score to 0',
             $node );
-        qx{ $CRM_MASTER --node "$node" --update 0 };
+        _set_master_score( 0, $node );
     }
 
     # Finally set the master score if not already done
-    $node_score = qx{ $CRM_MASTER --quiet --get-value };
-    chomp $node_score;
-    qx{ $CRM_MASTER --update 1001 } if $node_score eq '' or $node_score != 1001;
+    $node_score = _get_master_score();
+    _set_master_score( 1001 ) if $node_score eq '' or $node_score != 1001;
 
     return $OCF_SUCCESS;
 }
@@ -976,7 +1018,7 @@ sub pgsql_start {
                 unless ( $nodename eq $OCF_PRIMARY_NODE ) {
                     # Set master score to 1 so the node can be promoted.
                     ocf_log( 'debug', "pgsql_start: instance started as a secondary, set master score to 1.");
-                    qx{ $CRM_MASTER --update 1 };
+                    _set_master_score( 1 );
                 }
             }
 
@@ -1426,10 +1468,10 @@ sub pgsql_promote {
                 $node_to_promote );
 
             # Reset current node master score.
-            qx{ $CRM_MASTER --update 1 };
+            _set_master_score( 1 );
 
             # Set promotion candidate master score.
-            qx{ $CRM_MASTER --node "$node_to_promote" --update 1000 };
+            _set_master_score( 1000, $node_to_promote );
 
             # We fail the promotion to trigger another promotion transition
             # with the new scores.
@@ -1469,7 +1511,7 @@ sub pgsql_promote {
         ocf_log( 'debug', 'pgsql_promote: primary_node set' );
 
         # Set master score to 1001 for this node so it sticks to this role.
-        qx{ $CRM_MASTER --update 1001 };
+        _set_master_score( 1001 );
 
         ocf_log( 'debug', 'pgsql_promote: crm_master to 1001 done' );
 
