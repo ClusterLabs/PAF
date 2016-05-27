@@ -470,7 +470,7 @@ sub _controldata {
 sub _query {
     my $query        = shift;
     my $res          = shift;
-    my $connstr      = "dbname=postgres user=postgres";
+    my $connstr      = "dbname=postgres";
     my $RS           = chr(30); # ASCII RS  (record separator)
     my $FS           = chr(3);  # ASCII ETX (end of text)
     my $postgres_uid = getpwnam( $system_user );
@@ -514,7 +514,6 @@ sub _query {
     # parent
     $> = $oldeuid;
 
-    
     {
         local $/;
         $ans = <$KID>;
@@ -531,7 +530,8 @@ sub _query {
         push @{ $res }, [ split(chr(3) => $_, -1) ]
             foreach split (chr(30) => $ans, -1);
 
-        ocf_log( 'debug', '_query: @res:'. Dumper(\@res));
+        ocf_log( 'debug', sprintf '_query: @res: %s',
+            Data::Dumper->new( [ $res ] )->Terse(1)->Dump );
     }
 
     # Possible return codes:
