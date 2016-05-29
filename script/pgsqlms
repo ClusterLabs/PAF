@@ -228,8 +228,7 @@ sub _runas {
     my $rc;
     my $pid;
     my @cmd = @_;
-    my $postgres_uid = getpwnam( $system_user );
-    my $postgres_gid = getgrnam( $system_user );
+    my (undef, undef, $postgres_uid, $postgres_gid ) = getpwnam( $system_user );
 
     $pid = fork;
 
@@ -245,7 +244,7 @@ sub _runas {
         exec @cmd;
     }
 
-    ocf_log( 'debug', sprintf'_runas: launching as "%s" command "%s"',
+    ocf_log( 'debug', sprintf '_runas: launching as "%s" command "%s"',
         $system_user, join(' ', @cmd) );
 
     waitpid $pid, 0;
