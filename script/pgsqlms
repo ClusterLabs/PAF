@@ -1145,12 +1145,12 @@ sub pgsql_start {
             # one master score is found among the clones of the resource. If no
             # master score exists, set a score of 1 only if the resource was a
             # shut downed master before the start.
-            unless ( _master_score_exists() ) {
-                ocf_log( 'info',  sprintf
+            if ( $prev_state eq "shut down" and not _master_score_exists() ) {
+                ocf_log( 'info',
                     'pgsql_start: No master score around. Set mine to 1.',
-                    $OCF_RESOURCE_INSTANCE );
+                );
 
-                _set_master_score( 1 ) if $prev_state eq "shut down";
+                _set_master_score( 1 );
             }
 
             return $OCF_SUCCESS;
