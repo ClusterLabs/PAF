@@ -35,7 +35,6 @@ our $PROGRAM = 'pgsqlms';
 my $OCF_RESOURCE_INSTANCE = $ENV{'OCF_RESOURCE_INSTANCE'};
 my $OCF_ACTION            = $ARGV[0];
 my $OCF_RUNNING_SLAVE     = $OCF_SUCCESS;
-my $OCF_PRIMARY_NODE      = $ENV{'OCF_RESKEY_primary_node'} || '';
 my %OCF_NOTIFY_ENV        = ocf_notify_env() if $OCF_ACTION eq 'notify';
 
 # Default parameters values
@@ -628,15 +627,6 @@ sub _check_locations {
     # point.
     my $partition_nodes = qx{ $CRM_NODE --partition };
 
-    # If the primary node attribute has not been set, then no promotion has
-    # occurred yet, so we do not need to check locations yet.
-    if ( $OCF_PRIMARY_NODE eq '' ) {
-        ocf_log( 'debug',
-            '_check_locations: primary_node attribute not set, there was probably no promotion yet'
-        );
-
-        return $OCF_SUCCESS;
-    }
 
     # We check locations of connected standbies by querying the
     # "pg_stat_replication" view.
@@ -800,7 +790,7 @@ sub _confirm_role {
     # The query failed (rc: 3) or bad parameters (rc: -1).
     # This should not happen, raise a hard configuration error.
     ocf_log( 'err', sprintf
-        '_confirm_role: the query to check if instance "%s"is a primary or a secondary failed (rc: %d)',
+        '_confirm_role: the query to check if instance "%s" is a primary or a secondary failed (rc: %d)',
         $OCF_RESOURCE_INSTANCE, $rc );
 
     return $OCF_ERR_CONFIGURED;
@@ -948,16 +938,6 @@ sub ocf_meta_data {
               </longdesc>
               <shortdesc lang="en">Additionnal arguments given to the postgres process on startup.</shortdesc>
               <content type="string" default="$start_opts_default" />
-            </parameter>
-
-            <parameter name="primary_node" unique="0" required="0">
-              <longdesc lang="en">
-                Name of the node hosting the current master state.
-                This parameter is for internal use only, do not configure it
-                during cluster setup.
-              </longdesc>
-              <shortdesc lang="en">Internal use only</shortdesc>
-              <content type="string" default="" />
             </parameter>
 
           </parameters>
@@ -1524,12 +1504,6 @@ sub pgsql_promote {
         ocf_log( 'info',
             'pgsql_promote: recovering old master, no election needed');
     }
-    # If "primary_node" resource attribute has not been set, the cluster is
-    # starting up for the first time, no need to compare secondaries.
-    elsif ( $OCF_PRIMARY_NODE eq '' ) {
-        ocf_log( 'info',
-            'pgsql_promote: starting for the very first time. No election needed');
-    }
     else {
 
         # The promotion is occurring on the best known candidate (highest
@@ -1658,11 +1632,6 @@ sub pgsql_promote {
 
     ocf_log( 'info', 'pgsql_promote: promote complete' );
 
-    # Set the "primary_node" resource parameter to the promoted node name.
-    qx{ $CRM_RESOURCE --resource $OCF_RESOURCE_INSTANCE \\
-        --set-parameter primary_node --parameter-value "$nodename" };
-    ocf_log( 'debug', 'pgsql_promote: primary_node set' );
-
     return $OCF_SUCCESS;
 }
 
@@ -1730,15 +1699,6 @@ sub pgsql_notify_pre_promote {
     # information to check if the instance to be promoted is the best one,
     # so we can avoid a race condition between the last successful monitor
     # on the previous master and the current promotion.
-
-    # If this is the first promotion, "OCF_PRIMARY_NODE" will not be set,
-    # thus there is no point to record locations.
-    unless ( $OCF_PRIMARY_NODE ne '' ) {
-        ocf_log( 'info',
-            'pgsql_notify: It looks like a the very first promotion. No election needed.'
-        );
-        return $OCF_SUCCESS;
-    }
 
     # No need to do an election between slaves if this is recovery of the master
     if ( _is_master_recover( $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} ) ) {

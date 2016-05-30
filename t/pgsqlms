@@ -9,7 +9,6 @@ VARIABLE
     PGBIN=${PGBIN=/usr/pgsql-9.3/bin}
     PGHOST=${PGHOST=/tmp}
     RESOURCE_NAME=${RESOURCE_NAME=pgsqld}
-    PRIMARY_NODE=${PRIMARY_NODE=}
     NODENAME=$(uname -n)
 
 CASE-BLOCK cleanup
@@ -52,7 +51,6 @@ CASE-BLOCK required_args
     Env OCF_RESKEY_pgdata=$PGDATA
     Env OCF_RESKEY_pghost=$PGHOST
     Env OCF_RESOURCE_INSTANCE=$RESOURCE_NAME
-    Env OCF_RESKEY_primary_node=$PRIMARY_NODE
 
 CASE-BLOCK prepare
     Include required_args
