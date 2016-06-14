@@ -17,7 +17,7 @@ scripts.
 This manual explains the steps to install it correctly on your system.
 
 
-## Using packages
+## Using RPM packages
 
 A RPM file is available for each release. You should be able to find them on the
 release page of the project hosted on github:
@@ -34,6 +34,23 @@ instance:
 yum install https://github.com/dalibo/PAF/releases/download/v1.0.0/resource-agents-paf-1.0.0-1.noarch.rpm
 ```
 
+## Using Debian packages
+
+A Debian package is available for each release. You should be able to find them
+on the release page of the project hosted on github:
+[https://github.com/dalibo/PAF/releases](https://github.com/dalibo/PAF/releases)
+
+To install the lastest version of PostgreSQL Automatic Failover, go to the
+following link:
+[https://github.com/dalibo/PAF/releases/latest](https://github.com/dalibo/PAF/releases/latest)
+
+Copy the link to the associated DEB file, download it, then install it
+using `dpkg`. As instance:
+
+```
+wget 'https://github.com/dalibo/PAF/releases/download/v1.0.2/resource-agents-paf_1.0.2-1_all.deb'
+dpkg -i resource-agents-paf_1.0.2-1_all.deb
+```
 
 ## Installation from the sources
 
