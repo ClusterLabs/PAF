@@ -12,6 +12,7 @@ commands.
 ## A word of caution
 
 Pacemaker is a complex and sensitive tool.
+
 Before running any command modifying an active cluster configuration, you
 should always validate its effect beforehand by using the `crm_shadow` and
 `crm_simulate` tools.
@@ -21,8 +22,10 @@ should always validate its effect beforehand by using the `crm_shadow` and
 The Pacemaker-related actions documented on this page use exclusively generic
 Pacemaker commands.
 
-Depending on the Pacemaker stack you're using, you may have an additionnal
-command line administration tool installed (usually, `pcs` or `crmsh`).
+Depending on the Pacemaker packaging policy and choices of your operating
+system, you may have an additional command line administration tool installed
+(usually, `pcs` or `crmsh`).
+
 If that's the case, you should obviously use the tool that you're the most
 comfortable with.
 
@@ -37,6 +40,19 @@ action.
 If you're about to do something that may impact Pacemaker (reboot a PostgreSQL
 instance, a whole server, change the network configuration, etc.), you should
 consider using it.
+
+Here is the generic command line to put the cluster in maintenance mode:
+
+```
+crm_attribute --name maintenance-mode --update true
+```
+
+And how to leave the maintenance mode:
+
+```
+crm_attribute --name maintenance-mode --delete
+```
+
 Refer to the official Pacemaker's documentation related to your installation
 for the specific commands.
 
@@ -47,16 +63,21 @@ If your PostgreSQL instance is managed by Pacemaker, you should proceed to
 administration tasks with care.
 
 Especially, if you need to restart a PostgreSQL instance, you should first put
-the resource in maintenance mode, so Pacemaker will to attempt to automatically
+the resource in maintenance mode, so Pacemaker will not attempt to automatically
 restart it.
 
 Also, you should refrain to use any tool other than `pg_ctl` (provided with any
-PostgreSQL installation) to start and stop your instance if you need to
+PostgreSQL installation) to start and stop your instance if you need to.
+
 "Other tools" may include any conveniance wrapper, like SysV init scripts,
 systemd unit files, or `pg_ctlcluster` Debian wrapper.
+
 Pacemaker only uses `pg_ctl`, and as other tools behave differently, using them
-could lead to some easy mistakes, like an init script reporting that the
-instance is stopped when it is not.
+could lead to some unpredictable behavior, like an init script reporting that
+the instance is stopped when it is not.
+
+And again, we can not emphasis this stronger enough: __if you really need__ to
+use `pg_ctl`, do it under __maintenance mode__.
 
 
 
@@ -71,6 +92,7 @@ doing a maintenance operation on the node hosting the master resource.
 
 These steps use only Pacemaker commands to move the master PostgreSQL resource
 around.
+
 Note that in these examples, we only ask for Pacemaker to move the "master"
 resource. That means that, based on your configuration, the following should
 happen:
@@ -84,12 +106,12 @@ happen:
 ### Move the master resource to another node
 
 ```
-    crm_resource --move --master --resource <PAF_resource_name> --host <target_node>
+crm_resource --move --master --resource <PAF_resource_name> --host <target_node>
 ```
 
-This command will set up an `INFINITY` score ont the target node for the master
-resource.
-This will force Pacemaker to trigger the switchover to the target node:
+This command will set an `INFINITY` score on the target node for the master
+resource. This will force Pacemaker to trigger the switchover to the target
+node:
 
   * "demote" PostgreSQL resource on the current master node ("stop" the
     resource, and then "start" it as a "slave" resource)
@@ -99,12 +121,12 @@ This will force Pacemaker to trigger the switchover to the target node:
 ### Ban the master resource from a node
 
 ```
-    crm_resource --ban --master --resource <PAF_resource_name>
+crm_resource --ban --master --resource <PAF_resource_name>
 ```
 
 This command will set up a `-INFINITY` score on the node currently running the
-master resource.
-This will force Pacemaker to trigger the switchover to another available node:
+master resource. This will force Pacemaker to trigger the switchover to another
+available node:
   * "demote" PostgreSQL resource on the current master node ("stop" the
     resource, and then "start" it as a "slave" resource)
   * "promote" PostgreSQL resource on another node
@@ -117,12 +139,13 @@ the previous commands will not be automatically removed.
 __This means that unless you remove these scores manually, your master resource
 is now stuck on one node (`--move` case), or forbidden on one node (`--ban` 
 case).__
-So, for your cluster to be fully operational again, you have to clear these
-scores.
-The following command will remove any constraint set by the previous commands:
+
+To allow your cluster to be fully operational again, you have to clear these
+scores. The following command will remove any constraint set by the previous
+commands:
 
 ```
-    crm_resource --clear --master --resource <PAF_resource_name>
+crm_resource --clear --master --resource <PAF_resource_name>
 ```
 
 Note that depending on your configuration, the `--clear` action may trigger
@@ -137,6 +160,7 @@ configuration), you should always validate its effect beforehand by using the
 
 That's it, there was a problem with the node hosting the primary PostgreSQL
 instance, and your cluster triggered a failover.
+
 That means one of the standy instances has been promoted, is now a primary
 PostgreSQL instance, running as the `master` resource, and the high
 availability IP address has been moved to this node.
@@ -155,9 +179,10 @@ virtualization or hardware issues.
 
 Once that's done, you connect to your fenced node, and __before you do 
 anything__ (including un-fence it if your fencing method involves network
-isolation only), you ensure that Corosync, Pacemaker and PostgreSQL processes
+isolation only), ensure that Corosync, Pacemaker and PostgreSQL processes
 are down: you certainly don't want these to suddently kick in your alive
 cluster!
+
 Then, again, you check everything for errors related to the failure.
 Good starting points are the OS, Pacemaker and PostgreSQL log files.
 If you find something that went wrong, fix it before moving to the next step.
@@ -168,13 +193,14 @@ Finally, __you need to rebuild the PostgreSQL instance on the failed node__.
 That's right, as the PostgreSQL resource suffered a failover, it is very likely
 that the promoted PostgreSQL instance was late by a few transactions.
 
-  * the first consequence is that you did lose several commited transactions,
+  * the first consequence is that you did lose several committed transactions,
     hopefully not that many
   * the second consequence is that your old primary is too advanced in the
     transaction log to come back as a standby as it is
 
 So you need to rebuild your old, failed primary instance, based on the one
 currently used as the master resource.
+
 To do this, use any backup and recovery method that fits your configuration.
 PostgreSQL's `pg_basebackup` tool may be handy if your instance is not too
 big, and if you're in PostgreSQL 9.5+, you may want to consider `pg_rewind`.
@@ -186,11 +212,6 @@ be done in that case is not a good idea.
 Beware when you do your rebuild not to erase local files with a content
 specific to that node (at the very least, avoid erasing `recovery.conf.pcmk`
 and `pg_hba.conf` files content).
-
-The only exception to that "rebuild" rule is if you were only using
-PostgreSQL's synchronous replication at the time of the failover (and the
-synchronous standby was the one promoted, which would be the case unless it
-__also__ suffered from a failure).
 
 Once you have rebuilt your instance from the running master PostgreSQL
 resource, verify that you can successfully start it as a standby (remember
@@ -269,8 +290,9 @@ up again:
 Now, `srv1` is clean, and you can consider integrating it back in the cluster.
 Go to another node, like `srv2`, and check the cluster reaction if `srv1`
 member was to be up again :
+
 ```
-    crm_simulate -SL --node-up srv1
+crm_simulate -SL --node-up srv1
 ```
 
 This should print something like this:
@@ -320,7 +342,7 @@ This should print something like this:
 
 That seems good!
 So now you just need to really start Corosync and Pacemaker on `srv1`, and if
-everythings goes as planned, you're done.
+everything goes as planned, you're done.
 
 
 
