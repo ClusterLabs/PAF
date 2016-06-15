@@ -1,4 +1,4 @@
-resource-agents-paf (2.0beta1-1) unstable; urgency=low
+resource-agents-paf (2.0~beta1-1) unstable; urgency=low
 
   * 2.0_beta1 major release
   * fix: do not use crm_node --partition to discover resources
