@@ -1,3 +1,26 @@
+resource-agents-paf (2.0beta1-1) unstable; urgency=low
+
+  * 2.0_beta1 major release
+  * fix: do not use crm_node --partition to discover resources
+  * fix: unknown argument --query when calling crm_master
+  * fix: perl warning when master score has never been set on the master
+  * fix: remove wrong info message during post-promote notify
+  * fix: race condition when setting attributes during actions
+  * fix: bug where pgport and pghost where ignored in _query
+  * fix: use same role name than the system_user to connect
+  * fix: wrap crm_master calls in sub to make them synchronous
+  * fix: fixed a bug related to setgid in _runas
+  * fix: check on application_name in validate_all
+  * change: do not start standby with a master score of 1
+  * change: choose the clone to promote when no master score exist
+  * new: detect and deal master/slave recovery transition
+  * new: detect and enforce reliability of a switchover
+  * new: set next best secondaries base on their lag
+  * misc: code cleanup and refactoring
+  * misc: various log messages cleanup and enhancement
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Wed, 15 Jun 2016 23:19:58 +0200
+
 resource-agents-paf (1.0.1-1) unstable; urgency=low
 
   * 1.0.1 minor release

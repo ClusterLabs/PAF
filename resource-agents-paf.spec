@@ -1,7 +1,7 @@
-%global _tag v1.0.1
+%global _tag v2.0_beta1
 %global _ocfroot /usr/lib/ocf
 Name: resource-agents-paf
-Version: 1.0.1
+Version: 2.0b1
 Release: 1
 Summary: PostgreSQL resource agent for Pacemaker
 License: PostgreSQL
@@ -41,6 +41,26 @@ rm -f "%{buildroot}"/usr/local/lib64/perl5/auto/PAF/.packlist
 %{_datadir}/resource-agents/ocft/configs/pgsqlms
 
 %changelog
+* Wed Jun 15 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.0beta1-1
+- 2.0_beta1 major release
+- fix: do not use crm_node --partition to discover resources
+- fix: unknown argument --query when calling crm_master
+- fix: perl warning when master score has never been set on the master
+- fix: remove wrong info message during post-promote notify
+- fix: race condition when setting attributes during actions
+- fix: bug where pgport and pghost where ignored in _query
+- fix: use same role name than the system_user to connect
+- fix: wrap crm_master calls in sub to make them synchronous
+- fix: fixed a bug related to setgid in _runas
+- fix: check on application_name in validate_all
+- change: do not start standby with a master score of 1
+- change: choose the clone to promote when no master score exist
+- new: detect and deal master/slave recovery transition
+- new: detect and enforce reliability of a switchover
+- new: set next best secondaries base on their lag
+- misc: code cleanup and refactoring
+- misc: various log messages cleanup and enhancement
+
 * Wed Apr 27 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 1.0.1-1
 - 1.0.1 minor release
 - fix: forbid the master to decrease its own score (gh #19)
