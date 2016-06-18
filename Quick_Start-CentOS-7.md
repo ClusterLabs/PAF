@@ -72,15 +72,18 @@ yum install -y pacemaker postgresql93 postgresql93-contrib postgresql93-server r
 Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
-yum install -y https://github.com/dalibo/PAF/releases/download/v1.0.0/resource-agents-paf-1.0.0-1.noarch.rpm
+yum install -y https://github.com/dalibo/PAF/releases/download/v2.0_beta1/resource-agents-paf-2.0.beta1-1.noarch.rpm
 ```
 
 ## PostgreSQL setup
 
-The resource agent requires the PostgreSQL instances to be already set up and
-ready to start. Moreover, it requires a `recovery.conf` template ready to use.
-You can create a `recovery.conf` file suitable to your needs, the only
-requirements are:
+The resource agent requires the PostgreSQL instances to be already set up,
+ready to start and slaves ready to replicate. Make sure to setup your PostgreSQL
+master on your preferred node to host the master: during the very first startup
+of the cluster, PAF detects the master based on its shutdown status.
+
+Moreover, PAF requires a `recovery.conf` template ready to use. You can create
+a `recovery.conf` file suitable to your needs, the only requirements are:
 
   * have `standby_mode = on`
   * have `recovery_target_timeline = 'latest'`
@@ -92,7 +95,7 @@ __**quick and dirty**__. Rely on the
 [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
 for a proper setup.
 
-On the primary:
+This quick start considers `srv1` is the preferred master. On the primary:
 
 ```
 /usr/pgsql-9.3/bin/postgresql93-setup initdb
@@ -151,7 +154,7 @@ systemctl start postgresql-9.3
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
 disable them, as Pacemaker will take care of starting/stopping everything for
-you:
+you during cluster normal cluster operations:
 
 ```
 systemctl stop postgresql-9.3
@@ -220,8 +223,10 @@ and `fence_vm_xxx`.
 
 The `pgsql-ha` resource represents all the PostgreSQL instances of your cluster
 and controls where is the primary and where are the standbys.
+
 The `pgsql-master-ip` is located on the node hosting the PostgreSQL master
 resource.
+
 The last resources `fence_vm_xxx` are STONITH resources, used to manage fencing.
 We create one STONITH resource for each node. Each fencing resource will not be
 allowed to run on the node it is supposed to stop. We are using the
@@ -240,12 +245,14 @@ pcs -f cluster1.xml resource defaults migration-threshold=5
 pcs -f cluster1.xml resource defaults resource-stickiness=10
 ```
 
-Then, we must start populating it with the STONITH resources:
+Then, we must start populating it with the STONITH resources. Replace
+`<username>` with the system user name on the hypervisor able to manage your
+virtual machine: 
 
 ```
-pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="root" port="srv1-c7" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="root" port="srv2-c7" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="root" port="srv3-c7" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="<username>" port="srv1-c7" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="<username>" port="srv2-c7" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="<username>" port="srv3-c7" action="off" identity_file="/root/.ssh/id_rsa"
 pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv3 avoids srv3=INFINITY
@@ -296,12 +303,6 @@ process.
 pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsql-ha INFINITY
 pcs -f cluster1.xml constraint order promote pgsql-ha then start pgsql-master-ip symmetrical=false
 pcs -f cluster1.xml constraint order demote pgsql-ha then stop pgsql-master-ip symmetrical=false
-```
-
-And finally, we define a preference for our master node:
-
-```
-pcs -f cluster1.xml constraint location pgsql-ha prefers srv1=1
 ```
 
 We can now push our CIB to the cluster, which will start all the magic stuff:
