@@ -71,18 +71,15 @@ Let install everything we need for our cluster:
 ```
 apt-get install -t jessie-backports pacemaker crmsh
 
-apt-get install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3 git
+apt-get install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3
 ```
 
-Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
+We can now install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
-cd /usr/local/src
-git clone https://github.com/dalibo/PAF.git
-cd pgsql-resource-agent/
-perl Build.PL
-./Build
-./Build install
+wget 'https://github.com/dalibo/PAF/releases/download/v2.0_beta1/resource-agents-paf_2.0.beta1-1_all.deb'
+dpkg -i resource-agents-paf_2.0.beta1-1_all.deb
+apt-get -f install
 ```
 
 ## PostgreSQL setup
@@ -95,6 +92,10 @@ requirements are:
   * have `standby_mode = on`
   * have `recovery_target_timeline = 'latest'`
   * a `primary_conninfo` with an `application_name` set to the node name
+
+Make sure to setup your PostgreSQL master on your preferred node to host the
+master: during the very first startup of the cluster, PAF detects the master
+based on its shutdown status.
 
 Here are some quick steps to build your primary PostgreSQL instance and its
 standbys. As this is not the main subject here, they are
@@ -189,7 +190,13 @@ The cluster configuration client `crmsh` is supposed to be able to take care of
 this, but this feature was broken when this tutorial was written.
 See [the related bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=819545).
 
-So here is the content of the `/etc/corosync/corosync.conf` file suitable to
+First, stop corosync:
+
+```
+systemctl stop corosync.service
+```
+
+Here is the content of the `/etc/corosync/corosync.conf` file suitable to
 the cluster as we described it so far:
 
 ```
@@ -321,7 +328,7 @@ First of all, let's start with some basic setup of the cluster:
 ```
 crm conf <<EOC
 property default-resource-stickiness=10
-property migration-limit=3
+rsc_defaults migration-threshold=5
 EOC
 ```
 
@@ -366,8 +373,6 @@ the same time:
   3. the IP address that must be started on the PostgreSQL master node
   4. the collocation of the master IP address with the PostgreSQL master
      instance
-  5. the preference about where the master should be started. As we defined
-     earlier, our master is supposed to be on `srv1`
 
 ```
 crm conf <<EOC
@@ -381,14 +386,11 @@ primitive pgsqld pgsqlms                                                      \
          start_opts="-c config_file=/etc/postgresql/9.3/main/postgresql.conf" \
   op start timeout=60s                                                        \
   op stop timeout=60s                                                         \
-  op reload timeout=20s                                                       \
   op promote timeout=30s                                                      \
   op demote timeout=120s                                                      \
   op monitor interval=15s timeout=10s role="Master"                           \
   op monitor interval=16s timeout=10s role="Slave"                            \
-  op notify timeout=60s                                                       \
-  op meta-data timeout=5s                                                     \
-  op validate-all timeout=5s
+  op notify timeout=60s
 
 # 2. resource pgsql-ha
 ms pgsql-ha pgsqld                          \
@@ -410,9 +412,6 @@ order promote-then-ip Mandatory:         \
 order stop-ip-then-demote Mandatory:   \
   pgsql-ha:demote pgsql-master-ip:stop \
   sequential=true symmetrical=false
-
-# 5. location preference for the pgsql-ha master
-location pgsql-ha_master-prefers-srv1 pgsql-ha role=Master 1: srv1
 
 EOC
 ```
