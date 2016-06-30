@@ -82,6 +82,36 @@ dpkg -i resource-agents-paf_2.0.beta1-1_all.deb
 apt-get -f install
 ```
 
+By default, Debian set up the instances to put the temporary activity
+statistics inside a sub folder of `/var/run/postgresql/`. This sub folder is
+created by the debian specific tool `pg_ctlcluster` on instance startup.
+
+PAF only use tools provided by the PostgreSQL projects, not other specifics to
+some other packages or operating system. That means that this required sub
+folder set up in `stats_temp_directory` is never created and leads to error on
+instance startup by Pacemaker.
+
+To creating this sub folder on system initialization, we need to extend the
+existing `systemd-tmpfiles` configuration for `postgresql` to add it. In our
+environment `stats_temp_directory` is set
+to `/var/run/postgresql/9.3-main.pg_stat_tmp`, so we create the following
+file:
+
+```
+cat <<EOF > /etc/tmpfiles.d/postgresql-part.conf
+# Directory for PostgreSQL temp stat files
+d /var/run/postgresql/9.3-main.pg_stat_tmp 0700 postgres postgres - -
+EOF
+```
+
+If you don't want to reboot your system to take this file in consideration,
+just run the following command:
+
+```
+systemd-tmpfiles --create /etc/tmpfiles.d/postgresql-part.conf
+```
+
+
 ## PostgreSQL setup
 
 The resource agent requires the PostgreSQL instances to be already set up and
