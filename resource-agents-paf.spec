@@ -1,7 +1,7 @@
-%global _tag v2.0_beta1
+%global _tag v2.0_beta2
 %global _ocfroot /usr/lib/ocf
 Name: resource-agents-paf
-Version: 2.0~beta1
+Version: 2.0~beta2
 Release: 1
 Summary: PostgreSQL resource agent for Pacemaker
 License: PostgreSQL
@@ -41,8 +41,12 @@ rm -f "%{buildroot}"/usr/local/lib64/perl5/auto/PAF/.packlist
 %{_datadir}/resource-agents/ocft/configs/pgsqlms
 
 %changelog
+* Fri Jul 1 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.0beta2-1
+- 2.0_beta2 beta release
+- fix: bug in switchover with 9.5 and 9.6
+
 * Wed Jun 15 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.0beta1-1
-- 2.0_beta1 major release
+- 2.0_beta1 beta release
 - fix: do not use crm_node --partition to discover resources
 - fix: unknown argument --query when calling crm_master
 - fix: perl warning when master score has never been set on the master
