@@ -268,14 +268,11 @@ pcs -f cluster1.xml resource create pgsqld ocf:heartbeat:pgsqlms \
     bindir=/usr/pgsql-9.3/bin pgdata=/var/lib/pgsql/9.3/data     \
     op start timeout=60s                                         \
     op stop timeout=60s                                          \
-    op reload timeout=20s                                        \
     op promote timeout=30s                                       \
     op demote timeout=120s                                       \
     op monitor interval=15s timeout=10s role="Master"            \
     op monitor interval=16s timeout=10s role="Slave"             \
     op notify timeout=60s                                        \
-    op meta-data timeout=5s                                      \
-    op validate-all timeout=5s
 
 # pgsql-ha
 pcs -f cluster1.xml resource master pgsql-ha pgsqld \

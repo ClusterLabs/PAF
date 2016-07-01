@@ -20,15 +20,12 @@ Before configuring the resource agent, PostgreSQL must be installed on all the
 nodes it is supposed to run on, and be propertly configured to allow streaming
 replication between nodes.
 
-during the very first startup of your cluster, the designated master will be
-the only instance stopped gently as a master.
-
 For more details about how to configure streaming replication with PostgreSQL,
 please refer to the
 [official documentation](http://www.postgresql.org/docs/current/static/index.html).
 
-Moreover, it requires a `recovery.conf` template ready to use.
-You can create a `recovery.conf` file suitable to your needs, the only
+Next, it requires a template of the `recovery.conf` ready to use.
+You can create such a template file suitable to your needs, the only
 requirements are:
 
   * have `standby_mode = on`
@@ -38,6 +35,10 @@ requirements are:
 Moreover, if you rely on Pacemaker to move an IP resource on the node hosting
 the master role of PostgreSQL, make sure to add rules on the `pg_hba.conf` file
 of each instance to forbid self-replication.
+
+Last but not least, during the very first startup of your cluster, the
+designated master will be the only instance stopped gently as a master. Take
+great care of this when you setup your cluster for the first time
 
 
 ## PAF resource configuration
@@ -120,18 +121,9 @@ before deciding a resource has failed to stop, and fence the node instead).
     starting it again as a standby, thus its timeout should at least be equal
     to the sum of the ones of `stop` and `start` actions)
     * parameter `timeout` suggested value: `120s`
-  * action `reload`: change a resource parameter without restarting it, if the
-    parameter supports it
-    * parameter timeout suggested value: `30s`
   * action `notify`: executed at the same time on several nodes of the cluster
     before and after each actions. This is important in PAF mechanism.
     * parameter timeout suggested value: `60s`
-  * action `meta-data`: print the meta-data (parameters and supported actions)
-    of the resource agent
-    * parameter timeout suggested value: `5s`
-  * action `validate-all`: sanity check of the prerequisites of the resource
-    agent, like required binaries
-    * parameter timeout suggested value: `5s`
 
 ### Multi-state resource parameters
 

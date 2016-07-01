@@ -357,7 +357,7 @@ First of all, let's start with some basic setup of the cluster:
 
 ```
 crm conf <<EOC
-property default-resource-stickiness=10
+rsc_defaults resource-stickiness=10
 rsc_defaults migration-threshold=5
 EOC
 ```
