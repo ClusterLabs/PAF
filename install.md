@@ -28,10 +28,10 @@ following link:
 [https://github.com/dalibo/PAF/releases/latest](https://github.com/dalibo/PAF/releases/latest)
 
 Copy the link to the associated RPM file, and feed it to `yum install`. For
-instance:
+instance (replace `X.Y.Z` and `n` by their latest values):
 
 ```
-yum install https://github.com/dalibo/PAF/releases/download/v1.0.0/resource-agents-paf-1.0.0-1.noarch.rpm
+yum install https://github.com/dalibo/PAF/releases/download/vX.Y.Z/resource-agents-paf-X.Y.Z-n.noarch.rpm
 ```
 
 ## Using Debian packages
@@ -45,11 +45,11 @@ following link:
 [https://github.com/dalibo/PAF/releases/latest](https://github.com/dalibo/PAF/releases/latest)
 
 Copy the link to the associated DEB file, download it, then install it
-using `dpkg`. As instance:
+using `dpkg`. As instance (replace `X.Y.Z` and `n` by their latest values):
 
 ```
-wget 'https://github.com/dalibo/PAF/releases/download/v1.0.2/resource-agents-paf_1.0.2-1_all.deb'
-dpkg -i resource-agents-paf_1.0.2-1_all.deb
+wget 'https://github.com/dalibo/PAF/releases/download/vX.Y.Z/resource-agents-paf_X.Y.Z-n_all.deb'
+dpkg -i resource-agents-paf_X.Y.Z-n_all.deb
 ```
 
 ## Installation from the sources
@@ -72,8 +72,8 @@ resource agents. Under Debian, RHEL and their derivatives, you need the
 The latest version of PostgreSQL Automatic Failover can be downloaded from
 [https://github.com/dalibo/PAF/releases/latest](https://github.com/dalibo/PAF/releases/latest).
 
-Unpack the source and go to the `PAF-x.y.z` folder.
-To build and install the resource agent, run:
+Unpack the source and go to the `PAF-X.Y.Z` folder. To build and install the
+resource agent, run:
 
 ```
 ./Build.PL
