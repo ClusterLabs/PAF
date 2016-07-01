@@ -727,7 +727,7 @@ sub _check_switchover {
     );
 
     if ( $rc == 0 and
-         $ans =~ m{^rmgr: XLOG.*desc: checkpoint: redo [0-9A-F/]+; tli $tl;.*; shutdown$}m
+         $ans =~ m{^rmgr: XLOG.*desc: (?i:checkpoint)(?::|_SHUTDOWN) redo [0-9A-F/]+; tli $tl;.*; shutdown$}m
     ) {
         ocf_log( 'info', sprintf
             '_check_switchover: slave received the shutdown checkpoint',
