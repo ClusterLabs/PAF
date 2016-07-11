@@ -168,14 +168,31 @@ And remove the master IP address from `srv1`:
 ip addr del 192.168.122.50/24 dev eth0
 ```
 
+
 ## Cluster setup
+
+
+### Pacemaker
+
+It is advised to keep Pacemaker off on server boot. It helps the administrator
+to investigate after a node fencing before Pacemaker starts and potentially
+enters in a death match with the other nodes. Make sure to disable Corosync as
+well to avoid unexpected behaviors. Run this on all nodes:
+
+```
+systemctl disable corosync # important!
+systemctl disable pacemaker
+```
+
+
+### Cluster creation
 
 This guide uses the cluster management tool `pcsd` provided by RHEL to ease the
 creation and setup of a cluster. It allows to create the cluster from command
 line, without editing configuration files or XML by hands.
 
 `pcsd` uses the hacluster system user to work and communicate with other
-members of the cluster. We need to set a password for this user so it can
+members of the cluster. We need to set a password to this user so it can
 authenticate to other nodes easily. As cluster management commands can be run on
 any member of the cluster, it is recommended to set the same password everywhere
 to avoid confusions:
@@ -184,7 +201,7 @@ to avoid confusions:
 passwd hacluster
 ```
 
-Enable and start the pcsd daemon on all the nodes:
+Enable and start the `pcsd` daemon on all the nodes:
 
 ```
 chkconfig pcsd on
@@ -226,6 +243,19 @@ You can now start your cluster!
 ```
 pcs cluster start --all
 ```
+
+After some seconds of startup and cluster membership stuff, you should be able
+to see your three nodes up in `crm_mon` (or `pcs status`):
+
+```
+root@srv1:~# crm_mon -n1D
+Node srv1: online
+Node srv2: online
+Node srv3: online
+```
+
+We can now feed this cluster with some resources to keep available. This guide
+use the cluster client `pcs` to setup everything.
 
 
 ## Cluster resource creation and management

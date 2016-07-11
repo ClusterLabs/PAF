@@ -72,7 +72,7 @@ yum install -y pacemaker postgresql93 postgresql93-contrib postgresql93-server r
 Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
-yum install -y https://github.com/dalibo/PAF/releases/download/v2.0_beta1/resource-agents-paf-2.0.beta1-1.noarch.rpm
+yum install -y https://github.com/dalibo/PAF/releases/download/v2.0_beta1/resource-agents-paf-2.0.beta2-1.noarch.rpm
 ```
 
 ## PostgreSQL setup
@@ -167,7 +167,24 @@ And remove the master IP address from `srv1`:
 ip addr del 192.168.122.50/24 dev eth0
 ```
 
+
 ## Cluster setup
+
+
+### Pacemaker
+
+It is advised to keep Pacemaker off on server boot. It helps the administrator
+to investigate after a node fencing before Pacemaker starts and potentially
+enters in a death match with the other nodes. Make sure to disable Corosync as
+well to avoid unexpected behaviors. Run this on all nodes:
+
+```
+systemctl disable corosync # important!
+systemctl disable pacemaker
+```
+
+
+### Cluster creation
 
 This guide uses the cluster management tool `pcsd` provided by RHEL to ease the
 creation and setup of a cluster. It allows to create the cluster from command
@@ -214,6 +231,20 @@ You can now start your cluster!
 ```
 pcs cluster start --all
 ```
+
+
+After some seconds of startup and cluster membership stuff, you should be able
+to see your three nodes up in `crm_mon` (or `pcs status`):
+
+```
+root@srv1:~# crm_mon -n1D
+Node srv1: online
+Node srv2: online
+Node srv3: online
+```
+
+We can now feed this cluster with some resources to keep available. This guide
+use the cluster client `pcs` to setup everything.
 
 
 ## Cluster resource creation and management

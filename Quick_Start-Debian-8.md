@@ -77,7 +77,8 @@ apt-get install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3
 We can now install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
-wget 'https://github.com/dalibo/PAF/releases/download/v2.0_beta1/resource-agents-paf_2.0.beta1-1_all.deb'
+wget
+'https://github.com/dalibo/PAF/releases/download/v2.0_beta1/resource-agents-paf_2.0.beta2-1_all.deb'
 dpkg -i resource-agents-paf_2.0.beta1-1_all.deb
 apt-get -f install
 ```
@@ -211,6 +212,20 @@ ip addr del 192.168.122.100/24 dev eth0
 
 ## Cluster setup
 
+
+### Pacemaker
+
+It is advised to keep Pacemaker off on server boot. It helps the administrator
+to investigate after a node fencing before Pacemaker starts and potentially
+enters in a death match with the other nodes. Make sure to disable Corosync as
+well to avoid unexpected behaviors. Run this on all nodes:
+
+```
+systemctl disable corosync # important!
+systemctl disable pacemaker
+```
+
+
 ### Corosync
 
 The cluster communications and quorum (votes) rely on Corosync to work. So this
@@ -223,7 +238,7 @@ See [the related bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=8
 First, stop corosync:
 
 ```
-systemctl stop corosync.service
+systemctl stop corosync.service pacemaker.service
 ```
 
 Here is the content of the `/etc/corosync/corosync.conf` file suitable to
@@ -289,10 +304,10 @@ quorum {
 For more information about this configuration file, see the `corosync.conf`
 manual page.
 
-We can now start corosync:
+We can now start and Pacemaker:
 
 ```
-systemctl start corosync.service
+systemctl start pacemaker.service
 ```
 
 Here is a command to check everything is working correctly:
@@ -302,24 +317,6 @@ root@srv1:~# corosync-cmapctl | grep 'members.*ip'
 runtime.totem.pg.mrp.srp.members.3232266853.ip (str) = r(0) ip(192.168.122.101) r(1) ip(192.168.123.101)
 runtime.totem.pg.mrp.srp.members.3232266854.ip (str) = r(0) ip(192.168.122.102) r(1) ip(192.168.123.102)
 runtime.totem.pg.mrp.srp.members.3232266855.ip (str) = r(0) ip(192.168.122.103) r(1) ip(192.168.123.103)
-```
-
-### Pacemaker
-
-It is advised to keep Pacemaker off on server boot. It helps the administrator
-to investigate after a node fencing before Pacemaker starts and potentially
-enters in a death match with the other nodes.
-
-Run this on all nodes:
-
-```
-systemctl disable pacemaker
-```
-
-We can now start it manually on all nodes:
-
-```
-systemctl start pacemaker
 ```
 
 After some seconds of startup and cluster membership stuff, you should be able
@@ -334,6 +331,7 @@ Node srv3: online
 
 We can now feed this cluster with some resources to keep available. This guide
 use the cluster client `crmsh` to setup everything.
+
 
 ## Cluster resource creation and management
 
