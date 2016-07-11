@@ -180,8 +180,8 @@ enters in a death match with the other nodes. Make sure to disable Corosync as
 well to avoid unexpected behaviors. Run this on all nodes:
 
 ```
-systemctl disable corosync # important!
-systemctl disable pacemaker
+chkconfig corosync off # important!
+chkconfig pacemaker off
 ```
 
 
