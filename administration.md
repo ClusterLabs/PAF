@@ -103,6 +103,11 @@ happen:
   * any resource using a collocation constraint with the master resource (like
     a Pacemaker controlled IP address) will also be affected
 
+Moreover, during the switchover process, PAF will make sure the old master is
+be able to catchup with the new master. That means that if you try to switchover
+to a node which is not in streaming replication with the master, it will fail.
+
+
 ### Move the master resource to another node
 
 ```
