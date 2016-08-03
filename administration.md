@@ -113,9 +113,9 @@ This command will set an `INFINITY` score on the target node for the master
 resource. This will force Pacemaker to trigger the switchover to the target
 node:
 
-  * "demote" PostgreSQL resource on the current master node ("stop" the
-    resource, and then "start" it as a "slave" resource)
-  * "promote" PostgreSQL resource on the target node
+  * `demote` PostgreSQL resource on the current master node (stop the
+    resource, and then start it as a slave resource)
+  * `promote` PostgreSQL resource on the target node
 
 
 ### Ban the master resource from a node
