@@ -127,9 +127,10 @@ crm_resource --ban --master --resource <PAF_resource_name>
 This command will set up a `-INFINITY` score on the node currently running the
 master resource. This will force Pacemaker to trigger the switchover to another
 available node:
-  * "demote" PostgreSQL resource on the current master node ("stop" the
-    resource, and then "start" it as a "slave" resource)
-  * "promote" PostgreSQL resource on another node
+
+  * `demote` PostgreSQL resource on the current master node (stop the
+    resource, and then start it as a slave resource)
+  * `promote` PostgreSQL resource on another node
 
 
 ### Clear the constraints after the switchover
