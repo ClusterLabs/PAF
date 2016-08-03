@@ -22,7 +22,7 @@ my $build = Module::Build->new(
     create_packlist    => 1,
     #create_readme      => 1,
     create_makefile_pl => 'traditional',
-    dist_version       => '2.0_beta2',
+    dist_version       => '2.0_rc1',
     dist_abstract      => 'PostgreSQL multistate OCF resource agent for Pacemaker',
     dist_author        => [
         'Mael Rimbault <mael.rimbault@dalibo.com>',
