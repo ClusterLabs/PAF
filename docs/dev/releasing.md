@@ -90,7 +90,7 @@ Package to install on your debian host to build the builder environment
 VER=1.0.0
 wget "https://github.com/dalibo/PAF/releases/download/v${VER/\~/_}/PAF-v${VER/\~/_}.tgz" -O resource-agents-paf_${VER}.orig.tar.gz
 mkdir resource-agents-paf-$VER
-tar zxf PAF-v${VER/\~/_}.tgz -C "resource-agents-paf-$VER" --strip-components=1
+tar zxf resource-agents-paf_${VER}.orig.tar.gz -C "resource-agents-paf-$VER" --strip-components=1
 cd resource-agents-paf-${VER}
 debuild -i -us -uc -b
 ```
