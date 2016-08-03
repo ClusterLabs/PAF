@@ -84,9 +84,9 @@ __A__: PAF is designed to work with PostgreSQL 9.3 and higher.
 About Pacemaker, we tested in various configurations, the stacks available
 on the following systems are confirmed to work with PAF:
 
-  * CentOS / RHEL 6
-  * CentOS / RHEL 7
-  * Debian 8
+  * CentOS / RHEL 6 (PAF v1.x)
+  * CentOS / RHEL 7 (PAF v2.x)
+  * Debian 8 (PAF v2.x)
 
 
 __Q: Will PAF protect me against data loss?__
