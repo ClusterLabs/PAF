@@ -39,7 +39,7 @@ through a so-called "Resource Agent". Resource agents must comply to the OCF
 specification which define what they must implement (start, stop, promote,
 etc), how they should behave and inform Pacemaker of their results.
 
-PostgreSQL Automatic Failover (aka. PAF) is a new OCF resource Agent dedicated
+PostgreSQL Automatic Failover (aka. PAF) is a new Resource Agent dedicated
 to PostgreSQL. Its original wish is to keep a clear limit between the Pacemaker
 administration and the PostgreSQL one, to keep things simple, documented and
 yet powerful.
