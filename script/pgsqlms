@@ -273,7 +273,7 @@ sub _pg_isready {
 # though, as this is considered a hard error from monitor.
 #
 sub _pg_ctl_status {
-    my $rc = _runas( $PGCTL, '-D', $pgdata, 'status' );
+    my $rc = _runas( $PGCTL, '--pgdata', $pgdata, 'status' );
 
     # Possible error codes:
     #   3: postmaster.pid file does not exist OR it does but the process
@@ -287,7 +287,7 @@ sub _pg_ctl_start {
     # wait for 24h for the server to start.
     # this is probably too much, but starting a master in recovery
     # might take some time depending on the server setup.
-    my @cmd = ( $PGCTL, '-D', $pgdata, '-w', '--timeout', 86400, 'start' );
+    my @cmd = ( $PGCTL, '--pgdata', $pgdata, '-w', '--timeout', 86400, 'start' );
 
     push @cmd => ( '-o', $start_opts )
         if $start_opts ne '';
@@ -1208,7 +1208,7 @@ sub pgsql_stop {
     # We set a 10 minutes timeout to pg_ctl so we'll hit the pacemaker one
     # first.
     # TODO how to find the resource action timeout ?
-    $rc = _runas( $PGCTL, '-D', $pgdata, '-w', '--timeout', 600,
+    $rc = _runas( $PGCTL, '--pgdata', $pgdata, '-w', '--timeout', 600,
         '-m', 'fast', 'stop' );
 
     if ( $rc == 0 ) {
@@ -1627,7 +1627,7 @@ sub pgsql_promote {
 
     unless (
         # Promote the instance on the current node.
-        _runas( $PGCTL, '-D', $pgdata, '-w', 'promote' ) == 0 )
+        _runas( $PGCTL, '--pgdata', $pgdata, '-w', 'promote' ) == 0 )
     {
         ocf_log( 'err', 'pgsql_promote: error during promotion' );
         return $OCF_ERR_GENERIC;
