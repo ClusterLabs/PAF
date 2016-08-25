@@ -999,7 +999,7 @@ sub pgsql_validate_all {
         exit $OCF_ERR_CONFIGURED;
     }
 
-    # check pgdata
+    # check PG_VERSION
     if ( ! -s "$pgdata/PG_VERSION" ) {
         ocf_log( 'crit',  sprintf 'PG_VERSION does not exists in "%s"',
             $pgdata );
