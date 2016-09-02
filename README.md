@@ -58,6 +58,9 @@ can set:
   * `bindir`: location of the PostgreSQL binaries (default: `/usr/bin`)
   * `pgdata`: location of the PGDATA of your instance (default:
     `/var/lib/pgsql/data`)
+  * `datadir`: Path to the directory set in `data_directory` from your postgresql.conf file
+    (same default than PostgreSQL itself: the `pgdata` parameter value). Unless you have a
+    special PostgreSQL setup and you understand this parameter, __ignore it__.
   * `pghost`: the socket directory or IP address to use to connect to the
     local instance (default: `/tmp`)
   * `pgport`:  the port to connect to the local instance (default: `5432`)
