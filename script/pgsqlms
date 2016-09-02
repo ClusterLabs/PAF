@@ -49,6 +49,7 @@ my $start_opts_default  = "";
 my $system_user  = $ENV{'OCF_RESKEY_system_user'} || $system_user_default;
 my $bindir       = $ENV{'OCF_RESKEY_bindir'} || $bindir_default;
 my $pgdata       = $ENV{'OCF_RESKEY_pgdata'} || $pgdata_default;
+my $datadir      = $ENV{'OCF_RESKEY_datadir'} || $pgdata;
 my $pghost       = $ENV{'OCF_RESKEY_pghost'} || $pghost_default;
 my $pgport       = $ENV{'OCF_RESKEY_pgport'} || $pgport_default;
 my $start_opts   = $ENV{'OCF_RESKEY_start_opts'} || $start_opts_default;
@@ -395,14 +396,14 @@ sub _pg_ctl_start {
 # WARNING: the status is NOT updated in case of crash.
 #
 sub _controldata_state {
-    my $status = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
+    my $status = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
 
     $status =~ /^Database cluster state:\s+(.*?)\s*$/m;
 
     unless ( defined $1 ) {
         ocf_log( 'crit', sprintf
             '_controldata_state: could not read state from controldata file for "%s"',
-            $pgdata );
+            $datadir );
         exit $OCF_ERR_CONFIGURED;
     }
 
@@ -419,7 +420,7 @@ sub _create_recovery_conf {
     my $fh;
     my (undef, undef, $uid, $gid) = getpwnam($system_user);
     my $recovery_conf    = '';
-    my $recovery_file    = "$pgdata/recovery.conf";
+    my $recovery_file    = "$datadir/recovery.conf";
 
     ocf_log( 'debug', sprintf
         '_create_recovery_conf: get replication configuration from the template file "%s"',
@@ -821,7 +822,7 @@ sub _confirm_stopped {
         '_confirm_stopped: no postmaster process found for instance "%s"',
         $OCF_RESOURCE_INSTANCE );
 
-    if ( -f "$pgdata/backup_label" ) {
+    if ( -f "$datadir/backup_label" ) {
         # We are probably on a freshly built secondary that was not started yet.
         ocf_log( 'debug', sprintf
             '_confirm_stopped: backup_label file exists: probably on a never started secondary',
@@ -902,6 +903,16 @@ sub ocf_meta_data {
               </longdesc>
               <shortdesc lang="en">Path to the data directory</shortdesc>
               <content type="string" default="$pgdata_default" />
+            </parameter>
+
+            <parameter name="datadir" unique="1" required="0">
+              <longdesc lang="en">
+                Path to the directory set in data_directory from your postgresql.conf file (same default
+                than PostgreSQL itself: the pgdata parameter value). Unless you have a special
+                PostgreSQL setup and you understand this parameter, ignore it.
+              </longdesc>
+              <shortdesc lang="en">Path to the directory set in data_directory from your postgresql.conf file.</shortdesc>
+              <content type="string" default="PGDATA" />
             </parameter>
 
             <parameter name="pghost" unique="0" required="0">
@@ -996,10 +1007,16 @@ sub pgsql_validate_all {
         exit $OCF_ERR_CONFIGURED;
     }
 
+    # check datadir
+    if ( ! -d $datadir ) {
+        ocf_log( 'err',  sprintf 'data_directory "%s" does not exists', $datadir );
+        exit $OCF_ERR_CONFIGURED;
+    }
+
     # check PG_VERSION
-    if ( ! -s "$pgdata/PG_VERSION" ) {
+    if ( ! -s "$datadir/PG_VERSION" ) {
         ocf_log( 'crit',  sprintf 'PG_VERSION does not exists in "%s"',
-            $pgdata );
+            $datadir );
         exit $OCF_ERR_CONFIGURED;
     }
 
@@ -1051,9 +1068,9 @@ sub pgsql_validate_all {
     }
 
     # require 9.3 minimum
-    unless ( open( $fh, '<', "$pgdata/PG_VERSION" ) ) {
+    unless ( open( $fh, '<', "$datadir/PG_VERSION" ) ) {
         ocf_log( 'crit',  sprintf'Could not open file "%s"',
-            "$pgdata/PG_VERSION" );
+            "$datadir/PG_VERSION" );
         exit $OCF_ERR_CONFIGURED;
     }
     read( $fh, $PGVERSION, 64 );
@@ -1072,19 +1089,19 @@ sub pgsql_validate_all {
     }
 
     # require wal_level >= hot_standby
-    my $status = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
+    my $status = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
     # NOTE: pg_controldata output changed with PostgreSQL 9.5, so we need to
     # account for both syntaxes
     $status =~ /^(?:Current )?wal_level setting:\s+(.*?)\s*$/m;
     unless ( defined $1 ) {
         ocf_log( 'crit', sprintf
-            'Could not read current wal_level setting "%s"', $pgdata );
+            'Could not read current wal_level setting "%s"', $datadir );
         exit $OCF_ERR_INSTALLED;
     }
 
     unless ( $1 eq 'hot_standby' or $1 eq 'logical' ) {
         ocf_log( 'crit', sprintf 'wal_level must be "hot_standby" or "logical"',
-            $pgdata );
+            $datadir );
         exit $OCF_ERR_CONFIGURED;
     }
 
@@ -1176,7 +1193,7 @@ sub pgsql_start {
 sub pgsql_stop {
     my $rc;
     my $state;
-    my $pidfile = "$pgdata/postmaster.pid";
+    my $pidfile = "$datadir/postmaster.pid";
 
     # Instance must be running as secondary or primary or being stopped.
     # Anything else is an error.
