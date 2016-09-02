@@ -64,9 +64,13 @@ can set:
   * `pghost`: the socket directory or IP address to use to connect to the
     local instance (default: `/tmp`)
   * `pgport`:  the port to connect to the local instance (default: `5432`)
-  * `recovery_tpl`: the local template that will be copied as the
+  * `recovery_template`: the local template that will be copied as the
     `PGDATA/recovery.conf` file. This template file must exists on all node
     (default: `$PGDATA/recovery.conf.pcmk`)
+  * `start_opts`: Additionnal arguments given to the postgres process on startup.
+    See "postgres --help" for available options. Usefull when the postgresql.conf
+    file is not in the data directory (PGDATA), eg.:
+    `-c config_file=/etc/postgresql/9.3/main/postgresql.conf`.
   * `system_user`: the system owner of your instance's process (default:
     `postgres`)
 
