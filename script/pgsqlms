@@ -624,10 +624,13 @@ sub _check_locations {
     my @rs;
     my $rc;
 
-    # Call crm_node to exclude nodes that are not part of the cluster at this
-    # point.
-    my $partition_nodes = qx{ $CRM_NODE --partition };
-
+    # Call crm_node to list all node in the cluster
+    # The "crm_node --list" output is "node_id node_name\n"
+    my $list_nodes;
+    my $tmp_list_nodes = qx{ $CRM_NODE --list };
+    foreach my $node (split /\n/, $tmp_list_nodes) {
+       $list_nodes .= (split /\s/, $node)[1] . ' ';
+    }
 
     # We check locations of connected standbies by querying the
     # "pg_stat_replication" view.
@@ -676,7 +679,7 @@ sub _check_locations {
     # with an acceptable state.
     while ( $row = shift @rs ) {
 
-        if ( $partition_nodes !~ /$row->[0]/ ) {
+        if ( $list_nodes !~ /$row->[0]/ ) {
             ocf_log( 'info', sprintf
                 '_check_locations: ignoring unknown application_name/node "%s"', $row->[0] );
             next;
@@ -718,21 +721,23 @@ sub _check_locations {
         }
 
         # Remove this node from the known nodes list.
-        $partition_nodes =~ s/(?:^|\s)$row->[0](?:\s|$)/ /g;
+        $list_nodes =~ s/(?:^|\s)$row->[0](?:\s|$)/ /g;
     }
 
-    $partition_nodes =~ s/(?:^\s+)|(?:\s+$)//g;
+    $list_nodes =~ s/(?:^\s+)|(?:\s+$)//g;
 
-    # If there are still nodes in "partition_nodes", it means there is no
+    # If there are still nodes in "list_nodes", it means there is no
     # corresponding line in "pg_stat_replication".
-    foreach my $node (split /\s+/ => $partition_nodes) {
+    # In that case, we set the master_score to -1000 if it exists already.
+    foreach my $node (split /\s+/ => $list_nodes) {
         # Exclude the current node.
         next if $node eq $nodename;
 
         ocf_log( 'warning', sprintf
             '_check_locations: "%s" is not connected to the primary, set score to -1000',
             $node );
-        _set_master_score( -1000, $node );
+        $node_score = _get_master_score( $node );
+        _set_master_score( -1000, $node ) if $node_score ne '';
     }
 
     # Finally set the master score if not already done
