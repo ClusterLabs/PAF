@@ -72,7 +72,7 @@ yum install -y pacemaker postgresql93 postgresql93-contrib postgresql93-server r
 Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
-yum install -y https://github.com/dalibo/PAF/releases/download/v2.0_rc1/resource-agents-paf-2.0.rc1-1.noarch.rpm
+yum install -y https://github.com/dalibo/PAF/releases/download/v2.0.0/resource-agents-paf-2.0.0-1.noarch.rpm
 ```
 
 ## PostgreSQL setup
