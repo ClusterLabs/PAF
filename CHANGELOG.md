@@ -2,7 +2,7 @@
 
 Release date: 2016-09-16
 
-__WARNING__: This version is only compatible with at least 
+__WARNING__: This version is only compatible with at least
 Pacemaker 1.1.13 using a corosync 2.x stack.
 
 * 2.0.0 major release

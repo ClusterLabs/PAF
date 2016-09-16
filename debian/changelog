@@ -1,3 +1,10 @@
+resource-agents-paf (2.0.0-1) unstable; urgency=low
+
+  * 2.0.0 major release
+  * see CHANGELOG.md
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Fri, 16 Sep 2016 16:05:16 +0200
+
 resource-agents-paf (2.0~rc1-1) unstable; urgency=low
 
   * 2.0_rc1 first release candidate
