@@ -77,6 +77,12 @@ yum install -y https://github.com/dalibo/PAF/releases/download/v2.0.0/resource-a
 
 ## PostgreSQL setup
 
+> **WARNING**: building PostgreSQL standby is not the main subject here. The
+> following steps are __**quick and dirty**__. They lack of security, WAL
+> retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
+> for a proper setup.
+{: warning}
+
 The resource agent requires the PostgreSQL instances to be already set up,
 ready to start and slaves ready to replicate. Make sure to setup your PostgreSQL
 master on your preferred node to host the master: during the very first startup
@@ -90,12 +96,8 @@ a `recovery.conf` file suitable to your needs, the only requirements are:
   * a `primary_conninfo` with an `application_name` set to the node name
 
 Here are some quick steps to build your primary PostgreSQL instance and its
-standbys. As this is not the main subject here, they are
-__**quick and dirty**__. Rely on the
-[PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
-for a proper setup.
-
-This quick start considers `srv1` is the preferred master. On the primary:
+standbys. This quick start considers `srv1` is the preferred master. On the
+primary:
 
 ```
 /usr/pgsql-9.3/bin/postgresql93-setup initdb
@@ -219,12 +221,13 @@ We can now create our cluster!
 pcs cluster setup --name cluster_pgsql srv1,srv1-alt srv2,srv2-alt srv3,srv3-alt
 ```
 
-If you don't have an alternative network available (this is really not
-recommended), you can use the following syntax:
-
-```
-pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
-```
+> **NOTE**: If you don't have an alternative network available (this is really
+> not ideal), use the following syntax:
+>
+> ```
+> pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
+> ```
+{: .notice}
 
 You can now start your cluster!
 
