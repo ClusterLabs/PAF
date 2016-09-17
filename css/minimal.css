@@ -1,8 +1,8 @@
 body {
   padding:50px;
   font: 12px/1.5 Bitstream Vera Sans, Helvetica, Arial, sans-serif;
-  color:#333;
-  font-weight:300;
+  /*color:#333;
+  font-weight:300;*/
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -82,7 +82,7 @@ code, pre {
 
 pre {
   padding:8px 15px;
-  background: #f8f8f8;  
+  background: #f8f8f8;
   border-radius:5px;
   border:1px solid #e5e5e5;
   overflow-x: auto;
@@ -151,7 +151,7 @@ section {
 }
 
 small {
-  font-size:10px;
+  font-size:9px;
 }
 
 hr {
@@ -166,7 +166,9 @@ footer {
   float:left;
   position:fixed;
   bottom:50px;
-  font-size: 11px;
+  font-size: 9px;
+  color:#333;
+  font-weight:300;
 }
 
 .notice, .warning {
@@ -183,7 +185,7 @@ footer {
   background-color: #FAEDFA;
 }
 
-.notice p, .warning p {
+.notice :last-child, .warning :last-child {
   margin: 0;
 }
 
