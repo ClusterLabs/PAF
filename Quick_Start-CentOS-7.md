@@ -81,7 +81,7 @@ yum install -y https://github.com/dalibo/PAF/releases/download/v2.0.0/resource-a
 > following steps are __**quick and dirty**__. They lack of security, WAL
 > retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
 > for a proper setup.
-{: warning}
+{: .warning}
 
 The resource agent requires the PostgreSQL instances to be already set up,
 ready to start and slaves ready to replicate. Make sure to setup your PostgreSQL
