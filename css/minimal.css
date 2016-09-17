@@ -10,7 +10,7 @@ h1, h2, h3, h4, h5, h6 {
   margin:0 0 20px;
 }
 
-p, ul, ol, table, pre, dl {
+p, ul, ol, table, pre, dl, .notice {
   margin:0 0 20px;
 }
 
@@ -170,14 +170,18 @@ footer {
 }
 
 .notice {
+  font-style: normal;
   margin-top: 1.5em;
   padding: .5em 1em;
   text-indent: 0;
-  background-color: #F1EFD0;
+  background-color: #FAFAED;
   border-radius: 5px;
   border: 1px solid #E5E5E5;
 }
 
+.notice p {
+  margin: 0;
+}
 
 @media print, screen and (max-width: 960px) {
   
