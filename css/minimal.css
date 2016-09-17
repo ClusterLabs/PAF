@@ -169,6 +169,16 @@ footer {
   font-size: 11px;
 }
 
+.notice {
+  margin-top: 1.5em;
+  padding: .5em 1em;
+  text-indent: 0;
+  background-color: #F1EFD0;
+  border-radius: 5px;
+  border: 1px solid #E5E5E5;
+}
+
+
 @media print, screen and (max-width: 960px) {
   
   div.wrapper {

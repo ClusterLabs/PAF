@@ -311,9 +311,10 @@ pcs -f cluster1.xml resource master pgsql-ha pgsqld \
     clone-max=3 clone-node-max=1 notify=true
 ```
 
-Note that the values for `timeout` and `interval` on each operation are based
-on the minimum suggested value for PAF Resource Agent.
-These values should be adapted depending on the context.
+> **Note**: the values for `timeout` and `interval` on each operation are based
+> on the minimum suggested value for PAF Resource Agent. These values should be
+> adapted depending on the context.
+{: .notice}
 
 We add the IP address which should be started on the primary node:
 
