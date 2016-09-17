@@ -311,10 +311,9 @@ pcs -f cluster1.xml resource master pgsql-ha pgsqld \
     clone-max=3 clone-node-max=1 notify=true
 ```
 
-> **Note**: the values for `timeout` and `interval` on each operation are based
-> on the minimum suggested value for PAF Resource Agent. These values should be
-> adapted depending on the context.
-{: .notice}
+Note that the values for `timeout` and `interval` on each operation are based
+on the minimum suggested value for PAF Resource Agent. These values should be
+adapted depending on the context.
 
 We add the IP address which should be started on the primary node:
 
@@ -324,9 +323,11 @@ pcs -f cluster1.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
 ```
 
 We now define the collocation between `pgsql-ha` and `pgsql-master-ip`.
-Note that the start/stop and promote/demote order for these resources is
-asymetrical: we __must__ keep the master IP on the master during its demote
-process.
+
+> **WARNING**: the start/stop and promote/demote order for these resources must
+> be asymetrical: we __must__ keep the master IP on the master during its demote
+> process.
+{: .warning}
 
 ```
 pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsql-ha INFINITY

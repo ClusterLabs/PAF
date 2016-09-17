@@ -10,7 +10,7 @@ h1, h2, h3, h4, h5, h6 {
   margin:0 0 20px;
 }
 
-p, ul, ol, table, pre, dl, .notice {
+p, ul, ol, table, pre, dl, .notice, .warning {
   margin:0 0 20px;
 }
 
@@ -169,7 +169,7 @@ footer {
   font-size: 11px;
 }
 
-.notice {
+.notice, warning {
   font-style: normal;
   margin-top: 1.5em;
   padding: .5em 1em;
@@ -179,7 +179,11 @@ footer {
   border: 1px solid #E5E5E5;
 }
 
-.notice p {
+.warning {
+  background-color: #FAEDFA;
+}
+
+.notice p, .warning p {
   margin: 0;
 }
 
