@@ -169,7 +169,7 @@ footer {
   font-size: 11px;
 }
 
-.notice, warning {
+.notice, .warning {
   font-style: normal;
   margin-top: 1.5em;
   padding: .5em 1em;
