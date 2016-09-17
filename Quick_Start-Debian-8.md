@@ -114,26 +114,26 @@ systemd-tmpfiles --create /etc/tmpfiles.d/postgresql-part.conf
 
 ## PostgreSQL setup
 
-The resource agent requires the PostgreSQL instances to be already set up and
-ready to start. Moreover, it requires a `recovery.conf` template ready to use.
-You can create a `recovery.conf` file suitable to your needs, the only
-requirements are:
+> **WARNING**: building PostgreSQL standby is not the main subject here. The
+> following steps are __**quick and dirty**__. They lack of security, WAL
+> retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
+> for a proper setup.
+{: .warning}
+
+The resource agent requires the PostgreSQL instances to be already set up,
+ready to start and slaves ready to replicate. Make sure to setup your PostgreSQL
+master on your preferred node to host the master: during the very first startup
+of the cluster, PAF detects the master based on its shutdown status.
+
+Moreover, it requires a `recovery.conf` template ready to use. You can create
+a `recovery.conf` file suitable to your needs, the only requirements are:
 
   * have `standby_mode = on`
   * have `recovery_target_timeline = 'latest'`
   * a `primary_conninfo` with an `application_name` set to the node name
 
-Make sure to setup your PostgreSQL master on your preferred node to host the
-master: during the very first startup of the cluster, PAF detects the master
-based on its shutdown status.
-
 Here are some quick steps to build your primary PostgreSQL instance and its
-standbys. As this is not the main subject here, they are
-__**quick and dirty**__. Rely on the
-[PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
-for a proper setup.
-
-The next steps suppose the primary PostgreSQL instance is on `srv1`.
+standbys. The next steps suppose the primary PostgreSQL instance is on `srv1`.
 
 On all nodes:
 
@@ -442,17 +442,14 @@ order stop-ip-then-demote Mandatory:   \
 
 EOC
 ```
+> **WARNING**: in step 4, the start/stop and promote/demote order for these
+> resources must be asymetrical: we __must__ keep the master IP on the master
+> during its demote process.
+{: .warning}
 
 Note that the values for `timeout` and `interval` on each operation are based
 on the minimum suggested value for PAF Resource Agent.
 These values should be adapted depending on the context.
-
-
-
-
-About the collocation between `pgsql-ha` and `pgsql-master-ip`, note that the
-start/stop and promote/demote order for these resource is asymetrical: we
-__must__ keep the master IP on the master during its demote process.
 
 
 

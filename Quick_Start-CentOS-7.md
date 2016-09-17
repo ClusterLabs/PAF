@@ -88,7 +88,7 @@ ready to start and slaves ready to replicate. Make sure to setup your PostgreSQL
 master on your preferred node to host the master: during the very first startup
 of the cluster, PAF detects the master based on its shutdown status.
 
-Moreover, PAF requires a `recovery.conf` template ready to use. You can create
+Moreover, it requires a `recovery.conf` template ready to use. You can create
 a `recovery.conf` file suitable to your needs, the only requirements are:
 
   * have `standby_mode = on`
