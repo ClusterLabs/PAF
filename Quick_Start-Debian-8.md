@@ -436,7 +436,7 @@ order promote-then-ip Mandatory:         \
   pgsql-ha:promote pgsql-master-ip:start \
   sequential=true symmetrical=false
 
-order stop-ip-then-demote Mandatory:   \
+order demote-then-stop-ip Mandatory:   \
   pgsql-ha:demote pgsql-master-ip:stop \
   sequential=true symmetrical=false
 
