@@ -13,7 +13,7 @@ able to:
   * detect a failure of your PostgreSQL instance
   * recover your master instance...
   * ... or failover to another node
-  * elect the best available standby on failover (with the smallest lag)
+  * Select the best available standby on failover (with the smallest lag)
   * switchover roles in your cluster between your master and a standby
 
 Thanks to Pacemaker and Corsync, you can easily build a SAFE and ROBUST cluster
