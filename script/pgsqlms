@@ -1099,9 +1099,8 @@ sub pgsql_validate_all {
         exit $OCF_ERR_INSTALLED;
     }
 
-    unless ( $1 eq 'hot_standby' or $1 eq 'logical' ) {
-        ocf_log( 'crit', sprintf 'wal_level must be "hot_standby" or "logical"',
-            $datadir );
+    unless ( $1 eq 'hot_standby' or $1 eq 'logical' or $1 eq 'replica' ) {
+        ocf_log( 'crit', 'wal_level must be one of "hot_standby", "logical" or "replica"' );
         exit $OCF_ERR_CONFIGURED;
     }
 
