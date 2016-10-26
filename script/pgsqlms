@@ -1084,8 +1084,8 @@ sub pgsql_validate_all {
     }
 
     unless ( $1 eq 'hot_standby' or $1 eq 'logical' or $1 eq 'replica' ) {
-        ocf_log( 'crit', sprintf 'wal_level must be one of "hot_standby", "logical" or "replica"',
-            $pgdata );
+        ocf_log( 'crit',
+            'wal_level must be one of "hot_standby", "logical" or "replica"' );
         exit $OCF_ERR_CONFIGURED;
     }
 
