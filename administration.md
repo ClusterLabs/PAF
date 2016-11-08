@@ -350,6 +350,17 @@ That seems good!
 So now you just need to really start Corosync and Pacemaker on `srv1`, and if
 everything goes as planned, you're done.
 
+## Collecting traces.
 
+The `crm_report` utility will create an archive containing everything needed when reporting cluster problem.
 
+The following command will collect all relevant configuration and logs between 7am and 9am on the 8th of November from all the nodes into an archive called /tmp/crm_report_crash_20161108.tar.bz2:
+
+```
+crm_report -f "2016-11-08 07:00:00" -t "2016-11-08 09:00:00" /tmp/crm_report_crash_20161108
+```
+
+The command works better when used on an active node (Pacemaker will guess the list of nodes from it's configuration). Alternatively, you can use the -n "node1 node2" or -n node1 -n node2 to scpecify a list of nodes. It is requiered that all nodes are reachable thru ssh.
+
+__Be careful when sending these reports online as they may contain sensitive information like passwords.__
 
