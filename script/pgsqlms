@@ -1013,7 +1013,7 @@ sub pgsql_validate_all {
 
     # check PG_VERSION
     if ( ! -s "$datadir/PG_VERSION" ) {
-        ocf_log( 'crit',  sprintf 'PG_VERSION does not exists in "%s"',
+        ocf_log( 'crit', sprintf 'PG_VERSION does not exists in "%s"',
             $datadir );
         exit $OCF_ERR_CONFIGURED;
     }
@@ -1027,7 +1027,7 @@ sub pgsql_validate_all {
 
     # check content of the recovery template file
     unless ( open( $fh, '<', $recovery_tpl ) ) {
-        ocf_log( 'crit',  sprintf 'Could not open file "%s"',
+        ocf_log( 'crit', sprintf 'Could not open file "%s"',
             $recovery_tpl );
         exit $OCF_ERR_CONFIGURED;
     }
@@ -1035,14 +1035,14 @@ sub pgsql_validate_all {
     close $fh;
 
     unless ( grep /^\s*standby_mode\s*=\s*'?on'?\s*$/, @content ) {
-        ocf_log( 'crit',  sprintf
+        ocf_log( 'crit',
             'Recovery template file must contain "standby_mode = on"'
         );
         exit $OCF_ERR_CONFIGURED;
     }
 
     unless ( grep /^\s*recovery_target_timeline\s*=\s*'?latest'?\s*$/, @content ) {
-        ocf_log( 'crit',  sprintf
+        ocf_log( 'crit',
             "Recovery template file must contain \"recovery_target_timeline = 'latest'\""
         );
         exit $OCF_ERR_CONFIGURED;
@@ -1052,7 +1052,7 @@ sub pgsql_validate_all {
         /^\s*primary_conninfo\s*=.*['\s]application_name=$nodename['\s]/,
         @content
     ) {
-        ocf_log( 'crit',  sprintf
+        ocf_log( 'crit', sprintf
             "Recovery template file must contain in primary_conninfo parameter \"application_name=%s\"",
             $nodename );
         exit $OCF_ERR_CONFIGURED;
@@ -1060,14 +1060,14 @@ sub pgsql_validate_all {
 
     # check system user
     unless ( defined getpwnam $system_user ) {
-        ocf_log( 'crit',  sprintf
+        ocf_log( 'crit', sprintf
             'System user "%s" does not exist', $system_user );
         exit $OCF_ERR_CONFIGURED;
     }
 
     # require 9.3 minimum
     unless ( open( $fh, '<', "$datadir/PG_VERSION" ) ) {
-        ocf_log( 'crit',  sprintf'Could not open file "%s"',
+        ocf_log( 'crit', sprintf 'Could not open file "%s"',
             "$datadir/PG_VERSION" );
         exit $OCF_ERR_CONFIGURED;
     }
