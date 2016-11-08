@@ -48,6 +48,7 @@ my $start_opts_default  = "";
 my $system_user  = $ENV{'OCF_RESKEY_system_user'} || $system_user_default;
 my $bindir       = $ENV{'OCF_RESKEY_bindir'} || $bindir_default;
 my $pgdata       = $ENV{'OCF_RESKEY_pgdata'} || $pgdata_default;
+my $datadir      = $ENV{'OCF_RESKEY_datadir'} || $pgdata;
 my $pghost       = $ENV{'OCF_RESKEY_pghost'} || $pghost_default;
 my $pgport       = $ENV{'OCF_RESKEY_pgport'} || $pgport_default;
 my $start_opts   = $ENV{'OCF_RESKEY_start_opts'} || $start_opts_default;
@@ -300,14 +301,14 @@ sub _pg_ctl_start {
 # WARNING: the status is NOT updated in case of crash.
 #
 sub _controldata_state {
-    my $status = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
+    my $status = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
 
     $status =~ /^Database cluster state:\s+(.*?)\s*$/m;
 
     unless ( defined $1 ) {
         ocf_log( 'crit', sprintf
             '_controldata_state: could not read state from controldata file for "%s"',
-            $pgdata );
+            $datadir );
         exit $OCF_ERR_CONFIGURED;
     }
 
@@ -324,7 +325,7 @@ sub _create_recovery_conf {
     my $fh;
     my (undef, undef, $uid, $gid) = getpwnam($system_user);
     my $recovery_conf    = '';
-    my $recovery_file    = "$pgdata/recovery.conf";
+    my $recovery_file    = "$datadir/recovery.conf";
 
     ocf_log( 'debug', sprintf
         '_create_recovery_conf: get replication configuration from the template file "%s"',
@@ -677,7 +678,7 @@ sub _check_switchover {
     # We need the last local checkpoint LSN and the last received LSN from
     # master to check in the WAL between these adresses if we have a
     # "checkpoint shutdown" using pg_xlogdump.
-    $ans = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
+    $ans = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
 
     # Get the latest known TL
     $ans =~ m{^Latest checkpoint's TimeLineID:\s+(\d+)\s*$}m;
@@ -705,8 +706,8 @@ sub _check_switchover {
         );
 
         ocf_log( 'debug', sprintf
-            '_check_switchover: XLOGDUMP parameters: pgdata:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
-            $pgdata, $last_chk, $tl, $last_lsn
+            '_check_switchover: XLOGDUMP parameters: datadir:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
+            $datadir, $last_chk, $tl, $last_lsn
         );
 
         return 2;
@@ -715,7 +716,7 @@ sub _check_switchover {
     # force a checkpoint on the slave to flush the master's
     # shutdown checkpoint in the WAL
 
-    $ans = qx{ $PGXLOGDUMP --path "$pgdata" --timeline "$tl" \\
+    $ans = qx{ $PGXLOGDUMP --path "$datadir" --timeline "$tl" \\
                --start "$last_chk" --end "$last_lsn" 2>&1 };
     $rc = $?;
 
@@ -822,7 +823,7 @@ sub _confirm_stopped {
         '_confirm_stopped: no postmaster process found for instance "%s"',
         $OCF_RESOURCE_INSTANCE );
 
-    if ( -f "$pgdata/backup_label" ) {
+    if ( -f "$datadir/backup_label" ) {
         # We are probably on a freshly built secondary that was not started yet.
         ocf_log( 'debug', sprintf
             '_confirm_stopped: backup_label file exists: probably on a never started secondary',
@@ -903,6 +904,16 @@ sub ocf_meta_data {
               </longdesc>
               <shortdesc lang="en">Path to the data directory</shortdesc>
               <content type="string" default="$pgdata_default" />
+            </parameter>
+
+            <parameter name="datadir" unique="1" required="0">
+              <longdesc lang="en">
+                Path to the directory set in data_directory from your postgresql.conf file. This parameter
+                has the same default than PostgreSQL itself: the pgdata parameter value. Unless you have a
+                special PostgreSQL setup and you understand this parameter, ignore it.
+              </longdesc>
+              <shortdesc lang="en">Path to the directory set in data_directory from your postgresql.conf file</shortdesc>
+              <content type="string" default="PGDATA" />
             </parameter>
 
             <parameter name="pghost" unique="0" required="0">
@@ -993,27 +1004,33 @@ sub pgsql_validate_all {
 
     # check pgdata
     if ( ! -d $pgdata ) {
-        ocf_log( 'err',  sprintf 'PGDATA "%s" does not exists', $pgdata );
+        ocf_log( 'err', sprintf 'PGDATA "%s" does not exists', $pgdata );
+        exit $OCF_ERR_CONFIGURED;
+    }
+
+    # check datadir
+    if ( ! -d $datadir ) {
+        ocf_log( 'err', sprintf 'data_directory "%s" does not exists', $datadir );
         exit $OCF_ERR_CONFIGURED;
     }
 
     # check PG_VERSION
-    if ( ! -s "$pgdata/PG_VERSION" ) {
-        ocf_log( 'crit',  sprintf 'PG_VERSION does not exists in "%s"',
-            $pgdata );
+    if ( ! -s "$datadir/PG_VERSION" ) {
+        ocf_log( 'crit', sprintf 'PG_VERSION does not exists in "%s"',
+            $datadir );
         exit $OCF_ERR_CONFIGURED;
     }
 
     # check recovery template
     if ( ! -f $recovery_tpl ) {
-        ocf_log( 'crit',  sprintf 'Recovery template file "%s" does not exists',
+        ocf_log( 'crit', sprintf 'Recovery template file "%s" does not exists',
             $recovery_tpl );
         exit $OCF_ERR_CONFIGURED;
     }
 
     # check content of the recovery template file
     unless ( open( $fh, '<', $recovery_tpl ) ) {
-        ocf_log( 'crit',  sprintf 'Could not open file "%s"',
+        ocf_log( 'crit', sprintf 'Could not open file "%s"',
             $recovery_tpl );
         exit $OCF_ERR_CONFIGURED;
     }
@@ -1021,14 +1038,14 @@ sub pgsql_validate_all {
     close $fh;
 
     unless ( grep /^\s*standby_mode\s*=\s*'?on'?\s*$/, @content ) {
-        ocf_log( 'crit',  sprintf
+        ocf_log( 'crit', sprintf
             'Recovery template file must contain "standby_mode = on"'
         );
         exit $OCF_ERR_CONFIGURED;
     }
 
     unless ( grep /^\s*recovery_target_timeline\s*=\s*'?latest'?\s*$/, @content ) {
-        ocf_log( 'crit',  sprintf
+        ocf_log( 'crit',
             "Recovery template file must contain \"recovery_target_timeline = 'latest'\""
         );
         exit $OCF_ERR_CONFIGURED;
@@ -1038,23 +1055,22 @@ sub pgsql_validate_all {
         /^\s*primary_conninfo\s*=.*['\s]application_name=$nodename['\s]/,
         @content
     ) {
-        ocf_log( 'crit',  sprintf
-            "Recovery template file must contain in primary_conninfo parameter \"application_name=%s\"",
+        ocf_log( 'crit', sprintf
+            'Recovery template file must contain in primary_conninfo parameter "application_name=%s"',
             $nodename );
         exit $OCF_ERR_CONFIGURED;
     }
 
     # check system user
     unless ( defined getpwnam $system_user ) {
-        ocf_log( 'crit',  sprintf
+        ocf_log( 'crit', sprintf
             'System user "%s" does not exist', $system_user );
         exit $OCF_ERR_CONFIGURED;
     }
 
     # require 9.3 minimum
-    unless ( open( $fh, '<', "$pgdata/PG_VERSION" ) ) {
-        ocf_log( 'crit',  sprintf'Could not open file "%s"',
-            "$pgdata/PG_VERSION" );
+    unless ( open( $fh, '<', "$datadir/PG_VERSION" ) ) {
+        ocf_log( 'crit', "Could not open file \"$datadir/PG_VERSION\"" );
         exit $OCF_ERR_CONFIGURED;
     }
     read( $fh, $PGVERSION, 64 );
@@ -1073,13 +1089,12 @@ sub pgsql_validate_all {
     }
 
     # require wal_level >= hot_standby
-    my $status = qx{$PGCTRLDATA "$pgdata" 2>/dev/null};
+    my $status = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
     # NOTE: pg_controldata output changed with PostgreSQL 9.5, so we need to
     # account for both syntaxes
     $status =~ /^(?:Current )?wal_level setting:\s+(.*?)\s*$/m;
     unless ( defined $1 ) {
-        ocf_log( 'crit', sprintf
-            'Could not read current wal_level setting "%s"', $pgdata );
+        ocf_log( 'crit', 'Could not read wal_level setting' );
         exit $OCF_ERR_INSTALLED;
     }
 
@@ -1176,7 +1191,7 @@ sub pgsql_start {
 sub pgsql_stop {
     my $rc;
     my $state;
-    my $pidfile = "$pgdata/postmaster.pid";
+    my $pidfile = "$datadir/postmaster.pid";
 
     # Instance must be running as secondary or primary or being stopped.
     # Anything else is an error.

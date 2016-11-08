@@ -58,6 +58,10 @@ can set:
   * `bindir`: location of the PostgreSQL binaries (default: `/usr/bin`)
   * `pgdata`: location of the PGDATA of your instance (default:
     `/var/lib/pgsql/data`)
+  * `datadir`: path to the directory set in `data_directory` from your
+    postgresql.conf file. This parameter has same default than PostgreSQL
+    itself: the `pgdata` parameter value. Unless you have a special PostgreSQL
+    setup and you understand this parameter, __ignore it__
   * `pghost`: the socket directory or IP address to use to connect to the
     local instance (default: `/tmp`)
   * `pgport`:  the port to connect to the local instance (default: `5432`)
@@ -67,7 +71,7 @@ can set:
   * `start_opts`: Additionnal arguments given to the postgres process on startup.
     See "postgres --help" for available options. Usefull when the postgresql.conf 
     file is not in the data directory (PGDATA), eg.:
-    `-c config_file=/etc/postgresql/9.3/main/postgresql.conf`.
+    `-c config_file=/etc/postgresql/9.3/main/postgresql.conf`
   * `system_user`: the system owner of your instance's process (default:
     `postgres`)
 
