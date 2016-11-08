@@ -72,26 +72,8 @@ my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
 my $nodename;
 my $exit_code = 0;
 
-# _master_score_exists
-# This subroutine checks if a master score is set for one of the relative clones
-# in the cluster and the score is greater or equal of 0.
-# Returns 1 if at least one master score >= 0 is found.
-# Returns 0 otherwise
-sub _master_score_exists {
-    my @partition_nodes = split /\s+/ => qx{ $CRM_NODE --partition };
-
-    foreach my $node ( @partition_nodes ) {
-        my $score = _get_master_score( $node );
-
-        return 1 if defined $score and $score ne '' and $score > -1;
-    }
-
-    return 0;
-}
-
 # Get, parse and return the value of the given attribute name.
 # Returns an empty string if not found.
-# Returns undef crm_attribute call on error
 sub _get_attr {
     my ( $name, $node ) = @_;
     my $ans;
@@ -147,7 +129,6 @@ sub _delete_attr {
 
 # Get, parse and return the resource master score on given node.
 # Returns an empty string if not found.
-# Returns undef on crm_master call on error
 sub _get_master_score {
     my ( $node ) = @_;
     my $node_arg = '';
@@ -185,6 +166,23 @@ sub _set_master_score {
     }
 
     return;
+}
+
+# _master_score_exists
+# This subroutine checks if a master score is set for one of the relative clones
+# in the cluster and the score is greater or equal of 0.
+# Returns 1 if at least one master score >= 0 is found.
+# Returns 0 otherwise
+sub _master_score_exists {
+    my @partition_nodes = split /\s+/ => qx{ $CRM_NODE --partition };
+
+    foreach my $node ( @partition_nodes ) {
+        my $score = _get_master_score( $node );
+
+        return 1 if defined $score and $score ne '' and $score > -1;
+    }
+
+    return 0;
 }
 
 # Check if the current transition is a recover of a master clone on given node.
@@ -697,14 +695,14 @@ sub _check_locations {
                 '_check_locations: forbid promotion on "%s" in state "%s", set score to -1',
                 $row->[0], $row->[3] );
 
-            _set_master_score( -1, $row->[0] ) if $node_score != -1;
+            _set_master_score( '-1', $row->[0] ) unless $node_score eq '-1';
         }
         else {
             ocf_log( 'debug', sprintf
                 '_check_locations: checking "%s" promotion ability (current_score: %s, priority: %s, location: %s).',
                 $row->[0], $node_score, $row->[1], $row->[2] );
 
-            if ( $node_score != $row->[1] ) {
+            if ( $node_score ne $row->[1] ) {
                 ocf_log( 'info', sprintf
                     '_check_locations: update score of "%s" from "%s" to "%s"',
                     $row->[0], $node_score, $row->[1] );
@@ -732,12 +730,12 @@ sub _check_locations {
         ocf_log( 'warning', sprintf
             '_check_locations: "%s" is not connected to the primary, set score to -1000',
             $node );
-        _set_master_score( -1000, $node );
+        _set_master_score( '-1000', $node );
     }
 
     # Finally set the master score if not already done
     $node_score = _get_master_score();
-    _set_master_score( 1001 ) if $node_score eq '' or $node_score != 1001;
+    _set_master_score( '1001' ) unless $node_score eq '1001';
 
     return $OCF_SUCCESS;
 }
@@ -1167,7 +1165,7 @@ sub pgsql_start {
                     'pgsql_start: No master score around. Set mine to 1.',
                 );
 
-                _set_master_score( 1 );
+                _set_master_score( '1' );
             }
 
             return $OCF_SUCCESS;
@@ -1620,10 +1618,10 @@ sub pgsql_promote {
                 $node_to_promote );
 
             # Reset current node master score.
-            _set_master_score( 1 );
+            _set_master_score( '1' );
 
             # Set promotion candidate master score.
-            _set_master_score( 1000, $node_to_promote );
+            _set_master_score( '1000', $node_to_promote );
 
             # We fail the promotion to trigger another promotion transition
             # with the new scores.
