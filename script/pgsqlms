@@ -74,6 +74,20 @@ my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
 my $nodename;
 my $exit_code = 0;
 
+# get the timeout for the current action given from environment var
+# Returns   timeout as integer
+#           undef if unknown
+sub _get_action_timeout {
+    my $timeout = $ENV{'OCF_RESKEY_CRM_meta_timeout'};
+
+    ocf_log( 'debug', sprintf '_get_action_timeout: known timeout: %s',
+        defined $timeout ? $timeout : 'undef' );
+
+    return $timeout if defined $timeout and $timeout =~ /^\d+$/;
+
+    return undef;
+}
+
 # Get, parse and return the value of the given private attribute name
 # Returns an empty string if not found.
 sub _get_priv_attr {
@@ -285,13 +299,13 @@ sub _pg_ctl_status {
 # Start the local instance using pg_ctl
 #
 sub _pg_ctl_start {
-    # wait for 24h for the server to start.
-    # this is probably too much, but starting a master in recovery
-    # might take some time depending on the server setup.
-    my @cmd = ( $PGCTL, '--pgdata', $pgdata, '-w', '--timeout', 86400, 'start' );
+    # Add 60s to the timeout or use a 24h timeout fallback to make sure
+    # Pacemaker will give up before us and take decisions
+    my $timeout = _get_action_timeout() + 60 || 60*60*24;
 
-    push @cmd => ( '-o', $start_opts )
-        if $start_opts ne '';
+    my @cmd = ( $PGCTL, '--pgdata', $pgdata, '-w', '--timeout', $timeout, 'start' );
+
+    push @cmd => ( '-o', $start_opts ) if $start_opts ne '';
 
     return _runas( @cmd );
 }
@@ -1192,18 +1206,21 @@ sub pgsql_stop {
     my $rc;
     my $state;
     my $pidfile = "$datadir/postmaster.pid";
+    # Add 60s to the timeout or use a 24h timeout fallback to make sure
+    # Pacemaker will give up before us and take decisions
+    my $timeout = _get_action_timeout() + 60 || 60*60*24;
 
     # Instance must be running as secondary or primary or being stopped.
     # Anything else is an error.
     $rc = pgsql_monitor();
     if ( $rc == $OCF_NOT_RUNNING ) {
-        ocf_log( 'info',  sprintf
+        ocf_log( 'info', sprintf
             'pgsql_stop: instance "%s" already stopped',
             $OCF_RESOURCE_INSTANCE );
         return $OCF_SUCCESS;
     }
     elsif ( $rc != $OCF_SUCCESS and $rc != $OCF_RUNNING_MASTER ) {
-        ocf_log( 'warning',  sprintf
+        ocf_log( 'warning', sprintf
             'pgsql_stop: unexpected state for instance "%s" (returned %d)',
             $OCF_RESOURCE_INSTANCE, $rc );
         return $OCF_ERR_GENERIC;
@@ -1213,15 +1230,14 @@ sub pgsql_stop {
     # From here, the instance is running for sure.
     #
 
-    ocf_log( 'debug',  sprintf
+    ocf_log( 'debug', sprintf
         'pgsql_stop: instance "%s" is running, stopping it',
         $OCF_RESOURCE_INSTANCE );
 
     # Try to quit with proper shutdown.
-    # We set a 10 minutes timeout to pg_ctl so we'll hit the pacemaker one
-    # first.
-    # TODO how to find the resource action timeout ?
-    $rc = _runas( $PGCTL, '--pgdata', $pgdata, '-w', '--timeout', 600,
+
+
+    $rc = _runas( $PGCTL, '--pgdata', $pgdata, '-w', '--timeout', $timeout,
         '-m', 'fast', 'stop' );
 
     if ( $rc == 0 ) {
@@ -1412,16 +1428,17 @@ sub pgsql_demote {
     # See discussion "CRM trying to demote a stopped resource" on
     # developers@clusterlabs.org
     unless ( $rc == $OCF_NOT_RUNNING ) {
+        # Add 60s to the timeout or use a 24h timeout fallback to make sure
+        # Pacemaker will give up before us and take decisions
+        my $timeout = _get_action_timeout() + 60 || 60*60*24;
+
         # WARNING the instance **MUST** be stopped gracefully.
         # Do **not** use pg_stop() or service or systemctl here as these
         # commands might force-stop the PostgreSQL instance using immediate
         # after some timeout and return success, which is misleading.
 
-        # We set a 10 minutes timeout to pg_ctl so we'll hit the pacemaker
-        # timeout stop command first.
-        # TODO how to find the resource action timeout ?
         $rc = _runas( $PGCTL, '--pgdata', $pgdata, '--mode', 'fast', '-w',
-            '--timeout', 600 , 'stop' );
+            '--timeout', $timeout , 'stop' );
 
         # No need to wait for stop to complete, this is handled in pg_ctl
         # using -w option.
