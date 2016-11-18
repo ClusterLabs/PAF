@@ -1019,34 +1019,34 @@ sub pgsql_validate_all {
     # check pgdata
     if ( ! -d $pgdata ) {
         ocf_log( 'err', sprintf 'PGDATA "%s" does not exists', $pgdata );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     # check datadir
     if ( ! -d $datadir ) {
         ocf_log( 'err', sprintf 'data_directory "%s" does not exists', $datadir );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     # check PG_VERSION
     if ( ! -s "$datadir/PG_VERSION" ) {
         ocf_log( 'crit', sprintf 'PG_VERSION does not exists in "%s"',
             $datadir );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     # check recovery template
     if ( ! -f $recovery_tpl ) {
         ocf_log( 'crit', sprintf 'Recovery template file "%s" does not exists',
             $recovery_tpl );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     # check content of the recovery template file
     unless ( open( $fh, '<', $recovery_tpl ) ) {
         ocf_log( 'crit', sprintf 'Could not open file "%s"',
             $recovery_tpl );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
     @content = <$fh>;
     close $fh;
@@ -1055,14 +1055,14 @@ sub pgsql_validate_all {
         ocf_log( 'crit', sprintf
             'Recovery template file must contain "standby_mode = on"'
         );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     unless ( grep /^\s*recovery_target_timeline\s*=\s*'?latest'?\s*$/, @content ) {
         ocf_log( 'crit',
             "Recovery template file must contain \"recovery_target_timeline = 'latest'\""
         );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     unless ( grep
@@ -1072,20 +1072,20 @@ sub pgsql_validate_all {
         ocf_log( 'crit', sprintf
             'Recovery template file must contain in primary_conninfo parameter "application_name=%s"',
             $nodename );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     # check system user
     unless ( defined getpwnam $system_user ) {
         ocf_log( 'crit', sprintf
             'System user "%s" does not exist', $system_user );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     # require 9.3 minimum
     unless ( open( $fh, '<', "$datadir/PG_VERSION" ) ) {
         ocf_log( 'crit', "Could not open file \"$datadir/PG_VERSION\"" );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
     read( $fh, $PGVERSION, 64 );
     close $fh;
@@ -1099,7 +1099,7 @@ sub pgsql_validate_all {
         ocf_log( 'err', sprintf
             "PostgreSQL version %s not supported. Require 9.3 and more.",
             $PGVERSION );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_INSTALLED;
     }
 
     # require wal_level >= hot_standby
@@ -1109,13 +1109,13 @@ sub pgsql_validate_all {
     $status =~ /^(?:Current )?wal_level setting:\s+(.*?)\s*$/m;
     unless ( defined $1 ) {
         ocf_log( 'crit', 'Could not read wal_level setting' );
-        exit $OCF_ERR_INSTALLED;
+        exit $OCF_ERR_ARGS;
     }
 
     unless ( $1 eq 'hot_standby' or $1 eq 'logical' or $1 eq 'replica' ) {
         ocf_log( 'crit',
             'wal_level must be one of "hot_standby", "logical" or "replica"' );
-        exit $OCF_ERR_CONFIGURED;
+        exit $OCF_ERR_ARGS;
     }
 
     return $OCF_SUCCESS;
