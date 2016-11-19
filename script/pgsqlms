@@ -301,7 +301,7 @@ sub _pg_ctl_status {
 sub _pg_ctl_start {
     # Add 60s to the timeout or use a 24h timeout fallback to make sure
     # Pacemaker will give up before us and take decisions
-    my $timeout = _get_action_timeout() + 60 || 60*60*24;
+    my $timeout = ( _get_action_timeout() || 60*60*24 ) + 60;
 
     my @cmd = ( $PGCTL, '--pgdata', $pgdata, '-w', '--timeout', $timeout, 'start' );
 
@@ -1208,7 +1208,7 @@ sub pgsql_stop {
     my $pidfile = "$datadir/postmaster.pid";
     # Add 60s to the timeout or use a 24h timeout fallback to make sure
     # Pacemaker will give up before us and take decisions
-    my $timeout = _get_action_timeout() + 60 || 60*60*24;
+    my $timeout = ( _get_action_timeout() || 60*60*24 ) + 60;
 
     # Instance must be running as secondary or primary or being stopped.
     # Anything else is an error.
@@ -1430,7 +1430,7 @@ sub pgsql_demote {
     unless ( $rc == $OCF_NOT_RUNNING ) {
         # Add 60s to the timeout or use a 24h timeout fallback to make sure
         # Pacemaker will give up before us and take decisions
-        my $timeout = _get_action_timeout() + 60 || 60*60*24;
+        my $timeout = ( _get_action_timeout() || 60*60*24 )  + 60;
 
         # WARNING the instance **MUST** be stopped gracefully.
         # Do **not** use pg_stop() or service or systemctl here as these
