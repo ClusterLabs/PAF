@@ -96,3 +96,7 @@ debuild -i -us -uc -b
 ```
 
 Don't forget to upload the package on github release page.
+
+## Documentation
+
+Update the "quick start" documentation pages with the links to the new packges  
