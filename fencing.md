@@ -45,10 +45,10 @@ about this part, or refer to the [official Pacemaker's documentation](http://clu
 Before giving you some examples of fencing method below, here are some more
 interesting links about fencing:
 
-- http://clusterlabs.org/doc/crm_fencing.html
-- http://advogato.org/person/lmb/diary/105.html
-- https://ourobengr.com/ha/
-- https://ourobengr.com/stonith-story/
+- <http://clusterlabs.org/doc/crm_fencing.html>
+- <http://advogato.org/person/lmb/diary/105.html>
+- <https://ourobengr.com/ha/>
+- <https://ourobengr.com/stonith-story/>
 
 ## Virtual fencing using libvirtd and virsh
 
