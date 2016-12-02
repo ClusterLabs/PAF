@@ -34,6 +34,23 @@ git push --tags
 git archive --prefix=PAF-$TAG/ -o /tmp/PAF-$TAG.tgz $TAG
 ```
 
+## Release on github
+
+  - go to https://github.com/dalibo/PAF/tags
+  - edit the release notes for the new tag
+  - set "PAF $VERSION" as title, eg. "PAF 1.0.0"
+  - here is the format of the release node itself:
+    YYYY-MM-DD -  Version X.Y.Z
+    
+    Changelog:
+      * item 1
+      * item 2
+      * ...
+      
+      See http://dalibo.github.io/PAF/documentation.html
+  - upload the tar file
+  - save
+
 ## Building the RPM file
 
 ### Installation
@@ -54,6 +71,8 @@ spectool -R -g PAF/resource-agents-paf.spec
 rpmbuild -ba PAF/resource-agents-paf.spec
 ```
 
+Don't forget to upload the package on github release page.
+
 ## Building the deb file
 
 ### Installation
@@ -69,27 +88,15 @@ Package to install on your debian host to build the builder environment
 
 ```
 VER=1.0.0
-wget "https://github.com/dalibo/PAF/releases/download/v${VER}/PAF-v${VER}.tgz" -O resource-agents-paf_${VER}.orig.tar.gz
-tar zxf resource-agents-paf_${VER}.orig.tar.gz
-mv PAF-v${VER}/ resource-agents-paf-${VER}
+wget "https://github.com/dalibo/PAF/releases/download/v${VER/\~/_}/PAF-v${VER/\~/_}.tgz" -O resource-agents-paf_${VER}.orig.tar.gz
+mkdir resource-agents-paf-$VER
+tar zxf resource-agents-paf_${VER}.orig.tar.gz -C "resource-agents-paf-$VER" --strip-components=1
 cd resource-agents-paf-${VER}
 debuild -i -us -uc -b
 ```
 
-## Release on github
+Don't forget to upload the package on github release page.
 
-  - go to https://github.com/dalibo/PAF/tags
-  - edit the release notes for the new tag
-  - set "PAF $VERSION" as title, eg. "PAF 1.0.0"
-  - here is the format of the release node itself:
-    YYYY-MM-DD -  Version X.Y.Z
-    
-    Changelog:
-      * item 1
-      * item 2
-      * ...
-      
-      See http://dalibo.github.io/PAF/documentation.html
-  - upload the tar file and the RPM file
-  - save
+## Documentation
 
+Update the "quick start" documentation pages with the links to the new packges  
