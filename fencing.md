@@ -20,8 +20,9 @@ guys:
 Fencing is the ability to isolate a node from the cluster. It can be done in
 various way:
 
-  * I/O fencing: interrupt network access, SAN access through Fibre channel, etc.
-  * Power fencing: using an UPS, PDU, embeded IPMI
+- I/O fencing (aka. resource fencing): interrupt network access, SAN access 
+  through Fibre channel, etc.
+- Power fencing: using an UPS, PDU, embeded IPMI
 
 With the advent of virtualization, we could add another kind of fencing where
 the VM asks the hypervisor to force-shutdown one of its relatives.
@@ -40,6 +41,14 @@ Fencing agents are available for most Linux distributions as a package named
 `fence-agents`. As soon as you have a fencing agent working you just have
 to instruct your cluster how to use it. See the Quick start guides for examples
 about this part, or refer to the [official Pacemaker's documentation](http://clusterlabs.org/doc/).
+
+Before giving you some examples of fencing method below, here are some more
+interesting links about fencing:
+
+- http://clusterlabs.org/doc/crm_fencing.html
+- http://advogato.org/person/lmb/diary/105.html
+- https://ourobengr.com/ha/
+- https://ourobengr.com/stonith-story/
 
 ## Virtual fencing using libvirtd and virsh
 
