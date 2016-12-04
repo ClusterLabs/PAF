@@ -1,3 +1,19 @@
+# PAF v2.1 beta1
+
+Release date: WIP
+
+__WARNING__: This version is only compatible with at least
+Pacemaker 1.1.13 using a corosync 2.x stack.
+
+* 2.1 beta1 release
+* fix: compatibility with PostrgeSQL 9.6, YanChii
+* change: better handling of Pacemaker timeout, ioguix
+* change: avoid fatal error during validate action when possible, Benoit Lobréau & ioguix
+* new: parameter "datadir" to cope with PostgreSQL GUC data_directory, Benoit Lobréau & ioguix
+* misc: improve debian packaging, Christoph Berg
+
+
+
 # PAF v2.0.0
 
 Release date: 2016-09-16
