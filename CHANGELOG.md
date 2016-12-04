@@ -1,22 +1,25 @@
-# PAF v1.1.0
+# PAF v1.1 beta1
 
-Release date: WIP
+Release date: 2016-12-04
 
-* 1.1.0 major release
-* fix: do not use crm_node --partition to discover resources
-* fix: unknown argument --query when calling crm_master
-* fix: perl warning when master score has never been set on the master
-* fix: remove wrong info message during post-promote notify
-* fix: race condition when setting attributes during actions
-* fix: bug where pgport and pghost where ignored in _query
-* fix: use same role name than the system_user to connect
-* fix: wrap crm_master calls in sub to make them synchronous
-* fix: fixed a bug related to setgid in _runas
-* fix: check on application_name in validate_all
-* change: do not start standby with a master score of 1
-* change: choose the clone to promote when no master score exist
-* new: detect and deal master/slave recovery transition
-* new: set next best secondaries base on their lag
+* 1.1 beta1 release
+* fix: compatibility with PostrgeSQL 9.6, YanChii
+* fix: do not use crm_node --partition to discover resources, ioguix
+* fix: unknown argument --query when calling crm_master, ioguix
+* fix: perl warning when master score has never been set on the master, ioguix
+* fix: remove wrong info message during post-promote notify, ioguix
+* fix: race condition when setting attributes during actions, reported by Guillaume Lalarge, fixed by ioguix
+* fix: bug where pgport and pghost where ignored in "_query", reported by nnn-dev, fixed by ioguix
+* fix: use same role name than the system_user to connect, reported by nnn-dev, fixed by ioguix
+* fix: wrap crm_master calls in sub to make them synchronous, ioguix
+* fix: fixed a bug related to setgid in "_runas", reported by nnn-dev, fixed by ioguix
+* fix: check on application_name in validate_all, Benoit Lobréau
+* change: do not start standby with a master score of 1, ioguix
+* change: choose the clone to promote when no master score exist, ioguix
+* change: avoid fatal error during validate action when possible, Benoit Lobréau & ioguix
+* new: parameter "datadir" to cope with PostgreSQL GUC data_directory, Benoit Lobréau
+* new: detect and deal master/slave recovery transition, ioguix
+* new: set next best secondaries base on their lag, ioguix
 * misc: code cleanup and refactoring
 * misc: various log messages cleanup and enhancement
 

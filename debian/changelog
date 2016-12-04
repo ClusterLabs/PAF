@@ -1,14 +1,9 @@
-resource-agents-paf (1.1.0-1) unstable; urgency=low
+resource-agents-paf (1.1~beta1-1) unstable; urgency=low
 
-  * 1.1.0 minor release
-  * fix: Remove the primary_node parameter
-  * fix: Fix bug relative to setgid in _runas()
-  * fix: Choose a clone to promote when no master score exist
-  * change: Wrap crm_master calls in sub to make them synchronous
-  * fix: Use same role name than the system_user to connect
-  * fix: Fix bug where pgport and pghost where ignored in _query
+  * 1.1_beta1 beta release
+  * see CHANGELOG.md
 
- -- Mael Rimbault (mrimbault) <mael.rimbault@dalibo.com>  Fri, 03 Jun 2016 15:16:16 +0200
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Sun, 04 Dec 2016 16:00:00 +0100
 
 resource-agents-paf (1.0.2-1) unstable; urgency=low
 

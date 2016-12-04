@@ -60,7 +60,7 @@ use 5.008;
 BEGIN {
     use Exporter;
 
-    our $VERSION   = 'v1.0.2';
+    our $VERSION   = 'v1.1_beta1';
     our @ISA       = ('Exporter');
     our @EXPORT    = qw(
         $OCF_SUCCESS
