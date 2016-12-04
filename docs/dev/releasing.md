@@ -21,9 +21,7 @@ In `resource-agents-paf.spec`:
   * edit the changelog
     * date format: `LC_TIME=C date +"%a %b %d %Y"`
 
-In `debian/`:
-  * edit the `changelog` file
-  * update the package name in `files`
+In `debian/`, edit the `changelog` file
 
 ## Tagging and building tar file
 
