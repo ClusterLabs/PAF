@@ -19,7 +19,9 @@ See the [Configuration]({{ site.baseurl }}/configuration.html) page.
 
 ## Administration
 
-See the [Administration]({{ site.baseurl }}/administration.html) page.
+* general: see the [Administration]({{ site.baseurl }}/administration.html)
+  page.
+* [CentOS 7 administration]({{ site.baseurl }}/CentOS-7-admin.html) (pcs)
 
 ## Fencing
 
