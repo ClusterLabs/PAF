@@ -201,6 +201,7 @@ you. Start with your master:
 ```
 systemctl stop postgresql@9.3-main
 systemctl disable postgresql@9.3-main
+echo disabled > /etc/postgresql/9.3/main/start.conf
 ```
 
 And remove the master IP address from `srv1`:
