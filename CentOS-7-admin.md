@@ -171,7 +171,7 @@ The last command change the maximum clone allowed in the cluster:
 pcs resource meta pgsql-ha clone-max=2
 ```
 
-## Forbidding a PAF resource  on a node
+## Forbidding a PAF resource on a node
 
 In this chapter, we need to set up a node where no PostgreSQL instance of your
 cluster is supposed to run. That might be that PostgreSQL is not installed on
@@ -190,3 +190,42 @@ resource `pgsql-ha`. The `resource-discovery=never` is mandatory here as it
 forbid the "probe" action the CRM is usually running to discovers the state of
 a resource on a node. On a node where your PostgreSQL cluster is not running,
 this "probe" action will fail, leading to bad cluster reactions.
+
+## PostgreSQL minor upgrade
+
+This chapter explains how to do a minor upgrade of PostgreSQL on a two node
+cluster. Nodes are called `srv1` and `srv2`, the PostgreSQL HA resource is
+called `pgsql-ha`. Node `srv1` is hosting the master.
+
+The process is quite simple: upgrade the standby first, move the master
+role and finally upgrade PostgreSQL on the former PostgreSQL master node.
+
+Here is how to upgrade PostgeSQL on the standby side:
+
+```
+# yum install --downloadonly postgresql93 postgresql93-contrib postgresql93-server
+# pcs resource ban --wait pgsql-ha srv2
+# yum install -y postgresql93 postgresql93-contrib postgresql93-server
+# pcs resource clear pgsql-ha srv2
+```
+
+Here are the details of these commands:
+
+- download all the required packages
+- ban the `pgsql-ha` resource __only__ from `srv2`, effectively stopping it
+- upgrade the PostgreSQL packages
+- allow the `pgsql-ha` resource to run on `srv2`, effectively starting it
+
+Now, we can move the PostgreSQL master resource to `srv2`, then take care
+of `srv1`:
+
+```
+# pcs resource move --wait --master pgsql-ha srv2
+# yum install --downloadonly postgresql93 postgresql93-contrib postgresql93-server
+# pcs resource ban --wait pgsql-ha srv1
+# yum install -y postgresql93 postgresql93-contrib postgresql93-server
+# pcs resource clear pgsql-ha srv1
+```
+
+Minor upgrade is finished. Feel free to move your master back to `srv1` if you
+really need it.
