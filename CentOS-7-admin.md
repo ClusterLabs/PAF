@@ -115,7 +115,11 @@ it doesn't hurt anyway):
 pcs cluster reload corosync
 ```
 
-Add the STONITH resource for the new node:
+Fencing is mandatory. See: [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+Either edit the existing fencing resources to handle the new node if applicable,
+or add a new one being able to do it. In the example, we are using
+the `fence_virsh` fencing agent to create a dedicated fencing resource able to
+only fence `srv3`:
 
 ```
 pcs stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="<username>" port="srv3-c7" action="off" identity_file="/root/.ssh/id_rsa"
@@ -150,8 +154,8 @@ the node:
 # pcs cluster standby srv3
 ```
 
-Next command simply remove the node from the cluster. It stops Pacemaker on
-srv3, remove the cluster setup from it and reconfigure other nodes:
+Next command simply remove the node from the cluster. It stops Pacemaker
+on `srv3̀`, remove the cluster setup from it and reconfigure other nodes:
 
 ```
 # pcs cluster node remove srv3
@@ -161,7 +165,13 @@ srv1: Corosync updated
 srv2: Corosync updated
 ```
 
-# Forbidding a PAF resource  on a node
+The last command change the maximum clone allowed in the cluster:
+
+```
+pcs resource meta pgsql-ha clone-max=2
+```
+
+## Forbidding a PAF resource  on a node
 
 In this chapter, we need to set up a node where no PostgreSQL instance of your
 cluster is supposed to run. That might be that PostgreSQL is not installed on
