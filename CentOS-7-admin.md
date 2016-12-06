@@ -9,7 +9,17 @@ In this document, we are working with cluster under CentOS 7.2 using mostly
 the `pcs` command. It supposes that the `pcsd` deamon is enabled and running and
 authentication between node is set up (see quick start).
 
-## Start/Stop of the cluster
+Topics:
+
+* [Starting or stopping the cluster](#starting-or-stopping-the-cluster)
+* [Swapping master and slave roles between nodes](#swapping-master-and-slave-roles-between-nodes)
+* [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
+* [Adding a node](#adding-a-node)
+* [Removing a node](#removing-a-node)
+* [Forbidding a PAF resource on a node](#forbidding-a-paf-resource-on-a-node)
+
+
+## Starting or stopping the cluster
 
 Here is the command to start the cluster on all existing nodes:
 
@@ -66,7 +76,90 @@ srv1: Stopping Cluster (corosync)...
 This last command is perfectly safe and your cluster will start cleanly when
 desired.
 
-## Adding a node
+
+## Swapping master and slave roles between nodes
+
+In this chapter, we describe how to move the master role from one node to the
+other and getting back to the cluster the former master as a slave.
+
+Here is the command to move the master role from `srv1` to `srv2`:
+
+```
+# pcs resource move --master pgsql-ha srv2
+```
+
+That's it. Note that the former master became a slave and start replicating with
+the new master.
+
+You could add `--wait` so the command exits when everything is done. Here is an
+example moving back the master to `srv1`:
+
+```
+# pcs resource move --wait --master pgsql-ha srv1
+Resource 'pgsql-ha' is master on node srv1; slave on node srv2.
+```
+
+Note that if you do not specify the destination node, `pcs` set a `-INFINITY`
+score for the master resource on its current node to force it to move away.
+You must clear this constraint or the master will never get back to this node:
+
+```
+# pcs resource move --wait --master pgsql-ha
+Warning: Creating location constraint cli-ban-pgsql-ha-on-srv1 with a score of -INFINITY for resource pgsql-ha on node srv1.
+This will prevent pgsql-ha from being promoted on srv1 until the constraint is removed. This will be the case even if srv1 is the last node in the cluster.
+Resource 'pgsql-ha' is master on node srv2; slave on node srv1.
+
+# pcs constraint show | grep Master
+    Enabled on: srv1 (score:INFINITY) (role: Master)
+    Disabled on: srv1 (score:-INFINITY) (role: Master)
+
+# pcs resource clear pgsql-ha
+
+# pcs constraint show | grep Master
+(nothing)
+```
+
+## PostgreSQL minor upgrade
+
+This chapter explains how to do a minor upgrade of PostgreSQL on a two node
+cluster. Nodes are called `srv1` and `srv2`, the PostgreSQL HA resource is
+called `pgsql-ha`. Node `srv1` is hosting the master.
+
+The process is quite simple: upgrade the standby first, move the master
+role and finally upgrade PostgreSQL on the former PostgreSQL master node.
+
+Here is how to upgrade PostgeSQL on the standby side:
+
+```
+# yum install --downloadonly postgresql93 postgresql93-contrib postgresql93-server
+# pcs resource ban --wait pgsql-ha srv2
+# yum install -y postgresql93 postgresql93-contrib postgresql93-server
+# pcs resource clear pgsql-ha srv2
+```
+
+Here are the details of these commands:
+
+- download all the required packages
+- ban the `pgsql-ha` resource __only__ from `srv2`, effectively stopping it
+- upgrade the PostgreSQL packages
+- allow the `pgsql-ha` resource to run on `srv2`, effectively starting it
+
+Now, we can move the PostgreSQL master resource to `srv2`, then take care
+of `srv1`:
+
+```
+# pcs resource move --wait --master pgsql-ha srv2
+# yum install --downloadonly postgresql93 postgresql93-contrib postgresql93-server
+# pcs resource ban --wait pgsql-ha srv1
+# yum install -y postgresql93 postgresql93-contrib postgresql93-server
+# pcs resource clear pgsql-ha srv1
+```
+
+Minor upgrade is finished. Feel free to move your master back to `srv1` if you
+really need it.
+
+
+## Adding a node
 
 In this chapter, we add server `srv3` hosting a PostgreSQL standby instance as a
 new node in an existing two node cluster.
@@ -142,7 +235,8 @@ pcs resource meta pgsql-ha clone-max=3
 
 Your standby instance should start shortly.
 
-## Removing one node under CentOS 7
+
+## Removing a node
 
 This chapter explains how to remove a node called `srv3` from a three node
 cluster.
@@ -171,6 +265,7 @@ The last command change the maximum clone allowed in the cluster:
 pcs resource meta pgsql-ha clone-max=2
 ```
 
+
 ## Forbidding a PAF resource on a node
 
 In this chapter, we need to set up a node where no PostgreSQL instance of your
@@ -190,42 +285,3 @@ resource `pgsql-ha`. The `resource-discovery=never` is mandatory here as it
 forbid the "probe" action the CRM is usually running to discovers the state of
 a resource on a node. On a node where your PostgreSQL cluster is not running,
 this "probe" action will fail, leading to bad cluster reactions.
-
-## PostgreSQL minor upgrade
-
-This chapter explains how to do a minor upgrade of PostgreSQL on a two node
-cluster. Nodes are called `srv1` and `srv2`, the PostgreSQL HA resource is
-called `pgsql-ha`. Node `srv1` is hosting the master.
-
-The process is quite simple: upgrade the standby first, move the master
-role and finally upgrade PostgreSQL on the former PostgreSQL master node.
-
-Here is how to upgrade PostgeSQL on the standby side:
-
-```
-# yum install --downloadonly postgresql93 postgresql93-contrib postgresql93-server
-# pcs resource ban --wait pgsql-ha srv2
-# yum install -y postgresql93 postgresql93-contrib postgresql93-server
-# pcs resource clear pgsql-ha srv2
-```
-
-Here are the details of these commands:
-
-- download all the required packages
-- ban the `pgsql-ha` resource __only__ from `srv2`, effectively stopping it
-- upgrade the PostgreSQL packages
-- allow the `pgsql-ha` resource to run on `srv2`, effectively starting it
-
-Now, we can move the PostgreSQL master resource to `srv2`, then take care
-of `srv1`:
-
-```
-# pcs resource move --wait --master pgsql-ha srv2
-# yum install --downloadonly postgresql93 postgresql93-contrib postgresql93-server
-# pcs resource ban --wait pgsql-ha srv1
-# yum install -y postgresql93 postgresql93-contrib postgresql93-server
-# pcs resource clear pgsql-ha srv1
-```
-
-Minor upgrade is finished. Feel free to move your master back to `srv1` if you
-really need it.
