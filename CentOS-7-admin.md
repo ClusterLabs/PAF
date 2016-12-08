@@ -185,16 +185,17 @@ pcs cluster auth srv3 -u hacluster
 
 We are now ready to add the new node.
 
-> Put the cluster in maintenance mode or use crm_simulate if you are afraid
-> that some of your resources move all over the place when the new node appears
+> __NOTE__: Put the cluster in maintenance mode or use crm_simulate if you are
+> afraid that some of your resources move all over the place when the new node
+> appears
 {: .notice}
 
 ```
 pcs cluster node add srv3
 ```
 
-> If corosync is set up to use multiple network for redundancy, use the
-> following command:
+> __NOTE__: If corosync is set up to use multiple network for redundancy, use
+> the following command:
 >
 > ```
 > pcs cluster node add srv3,srv3-alt
