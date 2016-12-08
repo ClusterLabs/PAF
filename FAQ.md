@@ -5,17 +5,21 @@ title: PostgreSQL Automatic Failover - FAQ
 
 # Frequently Asked Questions
 
+<a name="why-new-ra-for-postgresql"></a>
 __Q: Why a new resource agent for PostgreSQL?__
 
 __A__: The `resource-agents` project already has a PostgreSQL agent. This
 agent supports stateless and multi-state setup of your PostgreSQL cluster,
-which make its code large and complex and make it a bit confusing and complicated
-to setup, with 32 parameters.
+which make its code large and complex and make it a bit confusing and
+complicated to setup, with 32 parameters.
 
-On top of this, because PostgreSQL did not support demote by this time, the RA
-tries hard to match PostgreSQL capabilities to Pacemaker requirement with
-complicated workarounds which makes it hard to manage (eg. lock file or
-strict starting order).
+On top of this, because PostgreSQL did not support clean demote by this time,
+the RA tries hard to match PostgreSQL capabilities to Pacemaker requirement with
+complicated workarounds which makes it hard to manage. A lot boils down to the
+lock file requirement to protect the cluster against corruption after a demote.
+Because of it, you __must__ respect a strict stop/start order of the nodes and
+you can not swap the master role between nodes (let's call that a
+"switchover").
 
 Moreover, the existing PostgreSQL agent takes control over the PostgreSQL
 configuration file through initial configuration and adjust it to the
@@ -23,7 +27,9 @@ situation.
 
 Our main objective was to write a new resource agent much simpler, with a code
 as simple as possible, with low Pacemaker setup requirement, as close to
-PostgreSQL current capabilities, non intrusive and as robust as possible.
+PostgreSQL current capabilities, non intrusive, easier and as robust as
+possible. PAF supports start/stop of any node in the cluster without blowing up
+everything else. It supports switchover without headache.
 
 Being PostgreSQL DBA's, we prefer to take care of PostrgeSQL's setup ourselves
 and knowing the resource agent is not messing with setup or internal mechanisms.
