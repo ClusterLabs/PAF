@@ -5,6 +5,15 @@ title: PostgreSQL Automatic Failover - FAQ
 
 # Frequently Asked Questions
 
+* [Why a new resource agent for PostgreSQL?](#why-new-ra-for-postgresql)
+* [Why perl?](#why-perl)
+* [But perl is heavier!](#perl-is-heavier)
+* [Why Pacemaker?](#why-pacemaker)
+* [What versions?](#what-versions)
+* [Will PAF protect me against data loss?](#protection-against-data-loss)
+* [Pacemaker triggered a failover, and now my old master cannot join the cluster anymore, what should I do?](#how-to-failback)
+
+
 <a name="why-new-ra-for-postgresql"></a>
 __Q: Why a new resource agent for PostgreSQL?__
 
@@ -36,6 +45,8 @@ and knowing the resource agent is not messing with setup or internal mechanisms.
 This make the Pacemaker setup much simpler and the PostgreSQL configuration
 much more flexible to the cluster topology.
 
+
+<a name="why-perl"></a>
 __Q: Why perl?__
 
 __A__: Let's answer "why not bash?" first
@@ -60,6 +71,7 @@ javascript, whatever-you-prefer, but we are just more comfortable with perl. No
 other arguments.
 
 
+<a name="perl-is-heavier"></a>
 __Q: But perl is heavier!__
 
 __A__: Just a bit more. Not that much. It's not 10x the memory usage by bash.
@@ -73,6 +85,8 @@ perl? Amongs the `/usr/sbin/fence_*` scripts on my system, I can find:
      25 #!/usr/bin/python
 ```
 
+
+<a name="why-pacemaker"></a>
 __Q: Why Pacemaker?__
 
 __A__: Pacemaker is the industry reference for high availability under Linux
@@ -83,6 +97,7 @@ sense to benefit from its well tested features, instead of reinventing
 something that already works well.
 
 
+<a name="what-versions"></a>
 __Q: What versions?__
 
 __A__: PAF is designed to work with PostgreSQL 9.3 and higher.
@@ -95,6 +110,7 @@ on the following systems are confirmed to work with PAF:
   * Debian 8 (PAF v2.x)
 
 
+<a name="protection-against-data-loss"></a>
 __Q: Will PAF protect me against data loss?__
 
 __A:__ No, PAF will not do that.
@@ -116,6 +132,7 @@ PostgreSQL's synchronous replication provides) are two different concepts, and
 are sometimes mutually exclusive.
 
 
+<a name="how-to-failback"></a>
 __Q: Pacemaker triggered a failover, and now my old master cannot join the
 cluster anymore, what should I do?__
 
