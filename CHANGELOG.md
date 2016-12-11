@@ -1,11 +1,11 @@
-# PAF v2.1 beta1
+# PAF v2.1 rc1
 
 Release date: WIP
 
 __WARNING__: This version is only compatible with at least
 Pacemaker 1.1.13 using a corosync 2.x stack.
 
-* 2.1 beta1 release
+* 2.1 rc1 release
 * fix: compatibility with PostrgeSQL 9.6, YanChii
 * change: better handling of Pacemaker timeout, ioguix
 * change: avoid fatal error during validate action when possible, Benoit Lobréau & ioguix
