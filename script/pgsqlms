@@ -78,7 +78,7 @@ my $exit_code = 0;
 # Returns   timeout as integer
 #           undef if unknown
 sub _get_action_timeout {
-    my $timeout = $ENV{'OCF_RESKEY_CRM_meta_timeout'};
+    my $timeout = $ENV{'OCF_RESKEY_CRM_meta_timeout'} / 1000;
 
     ocf_log( 'debug', sprintf '_get_action_timeout: known timeout: %s',
         defined $timeout ? $timeout : 'undef' );
