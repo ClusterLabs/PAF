@@ -7,12 +7,12 @@ Pacemaker 1.1.13 using a corosync 2.x stack.
 
 Changelog since 2.1 rc1:
 
-* fix: timeout given to pg_ctl was in ms instead of sec
+* fix: timeout given to pg_ctl was in ms instead of sec, YanChii
 
 Changelog since 2.0:
 
 * fix: compatibility with PostrgeSQL 9.6, YanChii
-* change: better handling of Pacemaker timeout, ioguix
+* change: better handling of Pacemaker timeout, ioguix with a fix from YanChii
 * change: avoid fatal error during validate action when possible, Benoit Lobréau & ioguix
 * new: parameter "datadir" to cope with PostgreSQL GUC data_directory, Benoit Lobréau & ioguix
 * misc: improve debian packaging, Christoph Berg
