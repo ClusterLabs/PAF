@@ -285,6 +285,6 @@ fencing is not possible and Pacemaker then accepts to start the resources.
 Setting up a watchdog with Pacemaker requires some system setup that differs
 among Linux distributions. For examples, see:
 
-* chapter in [Setting up a watchdog]({{ site.baseurl }}/CentOS-7-admin-cookbook.html#Setting up a watchdog)
+* chapter in [Setting up a watchdog]({{ site.baseurl }}/CentOS-7-admin-cookbook.html#setting-up-a-watchdog)
   in the Administration cookbook with CentOS 7
 * WIP for debian 8
