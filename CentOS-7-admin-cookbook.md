@@ -256,10 +256,10 @@ Dec  7 14:47:21 srv1 kernel: i6300esb: Intel 6300ESB WatchDog Timer Driver v0.05
 Dec  7 14:47:21 srv1 kernel: i6300esb: initialized (0xffffc90000128000). heartbeat=30 sec (nowayout=0)
 ~~~
 
-> in your test environment, you could use a software watchdog from the Linux
-> kernel called `softdog`. This is fine as far as this is just for demo purpose
-> or very last possible solution. You should definitely rely on a hardware
-> watchdog which is not tied to the operating system.
+> **NOTE**: in your test environment, you could use a software watchdog from the
+> Linux kernel called `softdog`. This is fine as far as this is just for demo
+> purpose or very last possible solution. You should definitely rely on a
+> hardware watchdog which is not tied to the operating system.
 {: .notice}
 
 First we need to stop the cluster to set everything up. The watchdog capability
