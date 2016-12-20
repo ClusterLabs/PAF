@@ -22,7 +22,7 @@ various way:
 
 - I/O fencing (aka. resource fencing): interrupt network access, SAN access 
   through Fibre channel, etc.
-- Power fencing: using an UPS, PDU, embeded IPMI
+- Node fencing: using some power devices like an UPS, PDU, embeded IPMI
 
 With the advent of virtualization, we could add another kind of fencing where
 the VM asks the hypervisor to force-shutdown one of its relatives.
@@ -35,7 +35,7 @@ you end up with split brain scenarios or data corruption.
 If one scenario exists where a corruption or split brain is possible in your
 architecture it __WILL__ happen, sooner or later. At this time, your high
 available cluster will become your worst enemy, interrupting your service way
-much more than with a manual failovers.
+much more than with a manual failovers on a human decision.
 
 Fencing agents are available for most Linux distributions as a package named
 `fence-agents`. As soon as you have a fencing agent working you just have
@@ -50,7 +50,62 @@ interesting links about fencing:
 - <https://ourobengr.com/ha/>
 - <https://ourobengr.com/stonith-story/>
 
-## Virtual fencing using libvirtd and virsh
+Fencing examples:
+
+- [Node fencing using a PDU](#node-fencing-using-a-pdu)
+- [Node fencing using libvirtd and virsh](#node-fencing-using-libvirtd-and-virsh)
+- [Resource fencing using SNMP](#resource-fencing-using-snmp)
+- [Using a watchdog device](#using-a-watchdog-device)
+
+## Node fencing using a PDU
+
+Power fencing allows you to shutdown a node by switching off its power outlet
+remotely.
+
+The following example is based on a PDU from APC, model AP7920,
+having 8 power outlets. This PDU allows you to control each outlet
+independently using a web interface, telnet, ssh, SNMP v1 or SNMPv3. Its IP
+address is `192.168.1.82`.
+
+To manage it using telnet or ssh, we use the fencing agent `fence_apc`:
+
+```
+root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --action=list-status
+1,Outlet 1,ON
+3,Outlet 3,ON
+2,Outlet 2,ON
+5,Outlet 5,ON
+4,Outlet 4,ON
+7,Outlet 7,ON
+6,Outlet 6,ON
+8,Outlet 8,ON
+
+root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
+Status: ON
+
+root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=off
+Success: Powered OFF
+
+root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
+Status: OFF
+```
+
+Just remove the `--ssh` to access your APC using telnet.
+
+To manage the same PDU using the SNMP protocol, we have to use the fence agent
+`fence_apc_snmp`, eg.:
+
+```
+root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
+Status: OFF
+root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=on
+Success: Powered ON
+root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
+Status: ON
+```
+
+
+## Node fencing using libvirtd and virsh
 
 This is the easier fencing method when testing your cluster in a virtualized
 environment. It relies on the fencing agent called `fence_virsh`. This tutorial
@@ -66,8 +121,8 @@ On the hypervisor's side, we need the following packages:
 The VMs has been created using `qemu-kvm` through the `virt-manager` user
 interface.
 
-After installing these packages and creating your VMs, root should be able to
-list them using `virsh`:
+After installing these packages and creating your VMs, root (or another system
+with some more setup) should be able to list them using `virsh`:
 
 ```
 root@hv:~# virsh list --all
@@ -92,9 +147,10 @@ root@hv:~# virsh list --all
 ```
 
 
-The fencing agent `fence_virsh` is quite simple: it connects as root on the
-hypervisor using SSH, then use `virsh` as you would have done to stop a VM. You
-just need to make sure your VMs are able to connect as root to your hypervisor.
+The fencing agent `fence_virsh` is quite simple: it connects as root (it is
+possible to use a normal user with some more setup though) on the hypervisor
+using SSH, then use `virsh` as you would have done to stop a VM. You just need
+to make sure your VMs are able to connect as root to your hypervisor.
 
 If you don't know how to configure SSH to allow a remote connexion without
 password, here is an example using `hv` (the hypervisor) and `ha1`. As root on
@@ -151,7 +207,7 @@ rtt min/avg/max/mdev = 1.548/1.548/1.548/0.000 ms
 ```
 
 
-## I/O fencing using SNMP
+## Resource fencing using SNMP
 
 This fencing method allows you to shutdown an ethernet port on a manageable
 switch using the SNMP protocol. This is useful to cut off all accesses to the
@@ -211,49 +267,24 @@ While fenced, the node might get angry and try to fence other node when coming
 back. You better want some quorum setup to keep it under control, or manually
 switching off pacemaker before unfencing it.
 
-## Power fencing
+## Using a watchdog device
 
-Power fencing allows you to shutdown a node by switching off its power outlet
-remotely.
+Watchdog devices are hardware able to reset servers on various conditions. The
+basic one is to reset the server on external demand, allowing the node to
+fence itself if needed (eg. failing to demote/stop a master).
 
-The following example is based on a PDU from APC, model AP7920,
-having 8 power outlets. This PDU allows you to control each outlet
-independently using a web interface, telnet, ssh, SNMP v1 or SNMPv3. Its IP
-address is `192.168.1.82`.
+Watchdogs are often initialized to start timer and reset the server if the timer
+elapses. An external program is then supposed to reset this timer before it
+times out to keep the system alive.
 
-To manage it using telnet or ssh, we use the fencing agent `fence_apc`:
+A watchdog can act as a fencing device but does not cover as many failure
+scenarios as external fencing devices (a network split in a two node cluster for
+instance). They can nevertheless be useful as last resort in environment where
+fencing is not possible and Pacemaker then accepts to start the resources. 
 
-```
-root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --action=list-status
-1,Outlet 1,ON
-3,Outlet 3,ON
-2,Outlet 2,ON
-5,Outlet 5,ON
-4,Outlet 4,ON
-7,Outlet 7,ON
-6,Outlet 6,ON
-8,Outlet 8,ON
+Setting up a watchdog with Pacemaker requires some system setup that differs
+among Linux distributions. For examples, see:
 
-root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
-Status: ON
-
-root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=off
-Success: Powered OFF
-
-root@srv1:~# fence_apc --ssh --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
-Status: OFF
-```
-
-Just remove the `--ssh` to access your APC using telnet.
-
-To manage the same PDU using the SNMP protocol, we have to use the fence agent
-`fence_apc_snmp`, eg.:
-
-```
-root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
-Status: OFF
-root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=on
-Success: Powered ON
-root@srv1:~# fence_apc_snmp --ip=192.168.1.82 --username=apc --password=apc --plug=1 --action=status
-Status: ON
-```
+* chapter in [Setting up a watchdog]({{ site.baseurl }}/CentOS-7-admin-cookbook.html#Setting up a watchdog)
+  in the Administration cookbook with CentOS 7
+* WIP for debian 8

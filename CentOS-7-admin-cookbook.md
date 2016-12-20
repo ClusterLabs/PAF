@@ -16,6 +16,7 @@ Topics:
 * [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
 * [Adding a node](#adding-a-node)
 * [Removing a node](#removing-a-node)
+* [Setting up a watchdog](#setting-up-a-watchdog)
 * [Forbidding a PAF resource on a node](#forbidding-a-paf-resource-on-a-node)
 
 
@@ -171,16 +172,16 @@ file, setup the `pg_hba.conf` file etc.
 On this new node, setup the pcsd deamon and its authentication:
 
 ```
-passwd hacluster
-systemctl enable pcsd
-systemctl start pcsd
-pcs cluster auth srv1 srv2 srv3 -u hacluster
+# passwd hacluster
+# systemctl enable pcsd
+# systemctl start pcsd
+# pcs cluster auth srv1 srv2 srv3 -u hacluster
 ```
 
 On all other nodes, authenticate to the new node:
 
 ```
-pcs cluster auth srv3 -u hacluster
+# pcs cluster auth srv3 -u hacluster
 ```
 
 We are now ready to add the new node.
@@ -191,14 +192,14 @@ We are now ready to add the new node.
 {: .notice}
 
 ```
-pcs cluster node add srv3
+# pcs cluster node add srv3
 ```
 
 > __NOTE__: If corosync is set up to use multiple network for redundancy, use
 > the following command:
 >
 > ```
-> pcs cluster node add srv3,srv3-alt
+> # pcs cluster node add srv3,srv3-alt
 > ```
 {: .notice}
 
@@ -206,7 +207,7 @@ Reload the corosync configuration on all the nodes if needed (it shouldn't, but
 it doesn't hurt anyway):
 
 ```
-pcs cluster reload corosync
+# pcs cluster reload corosync
 ```
 
 Fencing is mandatory. See: [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
@@ -216,14 +217,17 @@ the `fence_virsh` fencing agent to create a dedicated fencing resource able to
 only fence `srv3`:
 
 ```
-pcs stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="<username>" port="srv3-c7" action="off" identity_file="/root/.ssh/id_rsa"
-pcs constraint location fence_vm_srv3 avoids srv3=INFINITY
+# pcs stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" \
+    pcmk_host_list="srv3" ipaddr="192.168.122.1"                             \
+    login="<username>" port="srv3-c7" identity_file="/root/.ssh/id_rsa"      \
+    action="off" 
+# pcs constraint location fence_vm_srv3 avoids srv3=INFINITY
 ```
 
 We can now start the cluster on `srv3`!
 
 ```
-pcs cluster start
+# pcs cluster start
 ```
 
 After some time checking the integration of `srv3` in the cluster using `crm_mon`
@@ -231,11 +235,92 @@ or `pcs status`, you probably find that your PosgreSQL standby is not started on
 the new node. We actually need to allow one more clone in the cluster:
 
 ```
-pcs resource meta pgsql-ha clone-max=3
+# pcs resource meta pgsql-ha clone-max=3
 ```
 
 Your standby instance should start shortly.
 
+
+## Setting up a watchdog
+
+First, read [the watchdog chapter]({{ site.baseurl }}/fencing.html#using-a-watchdog-device)
+of the "How to fence your node" documentation page for some theory.
+
+We now explain how to setup a watchdog device as a fencing method in
+Pacemaker. The `i6300esb` watchdog "hardware" has been added to the virtual
+machines in our demo cluster. This hardware is correctly discovered on boot by
+the kernel:
+
+~~~
+Dec  7 14:47:21 srv1 kernel: i6300esb: Intel 6300ESB WatchDog Timer Driver v0.05
+Dec  7 14:47:21 srv1 kernel: i6300esb: initialized (0xffffc90000128000). heartbeat=30 sec (nowayout=0)
+~~~
+
+> in your test environment, you could use a software watchdog from the Linux
+> kernel called `softdog`. This is fine as far as this is just for demo purpose
+> or very last possible solution. You should definitely rely on a hardware
+> watchdog which is not tied to the operating system.
+{: .notice}
+
+First we need to stop the cluster to set everything up. The watchdog capability
+is detected by the cluster manager on each node during the cluster startup.
+
+~~~
+# pcs cluster stop --all
+~~~
+
+Install and enable `sbd`. This small deamon is the glue between the watchdog
+device and the inter-communication with Pacemaker:
+
+~~~
+# yum install -y sbd
+# systemctl enable sbd.service
+~~~
+
+Edit `/etc/sysconfig/sbd` and make sure you
+have `SBD_PACEMAKER=yes`, `SBD_WATCHDOG_DEV` pointing to the correct device
+and adjust the value of `SBD_WATCHDOG_TIMEOUT` to suit your need. This last
+variable is the time sbd will use to initialize the recurrent hardware watchdog
+timer.
+
+Start the cluster:
+
+~~~
+# pcs cluster start --all
+~~~
+
+If needed, adjust the `stonith-watchdog-timeout` cluster property:
+
+~~~~
+# pcs property set stonith-watchdog-timeout=10s
+~~~~
+
+A good value for `stonith-watchdog-timeout` is the double
+of `SBD_WATCHDOG_TIMEOUT`.
+
+After some seconds, the following command should return true:
+
+~~~
+# pcs property show | grep have-watchdog
+ have-watchdog: true
+~~~
+
+Now, if you kill the sbd process, the node should reset itself in less
+than `SBD_WATCHDOG_TIMEOUT` seconds:
+
+~~~
+# killall -9 sbd
+~~~
+
+Using the following command should ask the remote node to fence itself using
+its watchdog (if no other fencing device exist):
+
+~~~
+# stonith_admin -F srv1
+~~~
+
+If you stop Pacemaker but not Corosync or simulate a resource failing to
+stop or a resource fatal error, the node should fence itself immediately.
 
 ## Removing a node
 
@@ -263,7 +348,7 @@ srv2: Corosync updated
 The last command change the maximum clone allowed in the cluster:
 
 ```
-pcs resource meta pgsql-ha clone-max=2
+# pcs resource meta pgsql-ha clone-max=2
 ```
 
 
@@ -277,7 +362,7 @@ The following command forbid your multi-state PostgreSQL resource
 called `pgsql-ha` to run on node called `srv3`:
 
 ```
-pcs constraint location pgsql-ha rule resource-discovery=never score=-INFINITY \#uname eq srv3
+# pcs constraint location pgsql-ha rule resource-discovery=never score=-INFINITY \#uname eq srv3
 ```
 
 This creates constraint location associated to a rule allowing us to
