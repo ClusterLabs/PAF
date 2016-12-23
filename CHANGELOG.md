@@ -1,13 +1,9 @@
-# PAF v2.1 rc2
+# PAF v2.1.0
 
-Release date: WIP
+Release date: 2016-12-23
 
 __WARNING__: This version is only compatible with at least
 Pacemaker 1.1.13 using a corosync 2.x stack.
-
-Changelog since 2.1 rc1:
-
-* fix: timeout given to pg_ctl was in ms instead of sec, YanChii
 
 Changelog since 2.0:
 
