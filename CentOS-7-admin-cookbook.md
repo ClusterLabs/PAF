@@ -135,13 +135,13 @@ maintenance mode and update PAF, eg.:
 
 ```
 # pcs property set maintenance-mode=true
-# yum install https://github.com/dalibo/PAF/releases/download/v2.1/resource-agents-paf-2.1-1.noarch.rpm
+# yum install -y https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-agents-paf-2.1.0-1.noarch.rpm
 # pcs property set maintenance-mode=false
 ```
 
 That's it, you are done.
 
-### Hands-off approach of PostgreSQL resources to update PAF
+### Keep cluster's hands off PostgreSQL resources while updating PAF
 
 If putting the whole cluster is not an option to you, you must ask the
 cluster to only ignore and avoid your PostgreSQL resources. The cluster
@@ -213,7 +213,7 @@ You can check the recurring action are disabled (`enabled=false` bellow):
 Now, update PAF, eg.:
 
 ```
-# yum install https://github.com/dalibo/PAF/releases/download/v2.1/resource-agents-paf-2.1-1.noarch.rpm
+# yum install -y https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-agents-paf-2.1.0-1.noarch.rpm
 ```
 
 We can now enable the recurrent actions:
