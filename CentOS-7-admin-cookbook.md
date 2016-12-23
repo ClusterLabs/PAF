@@ -128,13 +128,32 @@ your PostgreSQL cluster. You just need to make sure the cluster manager do not
 decide to run an action while the system updates the `pgsqlms` script or the
 libraries. It's quite improbable, but this situation is still possible.
 
+### Easiest and faster way to update PAF
+
+The easiest way to acheive a clean update is to put the whole cluster in
+maintenance mode and update PAF, eg.:
+
+```
+# pcs property set maintenance-mode=true
+# yum install https://github.com/dalibo/PAF/releases/download/v2.1/resource-agents-paf-2.1-1.noarch.rpm
+# pcs property set maintenance-mode=false
+```
+
+That's it, you are done.
+
+### Hands-off approach of PostgreSQL resources to update PAF
+
+If putting the whole cluster is not an option to you, you must ask the
+cluster to only ignore and avoid your PostgreSQL resources. The cluster
+will still be in charge of other resources.
+
 Considers the PostgreSQL multistate resource is called `pgsql-ha`.
 
 First forbid the cluster resource manager to react on unexpected status by
 putting the resource in unmanaged mode:
 
 ```
-# pcs resource unmanage pgsql-ha
+# pcs resource unmanage pgsql-ha
 ```
 
 Notice `(unmanaged)` appeared in `crm_mon` and the meta
@@ -164,8 +183,8 @@ and `pgsqld-monitor-interval-16s`).
 Run the following commands to disable each of them:
 
 ```
-# pcs resource update pgsqld op monitor role=Master timeout=10s interval=15s enabled=false
-# pcs resource update pgsqld op monitor role=Slave timeout=10s interval=16s enabled=false
+# pcs resource update pgsqld op monitor role=Master timeout=10s interval=15s enabled=false
+# pcs resource update pgsqld op monitor role=Slave timeout=10s interval=16s enabled=false
 ```
 
 > __WARNING__: you __MUST__ give __ALL__ the options of the recurring command,
@@ -194,7 +213,7 @@ You can check the recurring action are disabled (`enabled=false` bellow):
 Now, update PAF, eg.:
 
 ```
-# yum install https://github.com/dalibo/PAF/releases/download/v2.1/resource-agents-paf-2.1-1.noarch.rpm
+# yum install https://github.com/dalibo/PAF/releases/download/v2.1/resource-agents-paf-2.1-1.noarch.rpm
 ```
 
 We can now enable the recurrent actions:
@@ -210,7 +229,7 @@ everything is running correctly in `crm_mon` and your log files.
 We can now put the resource in `managed` mode again:
 
 ```
-pcs resource manage pgsql-ha
+# pcs resource manage pgsql-ha
 ```
 
 
