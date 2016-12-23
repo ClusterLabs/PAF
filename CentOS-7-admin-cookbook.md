@@ -121,7 +121,7 @@ Resource 'pgsql-ha' is master on node srv2; slave on node srv1.
 (nothing)
 ```
 
-## PAF update
+## PAF update
 
 Updating the PostgreSQL Auto-Failover resource agent does not requires to stop
 your PostgreSQL cluster. You just need to make sure the cluster manager do not
