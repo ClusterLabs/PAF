@@ -13,6 +13,7 @@ Topics:
 
 * [Starting or stopping the cluster](#starting-or-stopping-the-cluster)
 * [Swapping master and slave roles between nodes](#swapping-master-and-slave-roles-between-nodes)
+* [PAF update](#paf-update)
 * [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
 * [Adding a node](#adding-a-node)
 * [Removing a node](#removing-a-node)
@@ -119,6 +120,99 @@ Resource 'pgsql-ha' is master on node srv2; slave on node srv1.
 # pcs constraint show | grep Master
 (nothing)
 ```
+
+## PAF update
+
+Updating the PostgreSQL Auto-Failover resource agent does not requires to stop
+your PostgreSQL cluster. You just need to make sure the cluster manager do not
+decide to run an action while the system updates the `pgsqlms` script or the
+libraries. It's quite improbable, but this situation is still possible.
+
+Considers the PostgreSQL multistate resource is called `pgsql-ha`.
+
+First forbid the cluster resource manager to react on unexpected status by
+putting the resource in unmanaged mode:
+
+```
+# pcs resource unmanage pgsql-ha
+```
+
+Notice `(unmanaged)` appeared in `crm_mon` and the meta
+attribute `is-managed=false` appeared for the `pgsql-ha` resource in this
+command:
+
+```
+# pcs resource show pgsql-ha
+ Master: pgsql-ha
+  Meta Attrs: master-max=1 master-node-max=1 clone-max=3 clone-node-max=1 notify=true is-managed=false
+  Resource: pgsqld (class=ocf provider=heartbeat type=pgsqlms)
+   Attributes: bindir=/usr/pgsql-9.4/bin pgdata=/var/lib/pgsql/9.4/data
+   Operations: start interval=0s timeout=60s (pgsqld-start-interval-0s)
+               stop interval=0s timeout=60s (pgsqld-stop-interval-0s)
+               promote interval=0s timeout=30s (pgsqld-promote-interval-0s)
+               demote interval=0s timeout=120s (pgsqld-demote-interval-0s)
+               monitor role=Master timeout=10s interval=15s (pgsqld-monitor-interval-15s)
+               monitor role=Slave timeout=10s interval=16s (pgsqld-monitor-interval-16s)
+               notify interval=0s timeout=60s (pgsqld-notify-interval-0s)
+```
+
+Now, we need to stop the recurring operations so the Local Resource Manager will
+not run a command during the update. In our demo, we only have the two
+monitor commands (id `pgsqld-monitor-interval-15s`
+and `pgsqld-monitor-interval-16s`).
+
+Run the following commands to disable each of them:
+
+```
+# pcs resource update pgsqld op monitor role=Master timeout=10s interval=15s enabled=false
+# pcs resource update pgsqld op monitor role=Slave timeout=10s interval=16s enabled=false
+```
+
+> __WARNING__: you __MUST__ give __ALL__ the options of the recurring command,
+> even if you update only one of them. If you forget one option, `pcs` will
+> create a new resource operation with the default value for this option.
+> Copy/editing the output of `pcs resource show ...` for the operation you
+> update is often a good idea.
+>
+> You could fallback to the low level command as well to disable your
+> operations if you prefer. Eg.:
+>
+> ```
+> # cibadmin --modify --xml-text '<op id="pgsqld-monitor-interval-15s" enabled="false"/>'
+> # cibadmin --modify --xml-text '<op id="pgsqld-monitor-interval-16s" enabled="false"/>'
+> ```
+{: .warning}
+
+You can check the recurring action are disabled (`enabled=false` bellow):
+
+```
+# pcs resource show pgsql-ha|grep enabled
+  monitor role=Master timeout=10s interval=15s enabled=false (pgsqld-monitor-interval-15s)
+  monitor role=Slave timeout=10s interval=16s enabled=false (pgsqld-monitor-interval-16s)
+```
+
+Now, update PAF, eg.:
+
+```
+# yum install https://github.com/dalibo/PAF/releases/download/v2.1/resource-agents-paf-2.1-1.noarch.rpm
+```
+
+We can now enable the recurrent actions:
+
+```
+# pcs resource update pgsqld op monitor role=Master timeout=10s interval=15s enabled=true
+# pcs resource update pgsqld op monitor role=Slave timeout=10s interval=16s enabled=true
+```
+
+Monitor action should be executed immediately and report no errors. Check that
+everything is running correctly in `crm_mon` and your log files.
+
+We can now put the resource in `managed` mode again:
+
+```
+pcs resource manage pgsql-ha
+```
+
 
 ## PostgreSQL minor upgrade
 
