@@ -235,7 +235,7 @@ The cluster configuration client `crmsh` is supposed to be able to take care of
 this, but this feature was broken when this tutorial was written.
 See [the related bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=819545).
 
-First, stop corosync:
+First, stop Corosync and Pacemaker on all nodes:
 
 ```
 systemctl stop corosync.service pacemaker.service
@@ -302,9 +302,9 @@ quorum {
 ```
 
 For more information about this configuration file, see the `corosync.conf`
-manual page.
+manual page. Make sure this file is strictly the same on each node.
 
-We can now start and Pacemaker:
+We can now start Pacemaker on every node of the cluster:
 
 ```
 systemctl start pacemaker.service

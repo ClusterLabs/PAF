@@ -22,6 +22,7 @@ See the [Configuration]({{ site.baseurl }}/configuration.html) page.
 * general: see the [Administration]({{ site.baseurl }}/administration.html)
   page.
 * [Administration cookbook with CentOS 7]({{ site.baseurl }}/CentOS-7-admin-cookbook.html) (using `pcs`)
+* [Administration cookbook with Debian 8]({{ site.baseurl }}/Debian-8-admin-cookbook.html) (WIP using `crm`)
 
 ## Fencing
 
