@@ -42,15 +42,18 @@ Here is the command to move the master role from `srv1` to `srv2`:
 
 ```
 # crm resource migrate pgsql-ha srv2
+# crm resource unmigrate pgsql-ha
 ```
 
 That's it. Note that the former master became a slave and start replicating with
 the new master.
 
+To move the resource, `crmsh` sets an `INFINITY` constraint location for the
+master on the given node. You must clear this constraint to avoid unexpected
+location behavior using the ` crm resource unmigrate` command.
+
 Note that if you do not specify the destination node, `crm` set a `-INFINITY`
-score for the master resource on its current node to force it to move away.
-You must clear this constraint using `unmigrate` or the master will never get
-back to this node:
+score for the master resource on its current node to force it to move away:
 
 ```
 # crm resource migrate pgsql-ha
@@ -59,7 +62,6 @@ back to this node:
     pgsql-master-ip                 (score=INFINITY, needs role=Master, id=ip-with-master)
 * pgsql-ha
   : Node srv1                       (score=-INFINITY, id=cli-ban-pgsql-ha-on-srv1)
-  : Node srv1                       (score=INFINITY, id=cli-prefer-pgsql-ha)
 
 # crm resource unmigrate pgsql-ha
 

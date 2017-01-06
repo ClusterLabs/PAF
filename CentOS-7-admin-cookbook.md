@@ -88,6 +88,7 @@ Here is the command to move the master role from `srv1` to `srv2`:
 
 ```
 # pcs resource move --master pgsql-ha srv2
+# pcs resource clear pgsql-ha
 ```
 
 That's it. Note that the former master became a slave and start replicating with
@@ -99,11 +100,16 @@ example moving back the master to `srv1`:
 ```
 # pcs resource move --wait --master pgsql-ha srv1
 Resource 'pgsql-ha' is master on node srv1; slave on node srv2.
+# pcs resource clear pgsql-ha
 ```
 
-Note that if you do not specify the destination node, `pcs` set a `-INFINITY`
-score for the master resource on its current node to force it to move away.
-You must clear this constraint or the master will never get back to this node:
+To move the resource, `pcs` sets an `INFINITY` constraint location for the
+master on the given node. You must clear this constraint to avoid unexpected
+location behavior using the `pcs resource clear` command.
+
+Note that giving the destination node is not mandatory. If no destination node
+is given, `pcs` set a `-INFINITY` score for the master resource on its current
+node to force it to move away:
 
 ```
 # pcs resource move --wait --master pgsql-ha
@@ -112,7 +118,6 @@ This will prevent pgsql-ha from being promoted on srv1 until the constraint is r
 Resource 'pgsql-ha' is master on node srv2; slave on node srv1.
 
 # pcs constraint show | grep Master
-    Enabled on: srv1 (score:INFINITY) (role: Master)
     Disabled on: srv1 (score:-INFINITY) (role: Master)
 
 # pcs resource clear pgsql-ha
@@ -248,7 +253,7 @@ Here is how to upgrade PostgeSQL on the standby side:
 # yum install --downloadonly postgresql93 postgresql93-contrib postgresql93-server
 # pcs resource ban --wait pgsql-ha srv2
 # yum install -y postgresql93 postgresql93-contrib postgresql93-server
-# pcs resource clear pgsql-ha srv2
+# pcs resource clear pgsql-ha
 ```
 
 Here are the details of these commands:
@@ -266,7 +271,7 @@ of `srv1`:
 # yum install --downloadonly postgresql93 postgresql93-contrib postgresql93-server
 # pcs resource ban --wait pgsql-ha srv1
 # yum install -y postgresql93 postgresql93-contrib postgresql93-server
-# pcs resource clear pgsql-ha srv1
+# pcs resource clear pgsql-ha
 ```
 
 Minor upgrade is finished. Feel free to move your master back to `srv1` if you
