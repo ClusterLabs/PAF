@@ -65,6 +65,7 @@ my $PGXLOGDUMP = "$bindir/pg_xlogdump";
 # pacemaker commands path
 my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime forever";
 my $CRM_ATTRIBUTE = "$HA_SBIN_DIR/crm_attribute --lifetime reboot --type status";
+my $CRM_CONF_ATTR = "$HA_SBIN_DIR/crm_attribute --lifetime forever --type crm_config";
 my $CRM_NODE      = "$HA_SBIN_DIR/crm_node";
 my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
 my $CRM_FAILCOUNT = "$HA_SBIN_DIR/crm_failcount";
@@ -73,6 +74,8 @@ my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
 # Global vars
 my $nodename;
 my $exit_code = 0;
+# Database unique id (see commentary in _get_highest_timeline_varname()):
+my $SYSTEM_IDENTIFIER = 0;
 
 # get the timeout for the current action given from environment var
 # Returns   timeout as integer
@@ -140,6 +143,54 @@ sub _delete_priv_attr {
     return;
 }
 
+# Get the value of given global cluster-wide CRM attribute.
+# Returns an empty string if not found.
+sub _get_crm_attr {
+    my ( $name ) = @_;
+    my $ans;
+
+    $ans = qx{ $CRM_CONF_ATTR --name "$name" --query --quiet 2>/dev/null };
+
+	chomp $ans;
+    return $ans if defined $ans;
+
+    return '';
+}
+
+# Set the given global cluster-wide CRM attribute.
+# As setting an attribute is asynchronous, this will return as soon as the
+# attribute is really set by attrd and available.
+sub _set_crm_attr {
+	my ( $name, $val ) = @_;
+
+    qx{ $CRM_CONF_ATTR --name "$name" --update "$val" };
+
+    while ( _get_crm_attr( $name ) ne $val ) {
+        ocf_log( 'debug', sprintf '_set_crm_attr: waiting to set "%s"...',
+            $name );
+        select(undef, undef, undef, 0.1);
+    }
+
+    return;
+}
+
+# Delete the given CRM attribute.
+# As setting an attribute is asynchronous, this will return as soon as the
+# attribute is really deleted by attrd.
+sub _delete_crm_attr {
+    my ( $name ) = @_;
+
+    qx{ $CRM_CONF_ATTR --name "$name" --delete };
+
+    while ( _get_crm_attr( $name ) ne '' ) {
+        ocf_log( 'debug', sprintf '_delete_priv_attr: waiting to delete "%s"...',
+            $name );
+        select(undef, undef, undef, 0.1);
+    }
+
+    return;
+}
+
 # Get, parse and return the resource master score on given node.
 # Returns an empty string if not found.
 # Returns undef on crm_master call on error
@@ -199,6 +250,110 @@ sub _master_score_exists {
     return 0;
 }
 
+# returns current timeline of local pg instance (as integer)
+sub _get_local_timeline {
+	
+    my $controldata_rc = _controldata();
+    if ( $controldata_rc == $OCF_SUCCESS 
+			or $controldata_rc == $OCF_RUNNING_MASTER ) {
+		# Force a checpoint to make sure the controldata shows the very last TL
+		_query( q{ CHECKPOINT }, {} );
+	}
+
+	# get pg_controldata output
+    my $ans = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
+
+    # Get the latest known TL
+    $ans =~ m{^Latest checkpoint's TimeLineID:\s+(\d+)\s*$}m;
+
+	return 0 if not defined $1;	# cannot query timeline, return zero
+	return 0 if $1 eq '';		# to prevent conversion warnings
+	return $1 + 0;				# convert to number
+}	
+
+sub _get_db_system_identifier {
+	# get pg_controldata output
+    my $ans = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
+
+    # Get the latest known TL
+    $ans =~ m{^Database system identifier:\s+(\d+)\s*$}m;
+
+	return '' if not defined $1;
+	return $1;
+}
+
+sub _get_highest_timeline_varname {
+
+	# Define unique variable names for checking timeline status.
+	# These variables contain the names of cluster-wide global highest timeline info.
+	# The actual cluster-wide variables are permament across reboots
+	# and when set, they last until explicitly deleted.
+	# Their names have to be globally unique so multiple postgres resources
+	# can coexist in the cluster.
+	# Because they are permanent, they need to be bound to something unique
+	# to this pg cluster data, because deletion of the cluster resource
+	# does not delete these variables (they are just not used anymore).
+	# That's why the "Database system identifier" was chosen as 
+	# part of the unique name (it is uniquely generated when DB is created (initdb)).
+	#
+
+	$SYSTEM_IDENTIFIER = _get_db_system_identifier() unless $SYSTEM_IDENTIFIER;
+
+	return "postgres-$SYSTEM_IDENTIFIER-highest-timeline";
+}
+
+# Returns: The highest timeline number ever seen in this resource (integer)
+sub _get_global_highest_timeline {
+
+	my $global_timeline;
+
+	my $HIGHEST_TIMELINE_VARNAME = _get_highest_timeline_varname();
+
+	$global_timeline = _get_crm_attr($HIGHEST_TIMELINE_VARNAME);
+	$global_timeline = 0 if $global_timeline eq '';		# if N/A, use lowest (zero)
+	$global_timeline += 0;		# convert to integer
+
+    ocf_log( 'debug', sprintf
+		'_get_global_highest_timeline: the highest observed timeline was %i',
+		$global_timeline);
+
+	return $global_timeline;
+}
+
+# Returns: The last promoted nodename
+sub _get_global_highest_timeline_host {
+
+	my $global_timeline_host;
+
+	my $HIGHEST_TIMELINE_VARNAME = _get_highest_timeline_varname();
+	# The cluster node that was promoted to this timeline number:
+	my $HIGHEST_TIMELINE_HOST_VARNAME = "$HIGHEST_TIMELINE_VARNAME-host";
+
+	$global_timeline_host = _get_crm_attr($HIGHEST_TIMELINE_HOST_VARNAME);
+    ocf_log( 'debug', sprintf
+		'_get_global_highest_timeline_host: the highest observed timeline was on host "%s"',
+		$global_timeline_host);
+
+	return $global_timeline_host;
+}
+
+sub _set_global_highest_timeline {
+	my ( $local_timeline ) = @_;
+
+	my $HIGHEST_TIMELINE_VARNAME = _get_highest_timeline_varname();
+	# The cluster node that was promoted to this timeline number:
+	my $HIGHEST_TIMELINE_HOST_VARNAME = "$HIGHEST_TIMELINE_VARNAME-host";
+
+    ocf_log( 'debug', sprintf
+		'_set_global_highest_timeline: setting highest timeline variable (%s) to %i on host "%s"',
+		$HIGHEST_TIMELINE_VARNAME, $local_timeline, $nodename);
+
+	_set_crm_attr($HIGHEST_TIMELINE_VARNAME, $local_timeline);
+	_set_crm_attr($HIGHEST_TIMELINE_HOST_VARNAME, $nodename);
+
+	return;
+}
+
 # Check if the current transiation is a recover of a master clone on given node.
 sub _is_master_recover {
     my ( $n ) = @_;
@@ -219,7 +374,7 @@ sub _is_slave_recover {
     );
 }
 
-# check if th current transition is a switchover to the given node.
+# check if the current transition is a switchover to the given node.
 sub _is_switchover {
     my ( $n ) = @_;
     my $old = $OCF_NOTIFY_ENV{'master'}[0]{'uname'};
@@ -662,8 +817,8 @@ sub _check_locations {
 
 # _check_switchover
 # check if the pgsql switchover to the localnode is safe.
-# This is supposed to be called **after** the master has been stopped or demote.
-# This sub check if the local standby received the shutdown checkpoint from the
+# This is supposed to be called **after** the master has been stopped or demoted.
+# This sub checks if the local standby received the shutdown checkpoint from the
 # old master to make sure it can take over the master role and the old master
 # will be able to catchup as a standby after.
 #
@@ -752,7 +907,7 @@ sub _check_switchover {
     _set_priv_attr( 'cancel_switchover', '1' );
 
     ocf_log( 'info', sprintf
-        'pgsql_notify: did not received the shutdown checkpoint from the old master!',
+        'pgsql_notify: did not receive the shutdown checkpoint from the old master!',
         $?, $ans
     );
 
@@ -1709,6 +1864,48 @@ sub pgsql_notify_pre_promote {
     _delete_priv_attr( 'nodes'             );
     _delete_priv_attr( 'cancel_switchover' );
 
+	# if this is a host awaiting promotion, check the local timeline value
+	if($OCF_NOTIFY_ENV{'promote'}[0]{'uname'} eq $nodename) {
+		# safety pre-check
+		# Do not allow promoting the instance that has timeline value lower than
+		# the _get_global_highest_timeline(). With doing so we would risk
+		# the data loss (e.g. old failed master could get promoted when all nodes
+		# reboot and only old master comes online, or on network split with
+		# fencing disabled, etc.).
+
+		my $global_timeline;
+		my $global_timeline_host;
+		$global_timeline = _get_global_highest_timeline();
+		$global_timeline_host = _get_global_highest_timeline_host();
+		my $local_timeline = _get_local_timeline();
+		ocf_log( 'debug', sprintf "pgsql_notify_pre_promote: highestTL:%s; promoted_host:%s; localTL:%s",
+			$global_timeline, $global_timeline_host, $local_timeline);
+
+		if($local_timeline lt $global_timeline) {
+			# Local timeline is lower than the highest reached timeline in this cluster.
+			# that means that we're trying to promote a failed master (or a greatly lagging slave).
+			ocf_log( 'warning', sprintf
+				'The local DB timeline value (%i) is lower than the highest timeline ' . 
+				'reached in this cluster. In the past, node "%s" was promoted to timeline %i.', 
+				$local_timeline, $global_timeline_host, $global_timeline);
+			ocf_log( 'warning', 
+				'We are probably trying to promote a previously failed/demoted master.');
+			ocf_log( 'warning', 
+				'Aborting the promotion as this probably isn\'t the best promote candidate.');
+			ocf_log( 'warning', sprintf
+				'To override this protection, run command: "%s --name %s --delete" and restart the resource.', 
+				$CRM_CONF_ATTR, _get_highest_timeline_varname());
+			
+			_set_priv_attr( 'cancel_switchover', '1' );
+
+			# Prevent this node to become a master in next elections.
+			_set_master_score( '-1' );
+
+			# Shortcut the election process as the switchover will be canceled
+			return $OCF_SUCCESS;
+		}
+	}
+
     # check for the last received entry of WAL from the master if we are
     # the designated slave to promote
     if ( _is_switchover( $nodename ) and scalar
@@ -1794,6 +1991,27 @@ sub pgsql_notify_post_promote {
     _delete_priv_attr( 'recover_master'    );
     _delete_priv_attr( 'nodes'             );
     _delete_priv_attr( 'cancel_switchover' );
+
+	# If this is not the promoted master node, return now.
+	return $OCF_SUCCESS if $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} ne $nodename;
+
+	# Saving timeline of this host as the highest observed timeline in this cluster
+	# (we know it is the highest because it was checked before promotion).
+	
+	my $local_timeline = _get_local_timeline();
+	my $global_timeline = _get_global_highest_timeline();
+	if($local_timeline ne 0) {
+		ocf_log( 'info', sprintf
+			'Updating highest seen postgres timeline from %i to %i', 
+			$global_timeline, $local_timeline);
+
+		_set_global_highest_timeline($local_timeline);
+	}
+	else {
+		ocf_log( 'warning', 'Could not query instance timeline!');
+		# This should not happen.
+		# But we can continue without affecting the service.
+	}
 
     return $OCF_SUCCESS;
 }
