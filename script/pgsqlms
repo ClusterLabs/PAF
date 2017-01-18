@@ -161,7 +161,7 @@ sub _get_master_score {
     return $score;
 }
 
-# Set the given attribute name to the given value.
+# Set the master score of the local node or the optionally given node.
 # As setting an attribute is asynchronous, this will return as soon as the
 # attribute is really set by attrd and available everywhere.
 sub _set_master_score {
