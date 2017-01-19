@@ -293,18 +293,27 @@ sub ha_debug {
             and (not defined $ENV{'HA_DEBUGLOG'} or $ENV{'HA_DEBUGLOG'} eq '' );
 }
 
+#
+# ocf_log: log messages from the resource agent
+# This function is slightly different from its equivalent in ocf-shellfuncs.in
+# as it behaves like printf.
+# Arguments:
+#   * __OCF_PRIO: log level
+#   * __OCF_MSG:  printf-like format string
+#   * all other arguments are values for the printf-like format string
+#
 sub ocf_log {
     my $__OCF_PRIO;
     my $__OCF_MSG;
 
     # TODO: Revisit and implement internally.
     if ( scalar @ARG < 2 ) {
-        ocf_log ( 'err',
-            sprintf "Not enough arguments [%d] to ocf_log", scalar @ARG );
+        ocf_log ( 'err', "Not enough arguments [%d] to ocf_log", scalar @ARG );
     }
 
     $__OCF_PRIO = shift;
-    $__OCF_MSG  = join ' ', @ARG;
+    $__OCF_MSG  = shift;
+    $__OCF_MSG  = sprintf $__OCF_MSG, @ARG;
 
     for ( $__OCF_PRIO ) {
         if    ( /crit/  ) { $__OCF_PRIO = 'CRIT'    }
@@ -341,8 +350,8 @@ sub ocf_exit_reason {
     # "Least surprise" in case some interpolated string from variable
     # expansion or other contains a percent sign.
     # More than one argument: first argument is going to be the format string.
-    ocf_log ( 'err', 'Not enough arguments to ocf_exit_reason' )
-        if scalar @ARG < 1;
+    ocf_log ( 'err', 'Not enough arguments [%d] to ocf_exit_reason',
+        scalar @ARG ) if scalar @ARG < 1;
 
     $fmt = shift;
     $msg = sprintf $fmt, @ARG;
