@@ -320,7 +320,7 @@ sub _controldata_state {
     $status =~ /^Database cluster state:\s+(.*?)\s*$/m;
 
     unless ( defined $1 ) {
-        ocf_log( 'crit', sprintf
+        ocf_exit_reason(
             '_controldata_state: could not read state from controldata file for "%s"',
             $datadir );
         exit $OCF_ERR_CONFIGURED;
@@ -354,8 +354,7 @@ sub _create_recovery_conf {
     # it, we will leave with this.
     # FIXME how would the reload help us in this case ?
     unless ( defined open( $fh, '<', $recovery_tpl ) ) {
-        ocf_log( 'crit',  sprintf
-            '_create_recovery_conf: could not open file "%s"',
+        ocf_exit_reason( '_create_recovery_conf: could not open file "%s"',
             $recovery_tpl );
         exit $OCF_ERR_CONFIGURED;
     }
@@ -372,8 +371,7 @@ sub _create_recovery_conf {
         $recovery_file );
 
     unless ( open( $fh, '>', $recovery_file ) ) {
-        ocf_log( 'crit',  sprintf
-            '_create_recovery_conf: Could not open file "%s"',
+        ocf_exit_reason( '_create_recovery_conf: Could not open file "%s"',
             $recovery_file );
         exit $OCF_ERR_CONFIGURED;
     }
@@ -384,8 +382,7 @@ sub _create_recovery_conf {
     close $fh;
 
     unless ( chown $uid, $gid, $recovery_file ) {
-        ocf_log( 'crit',  sprintf
-            '_create_recovery_conf: Could not set owner of "%s"',
+        ocf_exit_reason( '_create_recovery_conf: Could not set owner of "%s"',
             $recovery_file );
         exit $OCF_ERR_CONFIGURED;
     };
@@ -431,8 +428,8 @@ sub _controldata {
 
     # If we reach this point, something went really wrong with this code or
     # pg_controldata.
-    ocf_log( 'err', sprintf
-        '_controldata: unable get instance "%s" state using pg_controldata.',
+    ocf_exit_reason(
+        '_controldata: unable get instance "%s" state using pg_controldata',
         $OCF_RESOURCE_INSTANCE );
 
     return $OCF_ERR_INSTALLED ;
@@ -468,7 +465,7 @@ sub _query {
             DIR      => $HA_RSCTMP
         ) )
     {
-        ocf_log( 'crit', '_query: could not create or write in a temp file');
+        ocf_exit_reason( '_query: could not create or write in a temp file' );
         exit $OCF_ERR_INSTALLED;
     }
 
@@ -576,7 +573,7 @@ sub _check_locations {
     $rc = _query( $query, \@rs );
 
     if ( $rc != 0 ) {
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             '_check_locations: query to get standby locations failed (%d)',
             $rc );
         exit $OCF_ERR_GENERIC;
@@ -706,7 +703,7 @@ sub _check_switchover {
     $rc = _query( q{ SELECT pg_last_xlog_receive_location() }, \@rs );
 
     if ( $rc != 0 ) {
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             '_check_switchover: could not query last_xlog_receive_location (%d)',
             $rc );
         return 2;
@@ -715,8 +712,8 @@ sub _check_switchover {
     $last_lsn = $rs[0][0] if defined $rs[0][0];
 
     unless ( defined $tl and defined $last_chk and defined $last_lsn ) {
-        ocf_log( 'crit',
-            '_check_switchover: could not read last checkpoint and timeline from controldata file!',
+        ocf_exit_reason(
+            '_check_switchover: could not read last checkpoint and timeline from controldata file!'
         );
 
         ocf_log( 'debug', sprintf
@@ -787,7 +784,7 @@ sub _confirm_role {
         }
 
         # This should not happen, raise a hard configuration error.
-        ocf_log( 'err',  sprintf
+        ocf_exit_reason(
             '_confirm_role: unexpected result from query to check if "%s" is a primary or a secondary: "%s"',
             $OCF_RESOURCE_INSTANCE, $is_in_recovery );
 
@@ -797,7 +794,7 @@ sub _confirm_role {
         # psql cound not connect to the instance.
         # As pg_isready reported the instance was listening, this error
         # could be a max_connection saturation. Just report a soft error.
-        ocf_log( 'err',  sprintf
+        ocf_exit_reason(
             '_confirm_role: psql could not connect to instance "%s"',
             $OCF_RESOURCE_INSTANCE );
         return $OCF_ERR_GENERIC;
@@ -805,8 +802,8 @@ sub _confirm_role {
 
     # The query failed (rc: 3) or bad parameters (rc: -1).
     # This should not happen, raise a hard configuration error.
-    ocf_log( 'err', sprintf
-        '_confirm_role: the query to check if instance "%s"is a primary or a secondary failed (rc: %d)',
+    ocf_exit_reason(
+        '_confirm_role: the query to check if instance "%s" is a primary or a secondary failed (rc: %d)',
         $OCF_RESOURCE_INSTANCE, $rc );
 
     return $OCF_ERR_CONFIGURED;
@@ -826,7 +823,7 @@ sub _confirm_stopped {
     if ( $pgctlstatus_rc == 0 ) {
         # The PID file exists and the process is available.
         # That should not be the case, return an error.
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             '_confirm_stopped: instance "%s" is not listening, but the process referenced in postmaster.pid exists',
             $OCF_RESOURCE_INSTANCE );
         return $OCF_ERR_GENERIC;
@@ -850,7 +847,7 @@ sub _confirm_stopped {
     if ( $controldata_rc == $OCF_RUNNING_MASTER ) {
         # The controldata has not been updated to "shutdown".
         # It should mean we had a crash on a primary instance.
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             '_confirm_stopped: instance "%s" controldata indicates a running primary instance, the instance has probably crashed',
             $OCF_RESOURCE_INSTANCE );
         return $OCF_FAILED_MASTER;
@@ -859,7 +856,7 @@ sub _confirm_stopped {
         # The controldata has not been updated to "shutdown in recovery".
         # It should mean we had a crash on a secondary instance.
         # There is no "FAILED_SLAVE" return code, so we return a generic error.
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             '_confirm_stopped: instance "%s" controldata indicates a running secondary instance, the instance has probably crashed',
             $OCF_RESOURCE_INSTANCE );
         return $OCF_ERR_GENERIC;
@@ -874,7 +871,7 @@ sub _confirm_stopped {
     }
 
     # Something went wrong with the controldata check.
-    ocf_log( 'err', sprintf
+    ocf_exit_reason(
         '_confirm_stopped: could not get instance "%s" status from controldata (returned: %d)',
         $OCF_RESOURCE_INSTANCE, $controldata_rc );
 
@@ -1014,49 +1011,45 @@ sub pgsql_validate_all {
 
     # check pgdata
     if ( ! -d $pgdata ) {
-        ocf_log( 'err', sprintf 'PGDATA "%s" does not exists', $pgdata );
+        ocf_exit_reason( 'PGDATA "%s" does not exists', $pgdata );
         exit $OCF_ERR_ARGS;
     }
 
     # check datadir
     if ( ! -d $datadir ) {
-        ocf_log( 'err',
-            sprintf 'data_directory "%s" does not exists', $datadir );
+        ocf_exit_reason( 'data_directory "%s" does not exists', $datadir );
         exit $OCF_ERR_ARGS;
     }
 
     # check PG_VERSION
     if ( ! -s "$datadir/PG_VERSION" ) {
-        ocf_log( 'err', sprintf 'PG_VERSION does not exists in "%s"',
-            $datadir );
+        ocf_exit_reason( 'PG_VERSION does not exists in "%s"', $datadir );
         exit $OCF_ERR_ARGS;
     }
 
     # check recovery template
     if ( ! -f $recovery_tpl ) {
-        ocf_log( 'err', sprintf 'Recovery template file "%s" does not exist',
+        ocf_exit_reason( 'Recovery template file "%s" does not exist',
             $recovery_tpl );
         exit $OCF_ERR_ARGS;
     }
 
     # check content of the recovery template file
     unless ( open( $fh, '<', $recovery_tpl ) ) {
-        ocf_log( 'err',
-            sprintf 'Could not open file "%s": %s', $recovery_tpl, $! );
+        ocf_exit_reason( 'Could not open file "%s": %s', $recovery_tpl, $! );
         exit $OCF_ERR_ARGS;
     }
     @content = <$fh>;
     close $fh;
 
     unless ( grep /^\s*standby_mode\s*=\s*'?on'?\s*$/, @content ) {
-        ocf_log( 'err',
-            sprintf 'Recovery template file must contain "standby_mode = on"'
-        );
+        ocf_exit_reason(
+            'Recovery template file must contain "standby_mode = on"' );
         exit $OCF_ERR_ARGS;
     }
 
     unless ( grep /^\s*recovery_target_timeline\s*=\s*'?latest'?\s*$/, @content ) {
-        ocf_log( 'err',
+        ocf_exit_reason(
             "Recovery template file must contain \"recovery_target_timeline = 'latest'\""
         );
         exit $OCF_ERR_ARGS;
@@ -1066,7 +1059,7 @@ sub pgsql_validate_all {
         grep /^\s*primary_conninfo\s*=.*['\s]application_name=$nodename['\s]/,
         @content
     ) {
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             'Recovery template file must contain in primary_conninfo parameter "application_name=%s"',
             $nodename );
         exit $OCF_ERR_ARGS;
@@ -1074,14 +1067,13 @@ sub pgsql_validate_all {
 
     # check system user
     unless ( defined getpwnam $system_user ) {
-        ocf_log( 'err',
-            sprintf 'System user "%s" does not exist', $system_user );
+        ocf_exit_reason( 'System user "%s" does not exist', $system_user );
         exit $OCF_ERR_ARGS;
     }
 
     # require 9.3 minimum
     unless ( open( $fh, '<', "$datadir/PG_VERSION" ) ) {
-        ocf_log( 'err', "Could not open file \"$datadir/PG_VERSION\": $!" );
+        ocf_exit_reason( "Could not open file \"$datadir/PG_VERSION\": $!" );
         exit $OCF_ERR_ARGS;
     }
     read( $fh, $PGVERSION, 64 );
@@ -1093,17 +1085,16 @@ sub pgsql_validate_all {
     $PGVERNUM = $1 * 10000 + $2 * 100;
 
     if ( $PGVERNUM < 90300 ) {
-        ocf_log( 'crit',
-            sprintf "PostgreSQL %s not supported. Require 9.3 and more",
+        ocf_exit_reason( "PostgreSQL %s not supported. Require 9.3 and more",
             $PGVERSION );
         exit $OCF_ERR_INSTALLED;
     }
 
     # check binaries
     unless ( -x $PGCTL and -x $PGPSQL and -x $PGCTRLDATA and -x $PGISREADY ) {
-        ocf_log( 'crit',
-            sprintf "Missing one or more binary. Check following path: %s, %s, %s, %s",
-             $PGCTL, $PGPSQL, $PGCTRLDATA, $PGISREADY );
+        ocf_exit_reason(
+            "Missing one or more binary. Check following path: %s, %s, %s, %s",
+            $PGCTL, $PGPSQL, $PGCTRLDATA, $PGISREADY );
         exit $OCF_ERR_ARGS;
     }
 
@@ -1113,12 +1104,12 @@ sub pgsql_validate_all {
     # account for both syntaxes
     $status =~ /^(?:Current )?wal_level setting:\s+(.*?)\s*$/m;
     unless ( defined $1 ) {
-        ocf_log( 'crit', 'Could not read wal_level setting' );
+        ocf_exit_reason( 'Could not read wal_level setting' );
         exit $OCF_ERR_ARGS;
     }
 
     unless ( $1 eq 'hot_standby' or $1 eq 'logical' or $1 eq 'replica' ) {
-        ocf_log( 'crit',
+        ocf_exit_reason(
             'wal_level must be one of "hot_standby", "logical" or "replica"' );
         exit $OCF_ERR_ARGS;
     }
@@ -1141,7 +1132,7 @@ sub pgsql_start {
         return $OCF_SUCCESS;
     }
     elsif ( $rc != $OCF_NOT_RUNNING ) {
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             'pgsql_start: unexpected state for instance "%s" (returned %d)',
             $OCF_RESOURCE_INSTANCE, $rc );
         return $OCF_ERR_GENERIC;
@@ -1191,14 +1182,14 @@ sub pgsql_start {
             return $OCF_SUCCESS;
         }
 
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             'pgsql_start: instance "%s" is not running as a slave (returned %d)',
              $OCF_RESOURCE_INSTANCE, $rc );
 
         return $OCF_ERR_GENERIC;
     }
 
-    ocf_log( 'err',  sprintf
+    ocf_exit_reason(
         'pgsql_start: instance "%s" failed to start (rc: %d)',
         $OCF_RESOURCE_INSTANCE, $rc );
 
@@ -1225,7 +1216,7 @@ sub pgsql_stop {
         return $OCF_SUCCESS;
     }
     elsif ( $rc != $OCF_SUCCESS and $rc != $OCF_RUNNING_MASTER ) {
-        ocf_log( 'warning', sprintf
+        ocf_exit_reason(
             'pgsql_stop: unexpected state for instance "%s" (returned %d)',
             $OCF_RESOURCE_INSTANCE, $rc );
         return $OCF_ERR_GENERIC;
@@ -1254,8 +1245,8 @@ sub pgsql_stop {
         return $OCF_SUCCESS;
     }
 
-    ocf_log( 'err',
-        'pgsql_stop: instance "%s" failed to stop', $OCF_RESOURCE_INSTANCE );
+    ocf_exit_reason( 'pgsql_stop: instance "%s" failed to stop',
+        $OCF_RESOURCE_INSTANCE );
     return $OCF_ERR_GENERIC;
 }
 
@@ -1316,7 +1307,7 @@ sub pgsql_monitor {
             # Still not consistent, raise an error.
             # NOTE: if the instance is a warm standby, we end here.
             # TODO raise an hard error here ?
-            ocf_log( 'err', sprintf
+            ocf_exit_reason(
                 'pgsql_monitor: instance "%s" controldata is not consistent with pg_isready (returned: %d)',
                 $OCF_RESOURCE_INSTANCE, $pgisready_rc );
             ocf_log( 'info', sprintf
@@ -1341,7 +1332,7 @@ sub pgsql_monitor {
             }
             # Still not consistent, raise an error.
             # TODO raise an hard error here ?
-            ocf_log( 'err', sprintf
+            ocf_exit_reason(
                 'pgsql_monitor: instance "%s" controldata is not consistent with pg_isready (returned: %d)',
                 $OCF_RESOURCE_INSTANCE, $pgisready_rc );
 
@@ -1349,7 +1340,7 @@ sub pgsql_monitor {
         }
 
         # Something went wrong with the controldata check, hard fail.
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             'pgsql_monitor: could not get instance "%s" status from controldata (returned: %d)',
             $OCF_RESOURCE_INSTANCE, $controldata_rc );
 
@@ -1369,14 +1360,14 @@ sub pgsql_monitor {
     elsif ( $pgisready_rc == 3 ) {
         # No attempt was done, probably a syntax error.
         # Hard configuration error, we don't want to retry or failover here.
-        ocf_log( 'err', sprintf
+        ocf_exit_reason(
             'pgsql_monitor: unknown error while checking if instance "%s" is listening (returned %d)',
             $OCF_RESOURCE_INSTANCE, $pgisready_rc );
 
         return $OCF_ERR_CONFIGURED;
     }
 
-    ocf_log( 'err', sprintf
+    ocf_exit_reason(
         'pgsql_monitor: unexpected result when checking instance "%s" status',
         $OCF_RESOURCE_INSTANCE );
 
@@ -1448,7 +1439,7 @@ sub pgsql_demote {
         # No need to wait for stop to complete, this is handled in pg_ctl
         # using -w option.
         unless ( $rc == 0 ) {
-            ocf_log( 'err',  sprintf
+            ocf_exit_reason(
                 'pgsql_demote: failed to stop "%s" using pg_ctl (returned %d)',
                 $OCF_RESOURCE_INSTANCE, $rc );
             return $OCF_ERR_GENERIC;
@@ -1457,7 +1448,7 @@ sub pgsql_demote {
         # Double check that the instance is stopped correctly.
         $rc = pgsql_monitor();
         unless ( $rc == $OCF_NOT_RUNNING ) {
-            ocf_log( 'err', sprintf
+            ocf_exit_reason(
                 'pgsql_demote: unexpected "%s" state: monitor status (%d) disagree with pg_ctl return code',
                 $OCF_RESOURCE_INSTANCE, $rc );
             return $OCF_ERR_GENERIC;
@@ -1481,7 +1472,7 @@ sub pgsql_demote {
     # NOTE: No need to double check the instance state as pgsql_start already use
     # pgsql_monitor to check the state before returning.
 
-    ocf_log( 'err', sprintf
+    ocf_exit_reason(
         'pgsql_demote: starting "%s" as a standby failed (returned %d)',
         $OCF_RESOURCE_INSTANCE, $rc );
     return $OCF_ERR_GENERIC;
@@ -1516,14 +1507,13 @@ sub pgsql_promote {
 
         $rc = pgsql_start();
         if ( $rc != $OCF_SUCCESS ) {
-            ocf_log( 'err',  sprintf
-                'pgsql_promote: failed to start the instance "%s"',
+            ocf_exit_reason( 'pgsql_promote: failed to start the instance "%s"',
                 $OCF_RESOURCE_INSTANCE );
             return $OCF_ERR_GENERIC;
         }
     }
     else {
-        ocf_log( 'info',  sprintf
+        ocf_exit_reason(
             'pgsql_promote: unexpected error, cannot promote "%s"',
             $OCF_RESOURCE_INSTANCE );
         return $OCF_ERR_GENERIC;
@@ -1536,8 +1526,8 @@ sub pgsql_promote {
     # Cancel the switchover if it has been considered not safe during the
     # pre-promote action
     if ( _get_priv_attr('cancel_switchover') eq '1' ) {
-        ocf_log( 'err',  sprintf
-            'pgsql_promote: switchover has been canceled from pre-promote action',
+        ocf_exit_reason(
+            'pgsql_promote: switchover has been canceled from pre-promote action'
         );
 
         _delete_priv_attr( 'cancel_switchover' );
@@ -1587,8 +1577,8 @@ sub pgsql_promote {
         if ( $max_lsn eq '' ) {
             # This should not happen as the "lsn_location" attribute should have
             # been updated during the "pre-promote" action.
-            ocf_log( 'crit',
-                'pgsql_promote: can not get current node LSN location');
+            ocf_exit_reason(
+                'pgsql_promote: can not get current node LSN location' );
             return $OCF_ERR_GENERIC;
         }
 
@@ -1613,7 +1603,7 @@ sub pgsql_promote {
             if ( $node_lsn eq '' ) {
                 # This should not happen as the "lsn_location" attribute should
                 # have been updated during the "pre-promote" action.
-                ocf_log( 'crit', sprintf
+                ocf_exit_reason(
                     'pgsql_promote: can not get LSN location for "%s"', $node );
                 return $OCF_ERR_GENERIC;
             }
@@ -1642,7 +1632,7 @@ sub pgsql_promote {
         # If any node has been selected, we adapt the master scores accordingly
         # and break the current promotion.
         if ( $node_to_promote ne '' ) {
-            ocf_log( 'info', sprintf
+            ocf_exit_reason(
                 'pgsql_promote: %s is the best candidate to promote, aborting current promotion',
                 $node_to_promote );
 
@@ -1664,14 +1654,14 @@ sub pgsql_promote {
         # Promote the instance on the current node.
         _runas( $PGCTL, '--pgdata', $pgdata, '-w', 'promote' ) == 0 )
     {
-        ocf_log( 'err', 'pgsql_promote: error during promotion' );
+        ocf_exit_reason( 'pgsql_promote: error during promotion' );
         return $OCF_ERR_GENERIC;
     }
 
     # The instance promotion is asynchronous, so we need to wait for this
     # process to complete.
     while ( pgsql_monitor() != $OCF_RUNNING_MASTER ) {
-        ocf_log( 'debug',
+        ocf_log( 'info',
             'pgsql_promote: waiting for the promote to complete' );
         sleep 1;
     }
