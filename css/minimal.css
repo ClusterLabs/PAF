@@ -176,13 +176,13 @@ footer {
   margin-top: 1.5em;
   padding: .5em 1em;
   text-indent: 0;
-  background-color: #FAFAED;
+  background-color: #D6F6FF;
   border-radius: 5px;
   border: 1px solid #E5E5E5;
 }
 
 .warning {
-  background-color: #FAEDFA;
+  background-color: #FFE6E2;
 }
 
 .notice :last-child, .warning :last-child {
