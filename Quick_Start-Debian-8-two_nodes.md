@@ -9,7 +9,7 @@ This quick start tutorial is based on Debian 8.4, using the `crmsh` cluster
 client and `PostgreSQL 9.6`.
 
 The focus will be on setting up a two node cluster. The specific stuff is in 
-the "Corosync" part of this page and is not restricted to Debian 8.
+the "Corosync" [part of this page](#corosync) and is not restricted to Debian 8.
 
 ## Repository setup
 
@@ -43,7 +43,7 @@ apt-get install pgdg-keyring
 
 ## Network setup
 
-The cluster we are about to build include three servers called `srv1` and `srv2`. 
+The cluster we are about to build includes two servers called `srv1` and `srv2`. 
 Each of them have two network interfaces `eth1` and `eth2`. IP
 addresses of these servers are `192.168.2.10x/24` on the first interface,
 `192.168.3.10x/24` on the second one.
@@ -129,9 +129,9 @@ of the cluster, PAF detects the master based on its shutdown status.
 Moreover, it requires a `recovery.conf` template ready to use. You can create
 a `recovery.conf` file suitable to your needs, the only requirements are:
 
-  * have `standby_mode = on`
-  * have `recovery_target_timeline = 'latest'`
-  * a `primary_conninfo` with an `application_name` set to the node name
+* have `standby_mode = on`
+* have `recovery_target_timeline = 'latest'`
+* a `primary_conninfo` with an `application_name` set to the node name
 
 Here are some quick steps to build your primary PostgreSQL instance and its
 standbys. The next steps suppose the primary PostgreSQL instance is on `srv1`.
@@ -213,7 +213,6 @@ ip addr del 192.168.2.100/24 dev eth0
 
 ## Cluster setup
 
-
 ### Pacemaker
 
 It is advised to keep Pacemaker off on server boot. It helps the administrator
@@ -294,16 +293,20 @@ logging {
 
 quorum {
   provider: corosync_votequorum
-  two_node: 1			
-  expected_votes: 2  	
-  wait_for_all: 1  		
+  two_node: 1
+  expected_votes: 2
+  wait_for_all: 1
 }
 ```
 
-A frew notes about the two node specific configuration:
-	* `two_node: 1` is requiered for two node cluster.
-	* `expected_votes: 2` is when two_node is chosen, but I like things to be explicit.
-	* `wait_for_all: 1` is the default with two_node. when starting from scratch, prevent the cluster from becoming quorate until all of the nodes have joined in.  
+A few notes about the two node specific configuration:
+
+* `two_node: 1` is requiered for two node cluster.
+* `expected_votes: 2` is when two_node is chosen, but I like things to be
+  explicit.
+* `wait_for_all: 1` is the default with two_node. when starting from scratch,
+  prevent the cluster from becoming quorate until all of the nodes have joined
+  in.
 
 For more information about this configuration file, see the `corosync.conf`
 manual page. Make sure this file is strictly the same on each node.
@@ -321,7 +324,9 @@ root@srv1:~# corosync-cmapctl | grep 'members.*ip'
 runtime.totem.pg.mrp.srp.members.3232266853.ip (str) = r(0) ip(192.168.2.101) r(1) ip(192.168.3.101)
 runtime.totem.pg.mrp.srp.members.3232266854.ip (str) = r(0) ip(192.168.2.102) r(1) ip(192.168.3.102) 
 ```
+
 or
+
 ```
 root@srv2:~# corosync-quorumtool 
 Quorum information
@@ -349,7 +354,7 @@ Membership information
 ```
 
 After some seconds of startup and cluster membership stuff, you should be able
-to see your three nodes up in `crm_mon`:
+to see your tow nodes up in `crm_mon`:
 
 ```
 root@srv1:~# crm_mon -n1D
@@ -367,9 +372,11 @@ This setup creates three different resources: `pgsql-ha`, `pgsql-master-ip`
 and `fence_vm_xxx`.
 
 The `pgsql-ha` resource represents all the PostgreSQL instances of your cluster
-and controls where is the primary and where are the standbys.
+and controls where is the primary and where is the standby.
+
 The `pgsql-master-ip` is located on the node hosting the PostgreSQL master
 resource.
+
 The last resources `fence_vm_xxx` are STONITH resources, used to manage fencing.
 We create one STONITH resource for each node. Each fencing resource will not be
 allowed to run on the node it is supposed to stop. We are using the

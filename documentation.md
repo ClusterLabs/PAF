@@ -40,4 +40,5 @@ We currently provide the following quick starts:
   * [quick start using CentOS 6]({{ site.baseurl }}/Quick_Start-CentOS-6.html)
   * [quick start using CentOS 7]({{ site.baseurl }}/Quick_Start-CentOS-7.html)
   * [quick start using Debian 8]({{ site.baseurl }}/Quick_Start-Debian-8.html)
+  * [quick start using Debian 8 in a two node cluster]({{ site.baseurl }}/Quick_Start-Debian-8-two_nodes.html)
 
