@@ -52,6 +52,8 @@ Here are the subroutines ported from ocf-shellfuncs and exported by this module:
 
 =item ocf_log
 
+=item ocf_exit_reason
+
 =item ocf_maybe_random
 
 =item ocf_ver2num
@@ -106,6 +108,7 @@ BEGIN {
         ha_log
         ha_debug
         ocf_log
+        ocf_exit_reason
         ocf_is_probe
         ocf_is_clone
         ocf_is_ms
@@ -296,8 +299,8 @@ sub ocf_log {
 
     # TODO: Revisit and implement internally.
     if ( scalar @ARG < 2 ) {
-        ocf_log ('err',
-            sprintf ( "Not enough arguments [%d] to ocf_log.", scalar @ARG ) );
+        ocf_log ( 'err',
+            sprintf "Not enough arguments [%d] to ocf_log", scalar @ARG );
     }
 
     $__OCF_PRIO = shift;
@@ -318,6 +321,34 @@ sub ocf_log {
     else {
         ha_log( "$__OCF_PRIO: $__OCF_MSG");
     }
+}
+
+
+#
+# ocf_exit_reason: print exit error string to stderr and log
+# Usage:           Allows the OCF script to provide a string
+#                  describing why the exit code was returned.
+# Arguments:       reason - required, The string that represents
+#                  why the error occured.
+#
+sub ocf_exit_reason {
+    my $cookie = $ENV{'OCF_EXIT_REASON_PREFIX'} || 'ocf-exit-reason:';
+    my $fmt;
+    my $msg;
+
+    # No argument is likely not intentional.
+    # Just one argument implies a printf format string of just "%s".
+    # "Least surprise" in case some interpolated string from variable
+    # expansion or other contains a percent sign.
+    # More than one argument: first argument is going to be the format string.
+    ocf_log ( 'err', 'Not enough arguments to ocf_exit_reason' )
+        if scalar @ARG < 1;
+
+    $fmt = shift;
+    $msg = sprintf $fmt, @ARG;
+
+    print STDERR "$cookie$msg\n";
+    __ha_log( '--ignore-stderr', "ERROR: $msg" );
 }
 
 # returns true if the CRM is currently running a probe. A probe is
