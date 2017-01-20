@@ -1714,11 +1714,12 @@ sub pgsql_notify_pre_promote {
     # received the same notification to compare our LSN with them during
     # promotion
     if ( $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} eq $nodename ) {
-        # build the list of active nodes:
+        # Build the list of active nodes:
         #   master + slave + start - stop
-        $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'master'} };
-        $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'slave'} };
-        $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'start'} };
+        # FIXME: Deal with rsc started during the same transaction but **after**
+        #        the promotion ?
+        $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'active'} },
+                                                 @{ $OCF_NOTIFY_ENV{'start'} };
         $active_nodes{ $_->{'uname'} }-- foreach @{ $OCF_NOTIFY_ENV{'stop'} };
 
         $attr_nodes = join " "
