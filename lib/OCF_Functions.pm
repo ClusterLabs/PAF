@@ -450,15 +450,10 @@ sub ocf_version_cmp {
     $v1 = ocf_ver2num( $v1 );
     $v2 = ocf_ver2num( $v2 );
 
-    if    ( $v1 == $v2 ) {
-        return 1;
-    }
-    elsif ( $v1 < $v2 ) {
-        return 0;
-    }
-    else {
-        return 2; # -1 would look funny in shell ;-) ( T.N. not in perl ;) )
-    }
+    if    ( $v1 == $v2 ) { return 1; }
+    elsif ( $v1 < $v2  ) { return 0; }
+
+    return 2; # -1 would look funny in shell ;-) ( T.N. not in perl ;) )
 }
 
 sub ocf_local_nodename {
@@ -538,6 +533,19 @@ sub ocf_notify_env {
         $i = 0;
         $notify_env{ $action }[$i++]{'uname'} = $_ foreach split /\s+/ =>
             $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
+    }
+
+    # Fix active and inactive fields for Pacemaker version < 1.1.16
+    # ie. crm_feature_set < 3.0.11
+    # See http://lists.clusterlabs.org/pipermail/developers/2016-August/000265.html
+    # and git commit a6713c5d40327eff8549e7f596501ab1785b8765
+    if (
+        ocf_version_cmp( $ENV{"OCF_RESKEY_crm_feature_set"}, '3.0.11' ) == 0
+    ) {
+        $notify_env{ 'active' } = [
+            @{ $notify_env{ 'master' } },
+            @{ $notify_env{ 'slave' } }
+        ];
     }
 
     return %notify_env;
