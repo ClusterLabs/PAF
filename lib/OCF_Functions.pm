@@ -52,6 +52,8 @@ Here are the subroutines ported from ocf-shellfuncs and exported by this module:
 
 =item ocf_log
 
+=item ocf_exit_reason
+
 =item ocf_maybe_random
 
 =item ocf_ver2num
@@ -106,6 +108,7 @@ BEGIN {
         ha_log
         ha_debug
         ocf_log
+        ocf_exit_reason
         ocf_is_probe
         ocf_is_clone
         ocf_is_ms
@@ -290,18 +293,27 @@ sub ha_debug {
             and (not defined $ENV{'HA_DEBUGLOG'} or $ENV{'HA_DEBUGLOG'} eq '' );
 }
 
+#
+# ocf_log: log messages from the resource agent
+# This function is slightly different from its equivalent in ocf-shellfuncs.in
+# as it behaves like printf.
+# Arguments:
+#   * __OCF_PRIO: log level
+#   * __OCF_MSG:  printf-like format string
+#   * all other arguments are values for the printf-like format string
+#
 sub ocf_log {
     my $__OCF_PRIO;
     my $__OCF_MSG;
 
     # TODO: Revisit and implement internally.
     if ( scalar @ARG < 2 ) {
-        ocf_log ('err',
-            sprintf ( "Not enough arguments [%d] to ocf_log.", scalar @ARG ) );
+        ocf_log ( 'err', "Not enough arguments [%d] to ocf_log", scalar @ARG );
     }
 
     $__OCF_PRIO = shift;
-    $__OCF_MSG  = join ' ', @ARG;
+    $__OCF_MSG  = shift;
+    $__OCF_MSG  = sprintf $__OCF_MSG, @ARG;
 
     for ( $__OCF_PRIO ) {
         if    ( /crit/  ) { $__OCF_PRIO = 'CRIT'    }
@@ -318,6 +330,34 @@ sub ocf_log {
     else {
         ha_log( "$__OCF_PRIO: $__OCF_MSG");
     }
+}
+
+
+#
+# ocf_exit_reason: print exit error string to stderr and log
+# Usage:           Allows the OCF script to provide a string
+#                  describing why the exit code was returned.
+# Arguments:       reason - required, The string that represents
+#                  why the error occured.
+#
+sub ocf_exit_reason {
+    my $cookie = $ENV{'OCF_EXIT_REASON_PREFIX'} || 'ocf-exit-reason:';
+    my $fmt;
+    my $msg;
+
+    # No argument is likely not intentional.
+    # Just one argument implies a printf format string of just "%s".
+    # "Least surprise" in case some interpolated string from variable
+    # expansion or other contains a percent sign.
+    # More than one argument: first argument is going to be the format string.
+    ocf_log ( 'err', 'Not enough arguments [%d] to ocf_exit_reason',
+        scalar @ARG ) if scalar @ARG < 1;
+
+    $fmt = shift;
+    $msg = sprintf $fmt, @ARG;
+
+    print STDERR "$cookie$msg\n";
+    __ha_log( '--ignore-stderr', "ERROR: $msg" );
 }
 
 # returns true if the CRM is currently running a probe. A probe is
@@ -410,15 +450,10 @@ sub ocf_version_cmp {
     $v1 = ocf_ver2num( $v1 );
     $v2 = ocf_ver2num( $v2 );
 
-    if    ( $v1 == $v2 ) {
-        return 1;
-    }
-    elsif ( $v1 < $v2 ) {
-        return 0;
-    }
-    else {
-        return 2; # -1 would look funny in shell ;-) ( T.N. not in perl ;) )
-    }
+    if    ( $v1 == $v2 ) { return 1; }
+    elsif ( $v1 < $v2  ) { return 0; }
+
+    return 2; # -1 would look funny in shell ;-) ( T.N. not in perl ;) )
 }
 
 sub ocf_local_nodename {
@@ -498,6 +533,19 @@ sub ocf_notify_env {
         $i = 0;
         $notify_env{ $action }[$i++]{'uname'} = $_ foreach split /\s+/ =>
             $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
+    }
+
+    # Fix active and inactive fields for Pacemaker version < 1.1.16
+    # ie. crm_feature_set < 3.0.11
+    # See http://lists.clusterlabs.org/pipermail/developers/2016-August/000265.html
+    # and git commit a6713c5d40327eff8549e7f596501ab1785b8765
+    if (
+        ocf_version_cmp( $ENV{"OCF_RESKEY_crm_feature_set"}, '3.0.11' ) == 0
+    ) {
+        $notify_env{ 'active' } = [
+            @{ $notify_env{ 'master' } },
+            @{ $notify_env{ 'slave' } }
+        ];
     }
 
     return %notify_env;
