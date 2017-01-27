@@ -502,7 +502,7 @@ sub ocf_notify_env {
         'stop'       => [ ],
     );
 
-    for my $action ( qw{ active inactive start stop } ) {
+    for my $action ( qw{ active start stop } ) {
         next unless
                 defined $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_resource"}
             and defined $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
@@ -514,6 +514,14 @@ sub ocf_notify_env {
         $i = 0;
         $notify_env{ $action }[$i++]{'uname'} = $_ foreach split /\s+/ =>
             $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
+    }
+
+    # notify_nactive_uname doesn't exists. See:
+    # http://lists.clusterlabs.org/pipermail/developers/2017-January/000406.html
+    if ( defined $ENV{"OCF_RESKEY_CRM_meta_notify_inactive_resource"} ) {
+        $i = 0;
+        $notify_env{'inactive'}[$i++]{'rsc'} = $_ foreach split /\s+/ =>
+            $ENV{"OCF_RESKEY_CRM_meta_notify_inactive_resource"};
     }
 
     # exit if the resource is not a mutistate one
