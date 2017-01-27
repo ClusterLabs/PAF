@@ -2,7 +2,7 @@
 # This program is open source, licensed under the PostgreSQL License.
 # For license terms, see the LICENSE file.
 #
-# Copyright (C) 2015: Jehan-Guillaume de Rorthais and Mael Rimbault
+# Copyright (C) 2016-2017: Jehan-Guillaume de Rorthais and Mael Rimbault
 
 =head1 NAME
 
