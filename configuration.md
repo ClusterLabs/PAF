@@ -24,9 +24,12 @@ For more details about how to configure streaming replication with PostgreSQL,
 please refer to the
 [official documentation](http://www.postgresql.org/docs/current/static/index.html).
 
-Next, it requires a template of the `recovery.conf` ready to use.
-You can create such a template file suitable to your needs, the only
-requirements are:
+Next, it requires a template of the `recovery.conf` file ready to use on
+__all the nodes__. You have to know that every single PostgreSQL instance will
+be started as a standby before one of them is picked by Pacemaker to be promoted
+as the master. Moreover, your cluster will move with switchovers, failovers,
+upgrade, etc. In short, each node should be able to be a standby. You can
+create such a template file suitable to your needs, the only requirements are:
 
   * have `standby_mode = on`
   * have `recovery_target_timeline = 'latest'`
