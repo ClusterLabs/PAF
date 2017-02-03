@@ -467,6 +467,8 @@ sub _query {
     print $tmpfile $query;
     chmod 0644, $tmpfile;
 
+    ocf_log( 'debug', '_query: %s', $query );
+
     # Change the effective user to the given system_user so after forking
     # the given uid to the process should allow psql to connect w/o password
     $> = $postgres_uid;
