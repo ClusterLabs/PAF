@@ -309,24 +309,6 @@ sub _pg_ctl_start {
     return _runas( @cmd );
 }
 
-# Parse and return the current status of the local PostgreSQL instance as
-# reported by its controldata file
-# WARNING: the status is NOT updated in case of crash.
-#
-sub _controldata_state {
-    my $status = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
-
-    $status =~ /^Database cluster state:\s+(.*?)\s*$/m;
-
-    unless ( defined $1 ) {
-        ocf_exit_reason( 'Could not read state from controldata file for "%s"',
-            $datadir );
-        exit $OCF_ERR_CONFIGURED;
-    }
-
-    return $1;
-}
-
 # Create the recovery file based on the given template.
 # Given template MUST at least contain:
 #   standby_mode=on
@@ -383,32 +365,83 @@ sub _create_recovery_conf {
     };
 }
 
+# Parse and return various informations about the local PostgreSQL instance as
+# reported by its controldata file.
+#
+# WARNING: the status is NOT updated in case of crash.
+#
+sub _get_controldata {
+    my %controldata;
+    my $ans;
+
+    $ans = qx{ $PGCTRLDATA "$datadir" 2>/dev/null };
+
+    # Parse the output of pg_controldata.
+    # This output is quite stable between pg versions, but we might need to sort
+    # it at some point if things are moving in there...
+    $ans =~ m{
+        # get the current state
+        ^\QDatabase cluster state\E:\s+(.*?)\s*$
+        .*
+        # Get the latest known REDO location
+        ^\QLatest checkpoint's REDO location\E:\s+([/0-9A-F]+)\s*$
+        .*
+        # Get the latest known TL
+        ^\QLatest checkpoint's TimeLineID\E:\s+(\d+)\s*$
+        .*
+        # Get the wal level
+        # NOTE: pg_controldata output changed with PostgreSQL 9.5, so we need to
+        # account for both syntaxes
+        ^\Q(?:Current )?wal_level setting\E:\s+(.*?)\s*$
+    }smx;
+
+    $controldata{'state'}     = $1 if defined $1;
+    $controldata{'redo'}      = $2 if defined $2;
+    $controldata{'tl'}        = $3 if defined $3;
+    $controldata{'wal_level'} = $4 if defined $4;
+
+    return %controldata if defined $controldata{'state'}
+                        and defined $controldata{'tl'}
+                        and defined $controldata{'redo'}
+                        and defined $controldata{'wal_level'};
+
+    ocf_exit_reason( 'Could not read all datas from controldata file for "%s"',
+        $datadir );
+
+    ocf_log( 'debug',
+        "_get_controldata: found: %s\nfrom controldata file: %s",
+        Data::Dumper->new( [ \%controldata ] )->Terse(1)->Dump, $ans );
+
+    exit $OCF_ERR_ARGS;
+}
+
+
 # Use pg_controldata to check the state of the PostgreSQL server. This
 # function returns codes depending on this state, so we can find whether the
 # instance is a primary or a secondary, or use it to detect any inconsistency
 # that could indicate the instance has crashed.
 #
-sub _controldata {
-    my $state = _controldata_state();
+sub _controldata_to_ocf {
+    my %cdata = _get_controldata();
 
-    while ( $state ne '' ) {
+    while ( 1 ) {
         ocf_log( 'debug', '_controldata: instance "%s" state is "%s"',
-            $OCF_RESOURCE_INSTANCE, $state );
+            $OCF_RESOURCE_INSTANCE, $cdata{'state'} );
 
         # Instance should be running as a primary.
-        return $OCF_RUNNING_MASTER if $state eq "in production";
+        return $OCF_RUNNING_MASTER if $cdata{'state'} eq "in production";
 
         # Instance should be running as a secondary.
         # This state includes warm standby (rejects connections attempts,
         # including pg_isready)
-        return $OCF_SUCCESS if $state eq "in archive recovery";
+        return $OCF_SUCCESS if $cdata{'state'} eq "in archive recovery";
 
 
         # The instance should be stopped.
         # We don't care if it was a primary or secondary before, because we
         # always start instances as secondaries, and then promote if necessary.
-        return $OCF_NOT_RUNNING if $state eq "shut down"
-            or $state eq "shut down in recovery";
+        return $OCF_NOT_RUNNING if $cdata{'state'} eq "shut down"
+            or $cdata{'state'} eq "shut down in recovery";
 
         # The state is "in crash recovery", "starting up" or "shutting down".
         # This state should be transitional, so we wait and loop to check if
@@ -416,9 +449,9 @@ sub _controldata {
         # If it does not, pacemaker will eventually abort with a timeout.
         ocf_log( 'debug',
             '_controldata: waiting for transitionnal state "%s" to finish',
-            $state );
+            $cdata{'state'} );
         sleep 1;
-        $state = _controldata_state();
+        %cdata = _get_controldata();
     }
 
     # If we reach this point, something went really wrong with this code or
@@ -663,29 +696,24 @@ sub _check_switchover {
     my $ans;
     my $rc;
     my $tl;
+    my %cdata;
     my @rs;
 
     ocf_log( 'info', 'Switchover in progress from "%s" to "%s".'
         .' Need to check the last record in WAL',
         $OCF_NOTIFY_ENV{'demote'}[0]{'uname'}, $nodename );
 
-    # Force a checpoint to make sure the controldata shows the very last TL
-    _query( q{ CHECKPOINT }, {} );
-
     # check if we received the shutdown checkpoint of the master during its
     # demote process.
     # We need the last local checkpoint LSN and the last received LSN from
     # master to check in the WAL between these adresses if we have a
     # "checkpoint shutdown" using pg_xlogdump.
-    $ans = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
-
-    # Get the latest known TL
-    $ans =~ m{^Latest checkpoint's TimeLineID:\s+(\d+)\s*$}m;
-    $tl  = $1 if defined $1;
-
-    # Get the latest local checkpoint
-    $ans =~ m{^Latest checkpoint's REDO location:\s+([0-9A-F/]+)\s*$}m;
-    $last_chk = $1 if defined $1;
+    #
+    # Force a checpoint to make sure the controldata shows the very last TL
+    _query( q{ CHECKPOINT }, {} );
+    %cdata = _get_controldata();
+    $tl       = $cdata{'tl'};
+    $last_chk = $cdata{'last_chk'};
 
     # Get the last received LSN from master
     $rc = _query( q{ SELECT pg_last_xlog_receive_location() }, \@rs );
@@ -698,7 +726,7 @@ sub _check_switchover {
 
     $last_lsn = $rs[0][0] if defined $rs[0][0];
 
-    unless ( defined $tl and defined $last_chk and defined $last_lsn ) {
+    unless ( defined $last_lsn ) {
         ocf_exit_reason(
             'Could not read last checkpoint and timeline from controldata file!'
         );
@@ -822,7 +850,7 @@ sub _confirm_stopped {
     }
 
     # Continue the check with pg_controldata.
-    $controldata_rc = _controldata();
+    $controldata_rc = _controldata_to_ocf();
     if ( $controldata_rc == $OCF_RUNNING_MASTER ) {
         # The controldata has not been updated to "shutdown".
         # It should mean we had a crash on a primary instance.
@@ -987,6 +1015,7 @@ sub pgsql_validate_all {
     my $PGVERSION;
     my $PGVERNUM;
     my @content;
+    my %cdata;
 
     # check pgdata
     if ( ! -d $pgdata ) {
@@ -1078,16 +1107,8 @@ sub pgsql_validate_all {
     }
 
     # require wal_level >= hot_standby
-    my $status = qx{$PGCTRLDATA "$datadir" 2>/dev/null};
-    # NOTE: pg_controldata output changed with PostgreSQL 9.5, so we need to
-    # account for both syntaxes
-    $status =~ /^(?:Current )?wal_level setting:\s+(.*?)\s*$/m;
-    unless ( defined $1 ) {
-        ocf_exit_reason( 'Could not read wal_level setting' );
-        exit $OCF_ERR_ARGS;
-    }
-
-    unless ( $1 eq 'hot_standby' or $1 eq 'logical' or $1 eq 'replica' ) {
+    %cdata = _get_controldata();
+    unless ( $cdata{'wal_level'} =~ m{hot_standby|logical|replica} ) {
         ocf_exit_reason(
             'wal_level must be one of "hot_standby", "logical" or "replica"' );
         exit $OCF_ERR_ARGS;
@@ -1100,8 +1121,9 @@ sub pgsql_validate_all {
 # Start the PostgreSQL instance as a *secondary*
 #
 sub pgsql_start {
-    my $rc = pgsql_monitor();
-    my $prev_state = _controldata_state;
+    my $rc         = pgsql_monitor();
+    my %cdata      = _get_controldata();
+    my $prev_state = $cdata{'state'};
 
     # Instance must be running as secondary or being stopped.
     # Anything else is an error.
@@ -1252,7 +1274,7 @@ sub pgsql_monitor {
         ocf_log( 'debug',
             'pgsql_monitor: instance "%s" rejects connections - checking again...',
             $OCF_RESOURCE_INSTANCE );
-        $controldata_rc = _controldata();
+        $controldata_rc = _controldata_to_ocf();
 
         if ( $controldata_rc == $OCF_RUNNING_MASTER
             or $controldata_rc == $OCF_SUCCESS
@@ -1746,6 +1768,7 @@ sub pgsql_notify_post_promote {
 # This is called before a demote occurs.
 sub pgsql_notify_pre_demote {
     my $rc;
+    my %cdata;
 
     # do nothing if the local node will not be demoted
     return $OCF_SUCCESS unless scalar
@@ -1779,8 +1802,9 @@ sub pgsql_notify_pre_demote {
     # start, this error will be catched up later during the various checks
     _pg_ctl_start();
 
-    ocf_log( 'info', 'State is "%s" after recovery attempt',
-        _controldata_state() );
+    %cdata = _get_controldata();
+
+    ocf_log( 'info', 'State is "%s" after recovery attempt', $cdata{'state'} );
 
     return $OCF_SUCCESS;
 }
@@ -1788,12 +1812,13 @@ sub pgsql_notify_pre_demote {
 # This is called before a stop occurs.
 sub pgsql_notify_pre_stop {
     my $rc;
+    my %cdata;
 
     # do nothing if the local node will not be stopped
     return $OCF_SUCCESS unless scalar
         grep { $_->{'uname'} eq $nodename } @{ $OCF_NOTIFY_ENV{'stop'} };
 
-    $rc = _controldata();
+    $rc = _controldata_to_ocf();
 
     # do nothing if this is not a slave recovery
     return $OCF_SUCCESS unless _is_slave_recover( $nodename )
@@ -1818,8 +1843,9 @@ sub pgsql_notify_pre_stop {
     # start, this error will be catched up later during the various checks
     _pg_ctl_start();
 
-    ocf_log( 'info', 'State is "%s" after recovery attempt',
-        _controldata_state() );
+    %cdata = _get_controldata();
+
+    ocf_log( 'info', 'State is "%s" after recovery attempt', $cdata{'state'} );
 
     return $OCF_SUCCESS;
 }
