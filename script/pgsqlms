@@ -392,13 +392,17 @@ sub _get_controldata {
         # Get the wal level
         # NOTE: pg_controldata output changed with PostgreSQL 9.5, so we need to
         # account for both syntaxes
-        ^\Q(?:Current )?wal_level setting\E:\s+(.*?)\s*$
+        ^(?:\QCurrent \E)?\Qwal_level setting\E:\s+(.*?)\s*$
     }smx;
 
     $controldata{'state'}     = $1 if defined $1;
     $controldata{'redo'}      = $2 if defined $2;
     $controldata{'tl'}        = $3 if defined $3;
     $controldata{'wal_level'} = $4 if defined $4;
+
+    ocf_log( 'debug',
+        "_get_controldata: found: %s",
+        Data::Dumper->new( [ \%controldata ] )->Terse(1)->Dump );
 
     return %controldata if defined $controldata{'state'}
                         and defined $controldata{'tl'}
@@ -409,7 +413,7 @@ sub _get_controldata {
         $datadir );
 
     ocf_log( 'debug',
-        "_get_controldata: found: %s\nfrom controldata file: %s",
+        "_get_controldata: controldata file: %s",
         Data::Dumper->new( [ \%controldata ] )->Terse(1)->Dump, $ans );
 
     exit $OCF_ERR_ARGS;
@@ -691,7 +695,7 @@ sub _check_locations {
 # Returns 2 for internal error
 sub _check_switchover {
     my $has_sht_chk = 0;
-    my $last_chk;
+    my $last_redo;
     my $last_lsn;
     my $ans;
     my $rc;
@@ -709,11 +713,12 @@ sub _check_switchover {
     # master to check in the WAL between these adresses if we have a
     # "checkpoint shutdown" using pg_xlogdump.
     #
-    # Force a checpoint to make sure the controldata shows the very last TL
+    # Force a checkpoint to make sure the controldata shows the very last TL
+    # and the master's shutdown checkpoint
     _query( q{ CHECKPOINT }, {} );
-    %cdata = _get_controldata();
-    $tl       = $cdata{'tl'};
-    $last_chk = $cdata{'last_chk'};
+    %cdata     = _get_controldata();
+    $tl        = $cdata{'tl'};
+    $last_redo = $cdata{'redo'};
 
     # Get the last received LSN from master
     $rc = _query( q{ SELECT pg_last_xlog_receive_location() }, \@rs );
@@ -733,22 +738,19 @@ sub _check_switchover {
 
         ocf_log( 'debug',
             '_check_switchover: XLOGDUMP parameters: datadir:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
-            $datadir, $last_chk, $tl, $last_lsn
+            $datadir, $last_redo, $tl, $last_lsn
         );
 
         return 2;
     }
 
-    # force a checkpoint on the slave to flush the master's
-    # shutdown checkpoint in the WAL
-
     $ans = qx{ $PGXLOGDUMP --path "$datadir" --timeline "$tl" \\
-               --start "$last_chk" --end "$last_lsn" 2>&1 };
+               --start "$last_redo" --end "$last_lsn" 2>&1 };
     $rc = $?;
 
     ocf_log( 'debug',
         '_check_switchover: XLOGDUMP rc: "%s", tl: "%s", last_chk: %s, last_lsn: %s, output: "%s"',
-        $rc, $tl, $last_chk, $last_lsn, $ans
+        $rc, $tl, $last_redo, $last_lsn, $ans
     );
 
     if ( $rc == 0 and
@@ -1546,32 +1548,31 @@ sub pgsql_promote {
         # partition) using the "crm_node" command
         my @active_nodes    = split /\s+/ => _get_priv_attr( 'nodes' );
         my $node_to_promote = '';
+        my $ans;
+        my $max_tl;
         my $max_lsn;
+        my $node_tl;
         my $node_lsn;
-        my $max_lsn_dec;
-        my $node_lsn_dec;
         my $wal_num;
         my $wal_off;
 
         # Get the "lsn_location" attribute value for the current node, as set
         # during the "pre-promote" action.
         # It should be the greatest among the secondary instances.
-        $max_lsn = _get_priv_attr( 'lsn_location' );
+        $ans = _get_priv_attr( 'lsn_location' );
 
-        if ( $max_lsn eq '' ) {
+        if ( $ans eq '' ) {
             # This should not happen as the "lsn_location" attribute should have
             # been updated during the "pre-promote" action.
             ocf_exit_reason( 'Can not get current node LSN location' );
             return $OCF_ERR_GENERIC;
         }
 
-        # convert location to decimal
-        chomp $max_lsn;
-        ($wal_num, $wal_off) = split m@/@ => $max_lsn;
-        $max_lsn_dec = ( 4294967296 * hex( $wal_num ) ) + hex( $wal_off );
+        chomp $ans;
+        ( $max_tl, $max_lsn ) = split /#/, $ans;
 
-        ocf_log( 'debug', 'pgsql_promote: current node lsn location: %s(%s)',
-            $max_lsn, $max_lsn_dec );
+        ocf_log( 'debug', 'pgsql_promote: current node TL#LSN location: %s#%s',
+            $max_tl, $max_lsn );
 
         # Now we compare with the other available nodes.
         foreach my $node ( @active_nodes ) {
@@ -1580,9 +1581,9 @@ sub pgsql_promote {
 
             # Get the "lsn_location" attribute value for the node, as set during
             # the "pre-promote" action.
-            $node_lsn = _get_priv_attr( 'lsn_location', $node );
-            
-            if ( $node_lsn eq '' ) {
+            $ans = _get_priv_attr( 'lsn_location', $node );
+
+            if ( $ans eq '' ) {
                 # This should not happen as the "lsn_location" attribute should
                 # have been updated during the "pre-promote" action.
                 ocf_exit_reason( 'Can not get LSN location for "%s"', $node );
@@ -1590,23 +1591,24 @@ sub pgsql_promote {
             }
 
             # convert location to decimal
-            chomp $node_lsn;
-            ($wal_num, $wal_off) = split m@/@ => $node_lsn;
-            $node_lsn_dec = ( 4294967296 * hex( $wal_num ) ) + hex( $wal_off );
+            chomp $ans;
+            ( $node_tl, $node_lsn ) = split /#/, $ans;
 
             ocf_log( 'debug',
-                'pgsql_promote: comparing with "%s": lsn is %s(%s)',
-                $node, $node_lsn, $node_lsn_dec);
+                'pgsql_promote: comparing with "%s": TL#LSN is %s#%s',
+                $node, $node_tl, $node_lsn );
 
-            # If the node has a bigger delta, select it as a best candidate to
-            # promotion.
-            if ( $node_lsn_dec > $max_lsn_dec ) {
-                $node_to_promote = $node;
-                $max_lsn_dec     = $node_lsn_dec;
-                $max_lsn         = $node_lsn;
+            # If the node has a higher LSN, select it as a best candidate to
+            # promotion and keep looping to check the TL/LSN of other nodes.
+            if ( $node_tl > $max_tl
+                or ( $node_tl == $max_tl and $node_lsn > $max_lsn )
+            ) {
                 ocf_log( 'debug',
-                    'pgsql_promote: found "%s" is a better candidate to promote',
-                    $node);
+                    'pgsql_promote: "%s" is a better candidate to promote (%s#%s > %s#%s)',
+                    $node, $node_tl, $node_lsn, $max_tl, $max_lsn );
+                $node_to_promote = $node;
+                $max_tl          = $node_tl;
+                $max_lsn         = $node_lsn;
             }
         }
 
@@ -1659,7 +1661,9 @@ sub pgsql_promote {
 sub pgsql_notify_pre_promote {
     my @rs;
     my $rc;
+    my $node_tl;
     my $node_lsn;
+    my %cdata;
     my %active_nodes;
     my $attr_nodes;
 
@@ -1702,17 +1706,25 @@ sub pgsql_notify_pre_promote {
         # FIXME: should we allow a switchover to a lagging slave?
     }
 
-    # We need to trigger an election between existing slaves to promote the best
-    # one based on its current LSN location. The designated standby for
-    # promotion is responsible to connect to each available nodes to check their
-    # "lsn_location".
+    # We need to trigger an election between existing slaves to promote the best
+    # one based on its current LSN location. Each node set a private attribute
+    # "lsn_location" with its TL and LSN location.
     #
-    # During the following promote action, pgsql_promote will use this
-    # information to check if the instance to be promoted is the best one,
-    # so we can avoid a race condition between the last successful monitor
-    # on the previous master and the current promotion.
+    # During the following promote action, The designated standby for
+    # promotion use these attributes to check if the instance to be promoted
+    # is the best one, so we can avoid a race condition between the last
+    # successful monitor on the previous master and the current promotion.
 
-    $rc = _query( 'SELECT pg_last_xlog_receive_location()', \@rs );
+    # As we can not break the transition from a notification action, we check
+    # during the promotion if each node TL and LSN are valid.
+
+    # Force a checpoint to make sure the controldata shows the very last TL
+    _query( q{ CHECKPOINT }, {} );
+    %cdata   = _get_controldata();
+
+    $rc = _query( q{
+        SELECT pg_xlog_location_diff( pg_last_xlog_receive_location(), '0/0' )
+    }, \@rs );
 
     unless ( $rc == 0 ) {
         ocf_log( 'warning', 'Could not query the current node LSN' );
@@ -1720,9 +1732,9 @@ sub pgsql_notify_pre_promote {
         return $OCF_SUCCESS;
     }
 
-    $node_lsn = $rs[0][0];
+    $node_lsn = "$cdata{'tl'}#$rs[0][0]";
 
-    ocf_log( 'info', 'Current node LSN: %s', $node_lsn );
+    ocf_log( 'info', 'Current node TL#LSN: %s', $node_lsn );
 
     # Set the "lsn_location" attribute value for this node so we can use it
     # during the following "promote" action.
