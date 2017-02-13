@@ -67,7 +67,6 @@ my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime forever";
 my $CRM_ATTRIBUTE = "$HA_SBIN_DIR/crm_attribute --lifetime reboot --type status";
 my $CRM_NODE      = "$HA_SBIN_DIR/crm_node";
 my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
-my $CRM_FAILCOUNT = "$HA_SBIN_DIR/crm_failcount";
 my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
 
 # Global vars
@@ -467,6 +466,8 @@ sub _query {
     print $tmpfile $query;
     chmod 0644, $tmpfile;
 
+    ocf_log( 'debug', '_query: %s', $query );
+
     # Change the effective user to the given system_user so after forking
     # the given uid to the process should allow psql to connect w/o password
     $> = $postgres_uid;
@@ -728,8 +729,6 @@ sub _check_switchover {
         ocf_log( 'info', 'Slave received the shutdown checkpoint' );
         return 0;
     }
-
-    _set_priv_attr( 'cancel_switchover', '1' );
 
     ocf_exit_reason(
         'Did not received the shutdown checkpoint from the old master!' );
@@ -1448,6 +1447,7 @@ sub pgsql_demote {
 #
 sub pgsql_promote {
     my $rc;
+    my $cancel_switchover;
 
     $rc = pgsql_monitor();
 
@@ -1486,13 +1486,16 @@ sub pgsql_promote {
 
     # Cancel the switchover if it has been considered not safe during the
     # pre-promote action
-    if ( _get_priv_attr('cancel_switchover') eq '1' ) {
+    $cancel_switchover = _get_priv_attr('cancel_switchover');
+    if ( $cancel_switchover ) { # if not empty or not 0
         ocf_exit_reason(
             'Switchover has been canceled from pre-promote action' );
 
         _delete_priv_attr( 'cancel_switchover' );
 
-        return $OCF_ERR_GENERIC;
+        return $OCF_ERR_GENERIC if $cancel_switchover eq '1';
+        return $OCF_ERR_ARGS; # ban the resource from the node if we have an
+                              # internal error during _check_switchover
     }
 
     # Do not check for a better candidate if we try to recover the master
@@ -1664,15 +1667,11 @@ sub pgsql_notify_pre_promote {
     ) {
         $rc = _check_switchover();
 
-        if ( $rc == 1 ) {
+        unless ( $rc == 0 ) {
             # Shortcut the election process as the switchover will be
             # canceled
-            return $OCF_SUCCESS;
-        }
-        elsif ( $rc != 0 ) {
-            # This is an extreme mesure, it shouldn't happen.
-            qx{ $CRM_FAILCOUNT --resource "$OCF_RESOURCE_INSTANCE" -v 1000000 };
-            return $OCF_ERR_INSTALLED;
+            _set_priv_attr( 'cancel_switchover', $rc );
+            return $OCF_SUCCESS; # return code is ignored during notify
         }
 
         # If the sub keeps going, that means the switchover is safe.
