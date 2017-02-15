@@ -64,7 +64,6 @@ my $PGXLOGDUMP = "$bindir/pg_xlogdump";
 
 # pacemaker commands path
 my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime forever";
-my $CRM_ATTRIBUTE = "$HA_SBIN_DIR/crm_attribute --lifetime reboot --type status";
 my $CRM_NODE      = "$HA_SBIN_DIR/crm_node";
 my $CRM_RESOURCE  = "$HA_SBIN_DIR/crm_resource";
 my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
@@ -91,18 +90,26 @@ sub _get_action_timeout {
 # Returns an empty string if not found.
 sub _get_priv_attr {
     my ( $name, $node ) = @_;
+    my $val             = '';
+    my $node_arg        = '';
     my $ans;
 
     $node = '' unless defined $node;
-    $node = "--node $node" if $node ne '';
+    $name = "$name-$OCF_RESOURCE_INSTANCE";
 
-    $ans = qx{ $ATTRD_PRIV --name "$name" $node --query };
+    $node_arg= "--node $node" if $node ne '';
+
+    $ans = qx{ $ATTRD_PRIV --name "$name" --query $node_arg };
 
     $ans =~ m/^name=".*" host=".*" value="(.*)"$/;
 
-    return $1 if defined $1;
+    $val = $1 if defined $1;
 
-    return '';
+    ocf_log( 'debug', '_get_priv_attr: value of "%s"%s is "%s"', $name,
+        ( $node ? " on \"$node\"": ""),
+        $val );
+
+    return $val;
 }
 
 # Set the given private attribute name to the given value
@@ -110,12 +117,17 @@ sub _get_priv_attr {
 # attribute is really set by attrd and available.
 sub _set_priv_attr {
     my ( $name, $val ) = @_;
+    my $name_instance  = "$name-$OCF_RESOURCE_INSTANCE";
 
-    qx{ $ATTRD_PRIV --name "$name" --update "$val" };
+    ocf_log( 'debug', '_set_priv_attr: set "%s=%s"...', $name_instance, $val );
 
+    qx{ $ATTRD_PRIV --name "$name_instance" --update "$val" };
+
+    # give attr name without the resource instance name as _get_priv_attr adds
+    # it as well
     while ( _get_priv_attr( $name ) ne $val ) {
-        ocf_log( 'debug', '_set_priv_attr: waiting to set "%s"...', $name );
-        select(undef, undef, undef, 0.1);
+        ocf_log( 'debug', '_set_priv_attr: waiting attrd ack for "%s"...', $name_instance );
+        select( undef, undef, undef, 0.1 );
     }
 
     return;
@@ -126,13 +138,18 @@ sub _set_priv_attr {
 # attribute is really deleted by attrd.
 sub _delete_priv_attr {
     my ( $name ) = @_;
+    my $name_instance  = "$name-$OCF_RESOURCE_INSTANCE";
 
-    qx{ $ATTRD_PRIV --name "$name" --delete };
+    ocf_log( 'debug', '_delete_priv_attr: delete "%s"...', $name_instance );
 
+    qx{ $ATTRD_PRIV --name "$name_instance" --delete };
+
+    # give attr name without the resource instance name as _get_priv_attr adds
+    # it as well
     while ( _get_priv_attr( $name ) ne '' ) {
-        ocf_log( 'debug', '_delete_priv_attr: waiting to delete "%s"...',
-            $name );
-        select(undef, undef, undef, 0.1);
+        ocf_log( 'debug', '_delete_priv_attr: waiting attrd ack for "%s"...',
+            $name_instance );
+        select( undef, undef, undef, 0.1 );
     }
 
     return;
