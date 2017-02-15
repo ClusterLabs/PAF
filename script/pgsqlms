@@ -1031,10 +1031,22 @@ sub ocf_methods {
 
 sub pgsql_validate_all {
     my $fh;
+    my $ans = '';
     my $PGVERSION;
     my $PGVERNUM;
     my @content;
     my %cdata;
+
+    # check notify=true
+    $ans = qx{ $CRM_RESOURCE --resource "$OCF_RESOURCE_INSTANCE" \\
+                 --meta --get-parameter notify 2>/dev/null };
+    chomp $ans;
+    unless ( $ans eq 'true' ) {
+        ocf_exit_reason(
+            'You must set meta parameter notify=true for your master resource',
+            $pgdata );
+        exit $OCF_ERR_INSTALLED;
+    }
 
     # check pgdata
     if ( ! -d $pgdata ) {
