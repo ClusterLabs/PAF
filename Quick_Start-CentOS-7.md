@@ -306,7 +306,7 @@ pcs -f cluster1.xml resource create pgsqld ocf:heartbeat:pgsqlms \
     op demote timeout=120s                                       \
     op monitor interval=15s timeout=10s role="Master"            \
     op monitor interval=16s timeout=10s role="Slave"             \
-    op notify timeout=60s                                        \
+    op notify timeout=60s
 
 # pgsql-ha
 pcs -f cluster1.xml resource master pgsql-ha pgsqld \
