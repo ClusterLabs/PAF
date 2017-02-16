@@ -43,6 +43,7 @@ my $pgdata_default      = "/var/lib/pgsql/data";
 my $pghost_default      = "/tmp";
 my $pgport_default      = 5432;
 my $start_opts_default  = "";
+my $maxlag_default    = "0";
 
 # Set default values if not found in environment
 my $system_user  = $ENV{'OCF_RESKEY_system_user'} || $system_user_default;
@@ -52,6 +53,7 @@ my $datadir      = $ENV{'OCF_RESKEY_datadir'} || $pgdata;
 my $pghost       = $ENV{'OCF_RESKEY_pghost'} || $pghost_default;
 my $pgport       = $ENV{'OCF_RESKEY_pgport'} || $pgport_default;
 my $start_opts   = $ENV{'OCF_RESKEY_start_opts'} || $start_opts_default;
+my $maxlag       = $ENV{'OCF_RESKEY_maxlag'} || $maxlag_default;
 my $recovery_tpl = $ENV{'OCF_RESKEY_recovery_template'}
     || "$pgdata/recovery.conf.pcmk";
 
@@ -547,16 +549,21 @@ sub _check_locations {
     # master, then the lowest node name (alphanumeric sort) in case of equality.
     # The result set itself is order by priority DESC to process best known
     # candidate first.
-    $query = q{
+    $query = qq{
       SELECT application_name, priority, location, state
       FROM (
         SELECT application_name,
-          1000 - (
+          (1000 - (
             row_number() OVER (
               PARTITION BY state IN ('startup', 'backup')
               ORDER BY write_location ASC, application_name ASC
             ) - 1
-          ) * 10 AS priority,
+           ) * 10
+	  ) * CASE WHEN ($maxlag > 0
+	                 AND pg_xlog_location_diff(pg_current_xlog_location(), write_location) > $maxlag)
+                        THEN -1
+                   ELSE 1
+              END AS priority,
           write_location AS location, state
         FROM (
           SELECT application_name, write_location, state
@@ -922,6 +929,14 @@ sub ocf_meta_data {
               <content type="integer" default="$pgport_default" />
             </parameter>
 
+           <parameter name="maxlag" unique="0" required="0">
+              <longdesc lang="en">
+	        Maximum admitted lag before we mark the server as inappropriate to promote
+              </longdesc>
+              <shortdesc lang="en">Max admitted lag</shortdesc>
+              <content type="integer" default="$maxlag_default" />
+            </parameter>
+
             <parameter name="recovery_template" unique="1" required="0">
               <longdesc lang="en">
                 Path to the recovery.conf template. This file is simply copied to \$PGDATA
@@ -1020,6 +1035,11 @@ sub pgsql_validate_all {
     }
     @content = <$fh>;
     close $fh;
+
+    unless ( $maxlag =~ /^[0-9,.E]+$/ ) {
+	ocf_exit_reason( 'maxlag is not a number: "%s"', $maxlag );
+        exit $OCF_ERR_ARGS;
+    }
 
     unless ( grep /^\s*standby_mode\s*=\s*'?on'?\s*$/, @content ) {
         ocf_exit_reason(
