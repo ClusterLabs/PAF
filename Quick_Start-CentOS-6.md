@@ -23,7 +23,7 @@ all your servers names can be resolved to the correct IPs. We usually set this
 in the `/etc/hosts` file:
 
 ```
-192.168.122.50 pgsql-ha
+192.168.122.50 pgsql-vip
 192.168.122.51 srv1
 192.168.122.52 srv2
 192.168.122.53 srv3
@@ -32,7 +32,7 @@ in the `/etc/hosts` file:
 192.168.123.53 srv3-alt
 ```
 
-The IP address `192.168.122.50`, called `pgsql-ha` in this tutorial, will be set
+The IP address `192.168.122.50`, called `pgsql-vip` in this tutorial, will be set
 on the server hosting the master PostgreSQL intance.
 
 Finally, we have to allow the network traffic related to the cluster and
@@ -139,7 +139,7 @@ Now, on each standby, clone the primary. E.g.:
 ```
 su - postgres
 
-pg_basebackup -h pgsql-ha -D ~postgres/9.3/data/ -X stream -P
+pg_basebackup -h pgsql-vip -D ~postgres/9.3/data/ -X stream -P
 
 cd ~postgres/9.3/data/
 
