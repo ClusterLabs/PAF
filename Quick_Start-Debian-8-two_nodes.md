@@ -48,7 +48,7 @@ Each of them have two network interfaces `eth1` and `eth2`. IP
 addresses of these servers are `192.168.2.10x/24` on the first interface,
 `192.168.3.10x/24` on the second one.
 
-The IP address `192.168.2.100`, called `pgsql-ha` in this tutorial, will be set
+The IP address `192.168.2.100`, called `pgsql-vip` in this tutorial, will be set
 on the server hosting the master PostgreSQL instance.
 
 During the cluster setup, we use the node names in various places, make sure
@@ -57,7 +57,7 @@ in the `/etc/hosts` file:
 
 ```
 cat <<EOF >> /etc/hosts
-192.168.2.100 pgsql-ha
+192.168.2.100 pgsql-vip
 192.168.2.101 srv1
 192.168.2.102 srv2
 192.168.3.101 srv1-alt
@@ -186,7 +186,7 @@ systemctl stop postgresql@9.6-main
 su - postgres
 
 rm -rf 9.6/main/
-pg_basebackup -h pgsql-ha -D ~postgres/9.6/main/ -X stream -P
+pg_basebackup -h pgsql-vip -D ~postgres/9.6/main/ -X stream -P
 
 cp /etc/postgresql/9.6/main/recovery.conf.pcmk ~postgres/9.6/main/recovery.conf
 
