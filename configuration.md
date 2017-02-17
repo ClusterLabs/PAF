@@ -67,6 +67,10 @@ modified depending on the specificities of your installation.
   * `pgdata`: Path to the data directory of the managed PostgreSQL instance,
     e.g. `PGDATA`
     * default value: `/var/lib/pgsql/data`
+  * `datadir`: Path to the directory set in data_directory from your postgresql.conf file. This parameter
+    has the same default than PostgreSQL itself: the pgdata parameter value. Unless you have a
+    special PostgreSQL setup and you understand this parameter, ignore it.
+    * default value: `$PGDATA`
   * `pghost`: Local host IP address or unix socket folder the instance is
     listening on.
     * default value: `/tmp`
@@ -81,6 +85,11 @@ modified depending on the specificities of your installation.
     See `postgres --help` for available options. Usefull when the
     `postgresql.conf` file is not in the data directory (`PGDATA`), eg.:
     `-c config_file=/etc/postgresql/9.3/main/postgresql.conf`.
+  * `maxlag`: Maximum lag allowed on a standby before we set a negative master
+     score on it.
+     This parameter must be a valid positive number as described in PostgreSQL documentation.
+     See: https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS-NUMERIC
+    * default value: `0` (disabled)
 
 
 ### Resource agent actions
