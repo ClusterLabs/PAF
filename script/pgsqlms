@@ -1040,7 +1040,7 @@ sub pgsql_validate_all {
 
     unless ( $maxlag =~ /^[0-9,.E]+$/ ) {
 	ocf_exit_reason( 'maxlag is not a number: "%s"', $maxlag );
-        exit $OCF_ERR_ARGS;
+        exit $OCF_ERR_INSTALLED;
     }
 
     unless ( grep /^\s*standby_mode\s*=\s*'?on'?\s*$/, @content ) {
