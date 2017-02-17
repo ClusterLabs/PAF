@@ -15,6 +15,7 @@ use warnings;
 use 5.008;
 
 use POSIX qw(locale_h);
+use Scalar::Util qw(looks_like_number);
 use File::Spec;
 use File::Temp;
 use Data::Dumper;
@@ -1038,7 +1039,7 @@ sub pgsql_validate_all {
     @content = <$fh>;
     close $fh;
 
-    unless ( $maxlag =~ /^[0-9,.E]+$/ ) {
+    unless ( looks_like_number($maxlag) ) {
 	ocf_exit_reason( 'maxlag is not a number: "%s"', $maxlag );
         exit $OCF_ERR_INSTALLED;
     }
