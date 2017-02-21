@@ -61,7 +61,7 @@ We are using the PostgreSQL packages from the PGDG repository. Here is how to
 install and set up this repository on your system:
 
 ```
-yum install http://yum.postgresql.org/9.3/redhat/rhel-6-x86_64/pgdg-centos93-9.3-1.noarch.rpm
+yum install http://yum.postgresql.org/9.6/redhat/rhel-6-x86_64/pgdg-centos96-9.6-3.noarch.rpm
 ```
 
 Make sure to double adapt the previous command with the latest package available
@@ -99,11 +99,11 @@ for a proper setup.
 On the primary:
 
 ```
-service postgresql-9.3 initdb
+service postgresql-9.6 initdb
 
 su - postgres
 
-cd 9.3/data/
+cd 9.6/data/
 cat <<EOP >> postgresql.conf
 
 listen_addresses = '*'
@@ -130,7 +130,7 @@ EOP
 
 exit
 
-service postgresql-9.3 start
+service postgresql-9.6 start
 ip addr add 192.168.122.50/24 dev eth0
 ```
 
@@ -139,9 +139,9 @@ Now, on each standby, clone the primary. E.g.:
 ```
 su - postgres
 
-pg_basebackup -h pgsql-vip -D ~postgres/9.3/data/ -X stream -P
+pg_basebackup -h pgsql-vip -D ~postgres/9.6/data/ -X stream -P
 
-cd ~postgres/9.3/data/
+cd ~postgres/9.6/data/
 
 sed -ri s/srv[0-9]+/$(hostname -s)/ pg_hba.conf
 sed -ri s/srv[0-9]+/$(hostname -s)/ recovery.conf.pcmk
@@ -150,7 +150,7 @@ cp recovery.conf.pcmk recovery.conf
 
 exit
 
-service postgresql-9.3 start
+service postgresql-9.6 start
 ```
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
@@ -158,8 +158,8 @@ disabling them, as Pacemaker will take care of starting/stopping everything for
 you:
 
 ```
-service postgresql-9.3 stop
-chkconfig postgresql-9.3 off
+service postgresql-9.6 stop
+chkconfig postgresql-9.6 off
 ```
 
 And remove the master IP address from `srv1`:
@@ -305,7 +305,7 @@ clone:
 ```
 # pgsqld
 pcs -f cluster1.xml resource create pgsqld ocf:heartbeat:pgsqlms \
-    bindir=/usr/pgsql-9.3/bin pgdata=/var/lib/pgsql/9.3/data     \
+    bindir=/usr/pgsql-9.6/bin pgdata=/var/lib/pgsql/9.6/data     \
     op start timeout=60s                                         \
     op stop timeout=60s                                          \
     op reload timeout=20s                                        \
