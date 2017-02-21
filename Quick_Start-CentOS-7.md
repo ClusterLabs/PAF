@@ -57,7 +57,7 @@ We are using the PostgreSQL packages from the PGDG repository. Here is how to
 install and set up this repository on your system:
 
 ```
-yum install -y http://yum.postgresql.org/9.3/redhat/rhel-7-x86_64/pgdg-centos93-9.3-1.noarch.rpm
+yum install -y http://yum.postgresql.org/9.6/redhat/rhel-7-x86_64/pgdg-centos96-9.6-3.noarch.rpm
 ```
 
 Make sure to double adapt the previous command with the latest package available
@@ -66,7 +66,7 @@ and the PostgreSQL version you need.
 We can now install everything we need for our cluster:
 
 ```
-yum install -y pacemaker postgresql93 postgresql93-contrib postgresql93-server resource-agents pcs fence-agents-all fence-agents-virsh
+yum install -y pacemaker postgresql96 postgresql96-contrib postgresql96-server resource-agents pcs fence-agents-all fence-agents-virsh
 ```
 
 Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
@@ -100,11 +100,11 @@ standbys. This quick start considers `srv1` is the preferred master. On the
 primary:
 
 ```
-/usr/pgsql-9.3/bin/postgresql93-setup initdb
+/usr/pgsql-9.6/bin/postgresql96-setup initdb
 
 su - postgres
 
-cd 9.3/data/
+cd 9.6/data/
 cat <<EOP >> postgresql.conf
 
 listen_addresses = '*'
@@ -131,7 +131,7 @@ EOP
 
 exit
 
-systemctl start postgresql-9.3
+systemctl start postgresql-9.6
 ip addr add 192.168.122.50/24 dev eth0
 ```
 
@@ -140,9 +140,9 @@ Now, on each standby, clone the primary. E.g.:
 ```
 su - postgres
 
-pg_basebackup -h pgsql-vip -D ~postgres/9.3/data/ -X stream -P
+pg_basebackup -h pgsql-vip -D ~postgres/9.6/data/ -X stream -P
 
-cd ~postgres/9.3/data/
+cd ~postgres/9.6/data/
 
 sed -ri s/srv[0-9]+/$(hostname -s)/ pg_hba.conf
 sed -ri s/srv[0-9]+/$(hostname -s)/ recovery.conf.pcmk
@@ -151,7 +151,7 @@ cp recovery.conf.pcmk recovery.conf
 
 exit
 
-systemctl start postgresql-9.3
+systemctl start postgresql-9.6
 ```
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
@@ -159,8 +159,8 @@ disable them, as Pacemaker will take care of starting/stopping everything for
 you during cluster normal cluster operations:
 
 ```
-systemctl stop postgresql-9.3
-systemctl disable postgresql-9.3
+systemctl stop postgresql-9.6
+systemctl disable postgresql-9.6
 ```
 
 And remove the master IP address from `srv1`:
@@ -299,7 +299,7 @@ clone:
 ```
 # pgsqld
 pcs -f cluster1.xml resource create pgsqld ocf:heartbeat:pgsqlms \
-    bindir=/usr/pgsql-9.3/bin pgdata=/var/lib/pgsql/9.3/data     \
+    bindir=/usr/pgsql-9.6/bin pgdata=/var/lib/pgsql/9.6/data     \
     op start timeout=60s                                         \
     op stop timeout=60s                                          \
     op promote timeout=30s                                       \
