@@ -144,7 +144,7 @@ cd /etc/postgresql/9.6/main/
 cat <<EOP >> postgresql.conf
 
 listen_addresses = '*'
-wal_level = hot_standby
+wal_level = replica
 max_wal_senders = 10
 hot_standby = on
 hot_standby_feedback = on
