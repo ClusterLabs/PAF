@@ -71,7 +71,7 @@ Let install everything we need for our cluster:
 ```
 apt-get install -t jessie-backports pacemaker crmsh
 
-apt-get install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3
+apt-get install postgresql-9.6 postgresql-contrib-9.6 postgresql-client-9.6
 ```
 
 We can now install the "PostgreSQL Automatic Failover" (PAF) resource agent:
@@ -94,13 +94,13 @@ instance startup by Pacemaker.
 To creating this sub folder on system initialization, we need to extend the
 existing `systemd-tmpfiles` configuration for `postgresql` to add it. In our
 environment `stats_temp_directory` is set
-to `/var/run/postgresql/9.3-main.pg_stat_tmp`, so we create the following
+to `/var/run/postgresql/9.6-main.pg_stat_tmp`, so we create the following
 file:
 
 ```
 cat <<EOF > /etc/tmpfiles.d/postgresql-part.conf
 # Directory for PostgreSQL temp stat files
-d /var/run/postgresql/9.3-main.pg_stat_tmp 0700 postgres postgres - -
+d /var/run/postgresql/9.6-main.pg_stat_tmp 0700 postgres postgres - -
 EOF
 ```
 
@@ -140,7 +140,7 @@ On all nodes:
 ```
 su - postgres
 
-cd /etc/postgresql/9.3/main/
+cd /etc/postgresql/9.6/main/
 cat <<EOP >> postgresql.conf
 
 listen_addresses = '*'
@@ -172,7 +172,7 @@ exit
 On `srv1`, the master, restart the instance and give it the master IP address:
 
 ```
-systemctl restart postgresql@9.3-main
+systemctl restart postgresql@9.6-main
 
 ip addr add 192.168.122.100/24 dev eth0
 ```
@@ -181,17 +181,17 @@ Now, on each standby (`srv2` and `srv3` here), we have to cleanup the instance
 created by the package and clone the primary. E.g.:
 
 ```
-systemctl stop postgresql@9.3-main
+systemctl stop postgresql@9.6-main
 su - postgres
 
-rm -rf 9.3/main/
-pg_basebackup -h pgsql-vip -D ~postgres/9.3/main/ -X stream -P
+rm -rf 9.6/main/
+pg_basebackup -h pgsql-vip -D ~postgres/9.6/main/ -X stream -P
 
-cp /etc/postgresql/9.3/main/recovery.conf.pcmk ~postgres/9.3/main/recovery.conf
+cp /etc/postgresql/9.6/main/recovery.conf.pcmk ~postgres/9.6/main/recovery.conf
 
 exit
 
-systemctl start postgresql@9.3-main
+systemctl start postgresql@9.6-main
 ```
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
@@ -199,9 +199,9 @@ disable them, as Pacemaker will take care of starting/stopping everything for
 you. Start with your master:
 
 ```
-systemctl stop postgresql@9.3-main
-systemctl disable postgresql@9.3-main
-echo disabled > /etc/postgresql/9.3/main/start.conf
+systemctl stop postgresql@9.6-main
+systemctl disable postgresql@9.6-main
+echo disabled > /etc/postgresql/9.6/main/start.conf
 ```
 
 And remove the master IP address from `srv1`:
@@ -407,11 +407,11 @@ crm conf <<EOC
 
 # 1. resource pgsqld
 primitive pgsqld pgsqlms                                                      \
-  params pgdata="/var/lib/postgresql/9.3/main"                                \
-         bindir="/usr/lib/postgresql/9.3/bin"                                 \
+  params pgdata="/var/lib/postgresql/9.6/main"                                \
+         bindir="/usr/lib/postgresql/9.6/bin"                                 \
          pghost="/var/run/postgresql"                                         \
-         recovery_template="/etc/postgresql/9.3/main/recovery.conf.pcmk"      \
-         start_opts="-c config_file=/etc/postgresql/9.3/main/postgresql.conf" \
+         recovery_template="/etc/postgresql/9.6/main/recovery.conf.pcmk"      \
+         start_opts="-c config_file=/etc/postgresql/9.6/main/postgresql.conf" \
   op start timeout=60s                                                        \
   op stop timeout=60s                                                         \
   op promote timeout=30s                                                      \
