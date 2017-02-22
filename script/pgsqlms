@@ -979,7 +979,9 @@ sub ocf_meta_data {
 
            <parameter name="maxlag" unique="0" required="0">
               <longdesc lang="en">
-	        Maximum lag allowed on a standby before we set a negative master score on it. 
+                Maximum lag allowed on a standby before we set a negative master score on it. The calculation
+                is based on the difference between the current xlog location on the master and the write
+                location on the standby.
                 This parameter must be a valid positive number as described in PostgreSQL documentation.
                 See: https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS-NUMERIC
               </longdesc>
