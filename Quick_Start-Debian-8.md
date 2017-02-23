@@ -132,6 +132,17 @@ a `recovery.conf` file suitable to your needs, the only requirements are:
   * have `recovery_target_timeline = 'latest'`
   * a `primary_conninfo` with an `application_name` set to the node name
 
+Last but not least, make sure each instance will not be able to replicate with
+itself! A scenario exists where the master IP address `pgsql-vip` will be on
+the same node than a standby for a very short lap of time!
+
+> **NOTE**: as `recovery.conf.pcmk` and `pg_hba.conf` files are different
+> on each node, make sure to keep them out of the `$PGDATA` so you do not have
+> to deal with them (or worst: forget to edit them) each time you rebuild a
+> standby! Luckily, Debian packaging already enforce this as configuration files
+> are all located in `/etc/postgresql`.
+{: .notice}
+
 Here are some quick steps to build your primary PostgreSQL instance and its
 standbys. The next steps suppose the primary PostgreSQL instance is on `srv1`.
 

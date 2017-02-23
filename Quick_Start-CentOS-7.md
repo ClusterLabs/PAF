@@ -95,6 +95,18 @@ a `recovery.conf` file suitable to your needs, the only requirements are:
   * have `recovery_target_timeline = 'latest'`
   * a `primary_conninfo` with an `application_name` set to the node name
 
+Last but not least, make sure each instance will not be able to replicate with
+itself! A scenario exists where the master IP address `pgsql-vip` will be on
+the same node than a standby for a very short lap of time!
+
+> **WARNING**: as `recovery.conf.pcmk` and `pg_hba.conf` files are different
+> on each node, it is best to keep them out of the `$PGDATA` so you do not have
+> to deal with them (or worst: forget to edit them) each time you rebuild a
+> standby! We advice you to deal with this using the `hba_file` parameter in
+> your `postgresql.conf` file and `recovery_template` parameter in PAF for the
+> `recovery.conf.pcmk` file.
+{: .warning}
+
 Here are some quick steps to build your primary PostgreSQL instance and its
 standbys. This quick start considers `srv1` is the preferred master. On the
 primary:

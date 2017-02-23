@@ -81,6 +81,12 @@ yum install -y https://github.com/dalibo/PAF/releases/download/v1.0.0/resource-a
 
 ## PostgreSQL setup
 
+> **WARNING**: building PostgreSQL standby is not the main subject here. The
+> following steps are __**quick and dirty**__. They lack of security, WAL
+> retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
+> for a proper setup.
+{: .warning}
+
 The resource agent requires the PostgreSQL instances to be already set up and
 ready to start. Moreover, it requires a `recovery.conf` template ready to use.
 You can create a `recovery.conf` file suitable to your needs, the only
@@ -90,13 +96,20 @@ requirements are:
   * have ``recovery_target_timeline = 'latest'``
   * a ``primary_conninfo`` with an ``application_name`` set to the node name
 
-Here are some quick steps to build your primary PostgreSQL instance and its
-standbys. As this is not the main subject here, they are
-__**quick and dirty**__. Rely on the
-[PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
-for a proper setup.
+Last but not least, make sure each instance will not be able to replicate with
+itself! A scenario exists where the master IP address `pgsql-vip` will be on
+the same node than a standby for a very short lap of time!
 
-On the primary:
+> **WARNING**: as `recovery.conf.pcmk` and `pg_hba.conf` files are different
+> on each node, it is best to keep them out of the `$PGDATA` so you do not have
+> to deal with them (or worst: forget to edit them) each time you rebuild a
+> standby! We advice you to deal with this using the `hba_file` parameter in
+> your `postgresql.conf` file and `recovery_template` parameter in PAF for the
+> `recovery.conf.pcmk` file.
+{: .warning}
+
+Here are some quick steps to build your primary PostgreSQL instance and its
+standbys. On the primary:
 
 ```
 service postgresql-9.6 initdb
