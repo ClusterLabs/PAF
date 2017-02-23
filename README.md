@@ -75,7 +75,9 @@ can set:
   * `system_user`: the system owner of your instance's process (default:
     `postgres`)
   * `maxlag`: maximum lag allowed on a standby before we set a negative master
-     score on it. (default: 0, which disables this feature)
+     score on it. The calculation is based on the difference between the current
+     xlog location on the master and the write location on the standby.
+     (default: 0, which disables this feature)
 
 For a demonstration about how to setup a cluster, see
 [http://dalibo.github.com/PAF/documentation.html](http://dalibo.github.com/PAF/documentation.html).
