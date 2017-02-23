@@ -86,7 +86,8 @@ modified depending on the specificities of your installation.
     `postgresql.conf` file is not in the data directory (`PGDATA`), eg.:
     `-c config_file=/etc/postgresql/9.3/main/postgresql.conf`.
   * `maxlag`: Maximum lag allowed on a standby before we set a negative master
-     score on it.
+     score on it. The calculation is based on the difference between the current xlog 
+     location on the master and the write location on the standby.
      This parameter must be a valid positive number as described in PostgreSQL documentation.
      See: https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS-NUMERIC
     * default value: `0` (disabled)
