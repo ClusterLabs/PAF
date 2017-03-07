@@ -614,8 +614,8 @@ sub _check_locations {
               ORDER BY write_location ASC, application_name ASC
             ) - 1
            ) * 10
-	  ) * CASE WHEN ($maxlag > 0
-	                 AND current_lag > $maxlag)
+          ) * CASE WHEN ($maxlag > 0
+                     AND current_lag > $maxlag)
                         THEN -1
                    ELSE 1
               END AS priority,
@@ -986,7 +986,7 @@ sub ocf_meta_data {
 
            <parameter name="maxlag" unique="0" required="0">
               <longdesc lang="en">
-	        Maximum lag allowed on a standby before we set a negative master score on it. The calculation
+                Maximum lag allowed on a standby before we set a negative master score on it. The calculation
                 is based on the difference between the current xlog location on the master and the write
                 location on the standby.
                 This parameter must be a valid positive number as described in PostgreSQL documentation.
@@ -1109,7 +1109,7 @@ sub pgsql_validate_all {
     close $fh;
 
     unless ( looks_like_number($maxlag) ) {
-	ocf_exit_reason( 'maxlag is not a number: "%s"', $maxlag );
+        ocf_exit_reason( 'maxlag is not a number: "%s"', $maxlag );
         exit $OCF_ERR_INSTALLED;
     }
 
