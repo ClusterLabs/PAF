@@ -1064,14 +1064,35 @@ sub pgsql_validate_all {
     my @content;
     my %cdata;
 
+    unless (
+        ocf_version_cmp( $ENV{"OCF_RESKEY_crm_feature_set"}, '3.0.9' ) == 2
+    ) {
+        ocf_exit_reason(
+            'PAF %s is compatible with Pacemaker 1.1.13 and greater',
+            $VERSION
+        );
+        exit $OCF_ERR_INSTALLED;
+    }
+
     # check notify=true
     $ans = qx{ $CRM_RESOURCE --resource "$OCF_RESOURCE_INSTANCE" \\
                  --meta --get-parameter notify 2>/dev/null };
     chomp $ans;
     unless ( $ans eq 'true' ) {
         ocf_exit_reason(
-            'You must set meta parameter notify=true for your master resource',
-            $pgdata );
+            'You must set meta parameter notify=true for your master resource'
+        );
+        exit $OCF_ERR_INSTALLED;
+    }
+
+    # check master-max=1
+    unless (
+        defined $ENV{'OCF_RESKEY_CRM_meta_master_max'}
+            and $ENV{'OCF_RESKEY_CRM_meta_master_max'} eq '1'
+    ) {
+        ocf_exit_reason(
+            'You must set meta parameter master-max=1 for your master resource'
+        );
         exit $OCF_ERR_INSTALLED;
     }
 
