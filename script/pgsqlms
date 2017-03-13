@@ -872,7 +872,7 @@ sub ocf_meta_data {
     print qq{<?xml version="1.0"?>
         <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
         <resource-agent name="pgsqlms">
-          <version>1.1.0</version>
+          <version>$VERSION</version>
 
           <longdesc lang="en">
             Resource script for PostgreSQL in replication. It manages PostgreSQL servers using streaming replication as an HA resource.
