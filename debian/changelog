@@ -1,3 +1,10 @@
+resource-agents-paf (1.1.0-1) unstable; urgency=low
+
+  * 1.1.0 major release
+  * no changes since 1.1_beta1.
+
+ -- Benoit Lobréau <blo.talkto@gmail.com>  Tue, 14 Mar 2017 13:00:00 +0100
+
 resource-agents-paf (1.1~beta1-1) unstable; urgency=low
 
   * 1.1_beta1 beta release

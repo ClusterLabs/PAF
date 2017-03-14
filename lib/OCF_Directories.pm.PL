@@ -99,7 +99,7 @@ BEGIN {
     use Exporter;
 
 
-    our \$VERSION   = 'v1.1_beta1';
+    our \$VERSION   = 'v1.1.0';
     our \@ISA       = ('Exporter');
     our \@EXPORT    = qw(
         \$INITDIR
