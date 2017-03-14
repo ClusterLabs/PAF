@@ -1,14 +1,13 @@
-# PAF v1.1 beta1
+# PAF v1.1.0
 
-Release date: 2016-12-04
+Release date: 2017-03-14
 
-* 1.1 beta1 release
 * fix: compatibility with PostrgeSQL 9.6, YanChii
 * fix: do not use crm_node --partition to discover resources, ioguix
 * fix: unknown argument --query when calling crm_master, ioguix
 * fix: perl warning when master score has never been set on the master, ioguix
 * fix: remove wrong info message during post-promote notify, ioguix
-* fix: race condition when setting attributes during actions, reported by Guillaume Lalarge, fixed by ioguix
+* fix: race condition when setting attributes during actions, reported by Guillaume Lelarge, fixed by ioguix
 * fix: bug where pgport and pghost where ignored in "_query", reported by nnn-dev, fixed by ioguix
 * fix: use same role name than the system_user to connect, reported by nnn-dev, fixed by ioguix
 * fix: wrap crm_master calls in sub to make them synchronous, ioguix

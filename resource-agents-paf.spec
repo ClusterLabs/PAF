@@ -41,7 +41,7 @@ rm -f "%{buildroot}"/usr/local/lib64/perl5/auto/PAF/.packlist
 %{_datadir}/resource-agents/ocft/configs/pgsqlms
 
 %changelog
-* Fri Mar 10 2017 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 1.1.0-1
+* Tue Mar 14 2017 Benoit Lobréau <blo.talkto@gmail.com> - 1.1.0-1
 - 1.1.0 major release
 
 * Sun Dec 04 2016 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 1.1beta1-1
