@@ -23,6 +23,12 @@ In `resource-agents-paf.spec`:
 
 In `debian/`, edit the `changelog` file
 
+In `CHANGELOG.md`:
+ * remove non major releases.
+ * add the new Release info: 
+    * release date
+    * changelog
+
 ## Tagging and building tar file
 
 ```
