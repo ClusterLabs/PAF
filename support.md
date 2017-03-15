@@ -13,7 +13,7 @@ Please use the issue system in the github project page: [https://github.com/dali
 
 Please, use github issues in priority for bugs, setup problems and development discussions.
 
-As an alternative, you ca use the pgsql-general mailing list for general questions. See the [https://www.postgresql.org/community/lists/subscribe/](subscription) page.
+As an alternative, you can use the pgsql-general mailing list for general questions. See the [https://www.postgresql.org/community/lists/subscribe/](subscription) page.
 
 The archives are are available on [https://www.postgresql.org/list/pgsql-general/](postgresql.org).
 
