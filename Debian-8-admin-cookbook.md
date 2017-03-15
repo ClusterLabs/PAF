@@ -13,6 +13,7 @@ Topics:
 * [Starting or stopping the cluster](#starting-or-stopping-the-cluster)
 * [Swapping master and slave roles between nodes](#swapping-master-and-slave-roles-between-nodes)
 * [PAF update](#paf-update)
+* [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
 
 
 ## Starting or stopping the cluster
@@ -168,3 +169,43 @@ We can now put the resource in `managed` mode again:
 ```
 # crm resource manage pgsql-ha
 ```
+
+
+## PostgreSQL minor upgrade
+
+This chapter explains how to do a minor upgrade of PostgreSQL on a two node
+cluster. Nodes are called `srv1` and `srv2`, the PostgreSQL HA resource is
+called `pgsql-ha`. Node `srv1` is hosting the master.
+
+The process is quite simple: upgrade the standby first, move the master
+role and finally upgrade PostgreSQL on the former PostgreSQL master node.
+
+Here is how to upgrade PostgeSQL on the standby side:
+
+```
+# apt-get --download-only install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3
+# crm --wait resource ban pgsql-ha srv2
+# apt-get install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3
+# crm --wait resource unban pgsql-ha
+```
+
+Here are the details of these commands:
+
+- download all the required packages
+- ban the `pgsql-ha` resource __only__ from `srv2`, effectively stopping it
+- upgrade the PostgreSQL packages
+- allow the `pgsql-ha` resource to run on `srv2`, effectively starting it
+
+Now, we can move the PostgreSQL master resource to `srv2`, then take care
+of `srv1`:
+
+```
+# crm --wait resource migrate pgsql-ha srv2
+# apt-get --download-only install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3
+# crm --wait resource ban pgsql-ha srv1
+# apt-get install postgresql-9.3 postgresql-contrib-9.3 postgresql-client-9.3
+# crm resource unmigrate pgsql-ha
+```
+
+Minor upgrade is finished. Feel free to move your master back to `srv1` if you
+really need it.
