@@ -1,9 +1,9 @@
-#PostgreSQL Automatic Failover
+# PostgreSQL Automatic Failover
 
 High-Availibility for Postgres, based on industry references Pacemaker and
 Corosync.
 
-##Description
+## Description
 
 Pacemaker is nowadays the industry reference for High Availability. In the same
 fashion than for Systemd, all Linux distributions moved (or are moving) to this
@@ -33,7 +33,7 @@ importantly experienced project: Pacemaker.
 
 For information about how to install this agent, see `INSTALL.md`.
 
-##Setup and requirements
+## Setup and requirements
 
 PAF supports PostgreSQL 9.3 and higher. It has been extensively tested under
 CentOS 6 and 7 in various scenario.
