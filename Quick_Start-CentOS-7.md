@@ -83,6 +83,18 @@ yum install -y https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-a
 > for a proper setup.
 {: .warning}
 
+> **NOTE**: Moving the `recovery.conf.pcmk` file outside the PGDATA is not
+> mandatory. However, this ease the maintenance of the PostgreSQL instance,
+> as this avoids recreating these file (or forgetting to edit it) each time
+> you have to rebuild a slave instance.
+>
+> The pgsqlms resource agent has a parameter `recovery_template` to refer to
+> a recovery template located in another directory.
+>
+> You can imagine the same thing for the `pg_hba.conf` file. The parameter
+> `hba_file` is helpful to relocate this file to another place.
+{: .notice}
+
 The resource agent requires the PostgreSQL instances to be already set up,
 ready to start and slaves ready to replicate. Make sure to setup your PostgreSQL
 master on your preferred node to host the master: during the very first startup
@@ -116,8 +128,7 @@ primary:
 
 su - postgres
 
-cd 9.6/data/
-cat <<EOP >> postgresql.conf
+cat <<EOP >> ~postgres/9.6/data/postgresql.conf
 
 listen_addresses = '*'
 wal_level = replica
@@ -126,7 +137,9 @@ hot_standby = on
 hot_standby_feedback = on
 EOP
 
-cat <<EOP >> pg_hba.conf
+mkdir ~postgres/9.6/etc
+
+cat <<EOP >> ~postgres/9.6/data/pg_hba.conf
 # forbid self-replication
 host replication postgres 192.168.122.50/32 reject
 host replication postgres $(hostname -s) reject
@@ -135,7 +148,7 @@ host replication postgres $(hostname -s) reject
 host replication postgres 0.0.0.0/0 trust
 EOP
 
-cat <<EOP > recovery.conf.pcmk
+cat <<EOP > ~postgres/9.6/etc/recovery.conf.pcmk
 standby_mode = on
 primary_conninfo = 'host=192.168.122.50 application_name=$(hostname -s)'
 recovery_target_timeline = 'latest'
@@ -154,12 +167,17 @@ su - postgres
 
 pg_basebackup -h pgsql-vip -D ~postgres/9.6/data/ -X stream -P
 
-cd ~postgres/9.6/data/
+mkdir ~postgres/9.6/etc
 
-sed -ri s/srv[0-9]+/$(hostname -s)/ pg_hba.conf
-sed -ri s/srv[0-9]+/$(hostname -s)/ recovery.conf.pcmk
+sed -ri s/srv[0-9]+/$(hostname -s)/ ~postgres/9.6/data/pg_hba.conf
 
-cp recovery.conf.pcmk recovery.conf
+cat <<EOP > ~postgres/9.6/etc/recovery.conf.pcmk
+standby_mode = on
+primary_conninfo = 'host=192.168.122.50 application_name=$(hostname -s)'
+recovery_target_timeline = 'latest'
+EOP
+
+cp ~postgres/9.6/etc/recovery.conf.pcmk ~postgres/9.6/data/recovery.conf
 
 exit
 
@@ -312,6 +330,7 @@ clone:
 # pgsqld
 pcs -f cluster1.xml resource create pgsqld ocf:heartbeat:pgsqlms \
     bindir=/usr/pgsql-9.6/bin pgdata=/var/lib/pgsql/9.6/data     \
+    recovery_template=/var/lib/pgsql/9.6/etc/recovery.conf.pcmk  \
     op start timeout=60s                                         \
     op stop timeout=60s                                          \
     op promote timeout=30s                                       \
