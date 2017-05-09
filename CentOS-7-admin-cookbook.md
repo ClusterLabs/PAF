@@ -359,6 +359,36 @@ the new node. We actually need to allow one more clone in the cluster:
 Your standby instance should start shortly.
 
 
+## Removing a node
+
+This chapter explains how to remove a node called `srv3` from a three node
+cluster.
+
+The first command will put the node in standby. It stops __all__ resources on
+the node:
+
+```
+# pcs cluster standby srv3
+```
+
+Next command simply remove the node from the cluster. It stops Pacemaker
+on `srv3̀`, remove the cluster setup from it and reconfigure other nodes:
+
+```
+# pcs cluster node remove srv3
+srv3: Stopping Cluster (pacemaker)...
+srv3: Successfully destroyed cluster
+srv1: Corosync updated
+srv2: Corosync updated
+```
+
+The last command change the maximum clone allowed in the cluster:
+
+```
+# pcs resource meta pgsql-ha clone-max=2
+```
+
+
 ## Setting up a watchdog
 
 First, read [the watchdog chapter]({{ site.baseurl }}/fencing.html#using-a-watchdog-device)
@@ -439,35 +469,6 @@ its watchdog (if no other fencing device exist):
 
 If you stop Pacemaker but not Corosync or simulate a resource failing to
 stop or a resource fatal error, the node should fence itself immediately.
-
-## Removing a node
-
-This chapter explains how to remove a node called `srv3` from a three node
-cluster.
-
-The first command will put the node in standby. It stops __all__ resources on
-the node:
-
-```
-# pcs cluster standby srv3
-```
-
-Next command simply remove the node from the cluster. It stops Pacemaker
-on `srv3̀`, remove the cluster setup from it and reconfigure other nodes:
-
-```
-# pcs cluster node remove srv3
-srv3: Stopping Cluster (pacemaker)...
-srv3: Successfully destroyed cluster
-srv1: Corosync updated
-srv2: Corosync updated
-```
-
-The last command change the maximum clone allowed in the cluster:
-
-```
-# pcs resource meta pgsql-ha clone-max=2
-```
 
 
 ## Forbidding a PAF resource on a node
