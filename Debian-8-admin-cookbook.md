@@ -14,6 +14,7 @@ Topics:
 * [Swapping master and slave roles between nodes](#swapping-master-and-slave-roles-between-nodes)
 * [PAF update](#paf-update)
 * [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
+* [Adding a node](#adding-a-node)
 
 
 ## Starting or stopping the cluster
@@ -209,3 +210,89 @@ of `srv1`:
 
 Minor upgrade is finished. Feel free to move your master back to `srv1` if you
 really need it.
+
+
+
+## Adding a node
+
+In this chapter, we add server `srv3` hosting a PostgreSQL standby instance as a
+new node in an existing two node cluster.
+
+Setup everything so PostgreSQL can start on `srv3` as a slave and enter in
+streaming replication. Remember to create the recovery configuration template
+file, setup the `pg_hba.conf` file etc.
+
+> __NOTE__: Put the cluster in maintenance mode or use crm_simulate if you are
+> afraid that some of your resources move all over the place when the new node
+> appears
+{: .notice}
+
+On __all the nodes__, edit the `/etc/corosync/corosync.conf` file:
+
+* Add the new node to the `nodelist` block
+  
+  ~~~
+  nodelist {
+        [...]
+        node {
+                ring0_addr: srv3
+        }
+  }
+  ~~~
+  > __NOTE__: do not forget parameter `ring1_addr` if corosync is set up to use
+  > multiple network for redundancy.
+  {: .notice}
+* In the `quorum` block, remove the `two_node` parameter and adjust the
+  `expected_votes`:
+  
+  ~~~
+  quorum {
+    provider: corosync_votequorum
+    expected_votes: 3
+  }
+  ~~~
+
+> __WARNING__:Again, make sure your `/etc/corosync/corosync.conf` files are
+> exactly the same on **all** the nodes.
+{: .warning}
+
+Reload the corosync configuration on all the nodes if needed (it shouldn't, but
+it doesn't hurt anyway):
+
+```
+# corosync-cfgtool -R
+```
+
+Fencing is mandatory. See: [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+Either edit the existing fencing resources to handle the new node if applicable,
+or add a new one being able to do it. In the example, we are using
+the `fence_virsh` fencing agent to create a dedicated fencing resource able to
+only fence `srv3`:
+
+```
+crm conf<<EOC
+primitive fence_vm_srv3 stonith:fence_virsh                   \
+  params pcmk_host_check="static-list" pcmk_host_list="srv3"  \
+         ipaddr="192.168.122.1" login="<username>"            \
+         identity_file="/root/.ssh/id_rsa"                    \
+         port="srv3-d8" action="off"                          \
+  op monitor interval=10s
+location fence_vm_srv3-avoids-srv3 fence_vm_srv3 -inf: srv3
+EOC
+```
+
+We can now start the cluster on `srv3`!
+
+```
+# crm cluster start
+```
+
+After some time checking the integration of `srv3` in the cluster using `crm_mon`
+or `crm status`, you probably find that your PosgreSQL standby is not started on
+the new node. We actually need to allow one more clone in the cluster:
+
+```
+# crm resource meta pgsql-ha set clone-max 3
+```
+
+Your standby instance should start shortly.
