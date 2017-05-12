@@ -74,6 +74,186 @@ my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
 # Global vars
 my $nodename;
 my $exit_code = 0;
+# numeric pgsql versions
+my $PGVERNUM;
+my $PGVER_10  = 100000;
+
+# Run a query using psql.
+#
+# This function returns an array with psql return code as first element and
+# the result as second one.
+#
+sub _query {
+    my $query        = shift;
+    my $res          = shift;
+    my $connstr      = "dbname=postgres";
+    my $RS           = chr(30); # ASCII RS  (record separator)
+    my $FS           = chr(3);  # ASCII ETX (end of text)
+    my $postgres_uid = getpwnam( $system_user );
+    my $oldeuid      = $>;
+    my $tmpfile;
+    my @res;
+    my $ans;
+    my $pid;
+    my $rc;
+
+    unless ( defined $res and defined $query and $query ne '' ) {
+        ocf_log( 'debug', '_query: wrong parameters!' );
+        return -1;
+    }
+
+    unless ( $tmpfile = File::Temp->new(
+            TEMPLATE => 'pgsqlms-XXXXXXXX',
+            DIR      => $HA_RSCTMP
+        ) )
+    {
+        ocf_exit_reason( 'Could not create or write in a temp file' );
+        exit $OCF_ERR_INSTALLED;
+    }
+
+    print $tmpfile $query;
+    chmod 0644, $tmpfile;
+
+    ocf_log( 'debug', '_query: %s', $query );
+
+    # Change the effective user to the given system_user so after forking
+    # the given uid to the process should allow psql to connect w/o password
+    $> = $postgres_uid;
+
+    # Forking + piping
+    $pid = open(my $KID, "-|");
+
+    if ( $pid == 0 ) { # child
+        exec $PGPSQL, '--set', 'ON_ERROR_STOP=1', '-qXAtf', $tmpfile,
+            '-R', $RS, '-F', $FS, '--port', $pgport, '--host', $pghost,
+            $connstr;
+    }
+
+    # parent
+    $> = $oldeuid;
+
+    {
+        local $/;
+        $ans = <$KID>;
+    }
+
+    close $KID;
+    $rc = $? >> 8;
+
+    ocf_log( 'debug', '_query: psql return code: %d', $rc );
+
+    if ( defined $ans ) {
+        chop $ans;
+
+        push @{ $res }, [ split(chr(3) => $_, -1) ]
+            foreach split (chr(30) => $ans, -1);
+
+        ocf_log( 'debug', '_query: @res: %s',
+            Data::Dumper->new( [ $res ] )->Terse(1)->Dump );
+    }
+
+    # Possible return codes:
+    #  -1: wrong parameters
+    #   0: OK
+    #   1: failed to get resources (memory, missing file, ...)
+    #   2: unable to connect
+    #   3: query failed
+    return $rc;
+}
+
+# Get the last received location on a standby
+# if the first argument is true, returns the value as decimal
+# if the first argument is false, returns the value as LSN
+# Returns undef if query failed
+sub _get_last_received_lsn {
+    my ( $dec ) = @_;
+    my $pg_last_wal_receive_lsn = 'pg_last_wal_receive_lsn()';
+    my $pg_wal_lsn_diff         = 'pg_wal_lsn_diff';
+    my $query;
+    my $rc;
+    my @rs;
+
+    if ( $PGVERNUM < $PGVER_10  ) {
+        $pg_last_wal_receive_lsn = 'pg_last_xlog_receive_location()';
+        $pg_wal_lsn_diff         = 'pg_xlog_location_diff';
+    }
+
+    if ( $dec ) {
+        $query = "SELECT $pg_wal_lsn_diff( $pg_last_wal_receive_lsn, '0/0' )";
+    }
+    else {
+        $query = "SELECT $pg_last_wal_receive_lsn";
+    }
+
+    $rc = _query( $query, \@rs );
+
+    return $rs[0][0] if $rc == 0 and $rs[0][0];
+
+    ocf_log( 'err', 'Could not query last received LSN (%s)', $rc ) if $rc != 0;
+    ocf_log( 'err', 'No values for last received LSN' )
+        if $rc == 0 and not $rs[0][0];
+
+    return undef;
+}
+
+# Get the master score for each connected standby
+# Returns directly the result set of the query or exit with an error.
+# Exits with OCF_ERR_GENERIC if the query failed
+sub _get_lag_scores {
+    my $pg_current_wal_lsn = 'pg_current_wal_lsn()';
+    my $pg_wal_lsn_diff    = 'pg_wal_lsn_diff';
+    my $write_lsn          = 'write_lsn';
+    my $query;
+    my $rc;
+    my @rs;
+
+    if ( $PGVERNUM < $PGVER_10  ) {
+        $pg_current_wal_lsn = 'pg_current_xlog_location()';
+        $pg_wal_lsn_diff    = 'pg_xlog_location_diff';
+        $write_lsn          = 'write_location';
+    }
+
+    # We check locations of connected standbies by querying the
+    # "pg_stat_replication" view.
+    # The row_number applies on the result set ordered on write_location ASC so
+    # the highest row_number should be given to the closest node from the
+    # master, then the lowest node name (alphanumeric sort) in case of equality.
+    # The result set itself is order by priority DESC to process best known
+    # candidate first.
+    $query = qq{
+      SELECT application_name, priority, location, state, current_lag
+      FROM (
+        SELECT application_name,
+          (1000 - (
+            row_number() OVER (
+              PARTITION BY state IN ('startup', 'backup')
+              ORDER BY location ASC, application_name ASC
+            ) - 1
+           ) * 10
+          ) * CASE WHEN ( $maxlag > 0
+                     AND current_lag > $maxlag)
+                        THEN -1
+                   ELSE 1
+              END AS priority,
+          location, state, current_lag
+        FROM (
+          SELECT application_name, $write_lsn AS location, state,
+            $pg_wal_lsn_diff($pg_current_wal_lsn, $write_lsn) AS current_lag
+          FROM pg_stat_replication
+        ) AS s2
+      ) AS s1
+      ORDER BY priority DESC
+    };
+
+    $rc = _query( $query, \@rs );
+
+    if ( $rc != 0 ) {
+        ocf_exit_reason( 'Query to get standby locations failed (%d)', $rc );
+        exit $OCF_ERR_GENERIC;
+    }
+
+    return \@rs;
+}
 
 # get the timeout for the current action given from environment var
 # Returns   timeout as integer
@@ -300,7 +480,6 @@ sub _pg_isready {
     return $rc;
 }
 
-
 # Check the postmaster.pid file and the postmaster process.
 # WARNING: we do not distinguish the scenario where postmaster.pid does not
 # exist from the scenario where the process is still alive. It should be ok
@@ -439,7 +618,6 @@ sub _get_controldata {
     exit $OCF_ERR_ARGS;
 }
 
-
 # Use pg_controldata to check the state of the PostgreSQL server. This
 # function returns codes depending on this state, so we can find whether the
 # instance is a primary or a secondary, or use it to detect any inconsistency
@@ -486,91 +664,6 @@ sub _controldata_to_ocf {
     return $OCF_ERR_INSTALLED ;
 }
 
-
-# Run a query using psql.
-#
-# This function returns an array with psql return code as first element and
-# the result as second one.
-#
-sub _query {
-    my $query        = shift;
-    my $res          = shift;
-    my $connstr      = "dbname=postgres";
-    my $RS           = chr(30); # ASCII RS  (record separator)
-    my $FS           = chr(3);  # ASCII ETX (end of text)
-    my $postgres_uid = getpwnam( $system_user );
-    my $oldeuid      = $>;
-    my $tmpfile;
-    my @res;
-    my $ans;
-    my $pid;
-    my $rc;
-
-    unless ( defined $res and defined $query and $query ne '' ) {
-        ocf_log( 'debug', '_query: wrong parameters!' );
-        return -1;
-    }
-
-    unless ( $tmpfile = File::Temp->new(
-            TEMPLATE => 'pgsqlms-XXXXXXXX',
-            DIR      => $HA_RSCTMP
-        ) )
-    {
-        ocf_exit_reason( 'Could not create or write in a temp file' );
-        exit $OCF_ERR_INSTALLED;
-    }
-
-    print $tmpfile $query;
-    chmod 0644, $tmpfile;
-
-    ocf_log( 'debug', '_query: %s', $query );
-
-    # Change the effective user to the given system_user so after forking
-    # the given uid to the process should allow psql to connect w/o password
-    $> = $postgres_uid;
-
-    # Forking + piping
-    $pid = open(my $KID, "-|");
-
-    if ( $pid == 0 ) { # child
-        exec $PGPSQL, '--set', 'ON_ERROR_STOP=1', '-qXAtf', $tmpfile,
-            '-R', $RS, '-F', $FS, '--port', $pgport, '--host', $pghost,
-            $connstr;
-    }
-
-    # parent
-    $> = $oldeuid;
-
-    {
-        local $/;
-        $ans = <$KID>;
-    }
-
-    close $KID;
-    $rc = $? >> 8;
-
-    ocf_log( 'debug', '_query: psql return code: %d', $rc );
-
-    if ( defined $ans ) {
-        chop $ans;
-
-        push @{ $res }, [ split(chr(3) => $_, -1) ]
-            foreach split (chr(30) => $ans, -1);
-
-        ocf_log( 'debug', '_query: @res: %s',
-            Data::Dumper->new( [ $res ] )->Terse(1)->Dump );
-    }
-
-    # Possible return codes:
-    #  -1: wrong parameters
-    #   0: OK
-    #   1: failed to get resources (memory, missing file, ...)
-    #   2: unable to connect
-    #   3: query failed
-    return $rc;
-}
-
-
 # Check the write_location of all secondaries, and adapt their master score so
 # that the instance closest to the master will be the selected candidate should
 # a promotion be triggered.
@@ -589,52 +682,13 @@ sub _check_locations {
     my $node_score;
     my $row_num;
     my $row;
-    my $query;
     my @rs;
-    my $rc;
 
     # Call crm_node to exclude nodes that are not part of the cluster at this
     # point.
     my $partition_nodes = qx{ $CRM_NODE --partition };
 
-    # We check locations of connected standbies by querying the
-    # "pg_stat_replication" view.
-    # The row_number applies on the result set ordered on write_location ASC so
-    # the highest row_number should be given to the closest node from the
-    # master, then the lowest node name (alphanumeric sort) in case of equality.
-    # The result set itself is order by priority DESC to process best known
-    # candidate first.
-    $query = qq{
-      SELECT application_name, priority, location, state, current_lag
-      FROM (
-        SELECT application_name,
-          (1000 - (
-            row_number() OVER (
-              PARTITION BY state IN ('startup', 'backup')
-              ORDER BY write_location ASC, application_name ASC
-            ) - 1
-           ) * 10
-          ) * CASE WHEN ($maxlag > 0
-                     AND current_lag > $maxlag)
-                        THEN -1
-                   ELSE 1
-              END AS priority,
-          write_location AS location, state, current_lag
-        FROM (
-          SELECT application_name, write_location, state,
-                 pg_xlog_location_diff(pg_current_xlog_location(), write_location) AS current_lag
-          FROM pg_stat_replication
-        ) AS s2
-      ) AS s1
-      ORDER BY priority DESC
-    };
-
-    $rc = _query( $query, \@rs );
-
-    if ( $rc != 0 ) {
-        ocf_exit_reason( 'Query to get standby locations failed (%d)', $rc );
-        exit $OCF_ERR_GENERIC;
-    }
+    @rs = @{ _get_lag_scores() };
 
     $row_num = scalar @rs;
 
@@ -733,7 +787,6 @@ sub _check_switchover {
     my $rc;
     my $tl;
     my %cdata;
-    my @rs;
 
     ocf_log( 'info', 'Switchover in progress from "%s" to "%s".'
         .' Need to check the last record in WAL',
@@ -743,7 +796,7 @@ sub _check_switchover {
     # demote process.
     # We need the last local checkpoint LSN and the last received LSN from
     # master to check in the WAL between these adresses if we have a
-    # "checkpoint shutdown" using pg_xlogdump.
+    # "checkpoint shutdown" using pg_xlogdump/pg_waldump.
     #
     # Force a checkpoint to make sure the controldata shows the very last TL
     # and the master's shutdown checkpoint
@@ -753,15 +806,7 @@ sub _check_switchover {
     $last_redo = $cdata{'redo'};
 
     # Get the last received LSN from master
-    $rc = _query( q{ SELECT pg_last_xlog_receive_location() }, \@rs );
-
-    if ( $rc != 0 ) {
-        ocf_exit_reason( 'Could not query last_xlog_receive_location (%d)',
-            $rc );
-        return 2;
-    }
-
-    $last_lsn = $rs[0][0] if defined $rs[0][0];
+    $last_lsn = _get_last_received_lsn();
 
     unless ( defined $last_lsn ) {
         ocf_exit_reason(
@@ -987,8 +1032,8 @@ sub ocf_meta_data {
            <parameter name="maxlag" unique="0" required="0">
               <longdesc lang="en">
                 Maximum lag allowed on a standby before we set a negative master score on it. The calculation
-                is based on the difference between the current xlog location on the master and the write
-                location on the standby.
+                is based on the difference between the current LSN on the master and the LSN
+                written on the standby.
                 This parameter must be a valid positive number as described in PostgreSQL documentation.
                 See: https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS-NUMERIC
               </longdesc>
@@ -1060,7 +1105,6 @@ sub pgsql_validate_all {
     my $fh;
     my $ans = '';
     my $PGVERSION;
-    my $PGVERNUM;
     my @content;
     my %cdata;
 
@@ -1173,14 +1217,20 @@ sub pgsql_validate_all {
 
     chomp $PGVERSION;
 
-    $PGVERSION =~ /^(\d+)\.(\d+)$/;
-    $PGVERNUM = $1 * 10000 + $2 * 100;
+    $PGVERSION =~ /^(\d+)(?:\.(\d+))?$/;
+
+    $PGVERNUM = $1 * 10000;
+
+    # postgresql >= 10 do not include the 2nd num in the major release
+    $PGVERNUM += $2 * 100 if $1 < 10;
 
     if ( $PGVERNUM < 90300 ) {
         ocf_exit_reason( "PostgreSQL %s not supported. Require 9.3 and more",
             $PGVERSION );
         exit $OCF_ERR_INSTALLED;
     }
+
+    $PGXLOGDUMP = "$bindir/pg_waldump" if $PGVERNUM >= $PGVER_10;
 
     # check binaries
     unless ( -x $PGCTL and -x $PGPSQL and -x $PGCTRLDATA and -x $PGISREADY ) {
@@ -1741,7 +1791,6 @@ sub pgsql_promote {
 # As every "notify" action, it is executed almost simultaneously on all
 # available nodes.
 sub pgsql_notify_pre_promote {
-    my @rs;
     my $rc;
     my $node_tl;
     my $node_lsn;
@@ -1802,19 +1851,16 @@ sub pgsql_notify_pre_promote {
 
     # Force a checpoint to make sure the controldata shows the very last TL
     _query( q{ CHECKPOINT }, {} );
-    %cdata   = _get_controldata();
+    %cdata    = _get_controldata();
+    $node_lsn = _get_last_received_lsn( 'in decimal' );
 
-    $rc = _query( q{
-        SELECT pg_xlog_location_diff( pg_last_xlog_receive_location(), '0/0' )
-    }, \@rs );
-
-    unless ( $rc == 0 ) {
-        ocf_log( 'warning', 'Could not query the current node LSN' );
+    unless ( defined $node_lsn ) {
+        ocf_log( 'warning', 'Unknown current node LSN' );
         # Return code are ignored during notifications...
         return $OCF_SUCCESS;
     }
 
-    $node_lsn = "$cdata{'tl'}#$rs[0][0]";
+    $node_lsn = "$cdata{'tl'}#$node_lsn";
 
     ocf_log( 'info', 'Current node TL#LSN: %s', $node_lsn );
 
