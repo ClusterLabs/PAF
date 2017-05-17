@@ -26,7 +26,7 @@ perl Build
 
 %install
 ./Build install
-rm -f "%{buildroot}"/usr/local/lib64/perl5/auto/PAF/.packlist
+find "%{buildroot}" -type f -name .packlist -delete
 
 %files
 %defattr(-,root,root,0755)
