@@ -354,8 +354,8 @@ process.
 
 ```
 pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsql-ha INFINITY
-pcs -f cluster1.xml constraint order promote pgsql-ha then start pgsql-master-ip symmetrical=false
-pcs -f cluster1.xml constraint order demote pgsql-ha then stop pgsql-master-ip symmetrical=false
+pcs -f cluster1.xml constraint order promote pgsql-ha then start pgsql-master-ip symmetrical=false kind=Mandatory
+pcs -f cluster1.xml constraint order demote pgsql-ha then stop pgsql-master-ip symmetrical=false kind=Mandatory
 ```
 
 And finally, we define a preference for our master node:
