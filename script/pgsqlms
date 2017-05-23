@@ -63,7 +63,7 @@ my $PGCTL      = "$bindir/pg_ctl";
 my $PGPSQL     = "$bindir/psql";
 my $PGCTRLDATA = "$bindir/pg_controldata";
 my $PGISREADY  = "$bindir/pg_isready";
-my $PGXLOGDUMP = "$bindir/pg_xlogdump";
+my $PGWALDUMP = "$bindir/pg_waldump";
 
 # pacemaker commands path
 my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime forever";
@@ -814,20 +814,20 @@ sub _check_switchover {
         );
 
         ocf_log( 'debug',
-            '_check_switchover: XLOGDUMP parameters: datadir:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
-            $datadir, $last_redo, $tl, $last_lsn
+            '_check_switchover: %s parameters: datadir:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
+            $PGWALDUMP, $datadir, $last_redo, $tl, $last_lsn
         );
 
         return 2;
     }
 
-    $ans = qx{ $PGXLOGDUMP --path "$datadir" --timeline "$tl" \\
+    $ans = qx{ $PGWALDUMP --path "$datadir" --timeline "$tl" \\
                --start "$last_redo" --end "$last_lsn" 2>&1 };
     $rc = $?;
 
     ocf_log( 'debug',
-        '_check_switchover: XLOGDUMP rc: "%s", tl: "%s", last_chk: %s, last_lsn: %s, output: "%s"',
-        $rc, $tl, $last_redo, $last_lsn, $ans
+        '_check_switchover: %s rc: "%s", tl: "%s", last_chk: %s, last_lsn: %s, output: "%s"',
+        $PGWALDUMP, $rc, $tl, $last_redo, $last_lsn, $ans
     );
 
     if ( $rc == 0 and
@@ -1230,13 +1230,15 @@ sub pgsql_validate_all {
         exit $OCF_ERR_INSTALLED;
     }
 
-    $PGXLOGDUMP = "$bindir/pg_waldump" if $PGVERNUM >= $PGVER_10;
+    $PGWALDUMP = "$bindir/pg_xlogdump" if $PGVERNUM < $PGVER_10;
 
     # check binaries
-    unless ( -x $PGCTL and -x $PGPSQL and -x $PGCTRLDATA and -x $PGISREADY ) {
+    unless ( -x $PGCTL and -x $PGPSQL and -x $PGCTRLDATA and -x $PGISREADY
+         and -x $PGWALDUMP
+     ) {
         ocf_exit_reason(
-            "Missing one or more binary. Check following path: %s, %s, %s, %s",
-            $PGCTL, $PGPSQL, $PGCTRLDATA, $PGISREADY );
+            "Missing one or more binary. Check following path: %s, %s, %s, %s, %s",
+            $PGCTL, $PGPSQL, $PGCTRLDATA, $PGISREADY, $PGWALDUMP );
         exit $OCF_ERR_ARGS;
     }
 
