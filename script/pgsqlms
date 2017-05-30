@@ -570,6 +570,17 @@ sub _query {
     return $rc;
 }
 
+# Return list of all nodes in the cluster (including not available ones).
+# The output format is a comma separated list of nodenames.
+sub _get_all_cluster_nodes {
+    my $nodes_raw = qx{ $CRM_NODE --list };
+    my $allnodes = '';
+    for (split /^/, $nodes_raw) {
+        $_ =~ m/\d\s([a-zA-Z0-9_]+).*$/;
+        $allnodes = "$allnodes $1" if defined $1;
+    }
+    return $allnodes;
+}
 
 # Check the write_location of all secondaries, and adapt their master score so
 # that the instance closest to the master will be the selected candidate should
@@ -593,9 +604,9 @@ sub _check_locations {
     my @rs;
     my $rc;
 
-    # Call crm_node to exclude nodes that are not part of the cluster at this
-    # point.
-    my $partition_nodes = qx{ $CRM_NODE --partition };
+    ## Get a list of all nodes so we can find out which ones are not connected
+    ## to the master (and ajust scores accordingly).
+    my $partition_nodes = _get_all_cluster_nodes();
 
     # We check locations of connected standbies by querying the
     # "pg_stat_replication" view.
