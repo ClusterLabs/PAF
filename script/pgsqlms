@@ -6,7 +6,15 @@
 
 =head1 NAME
 
-pgsqlms - A PostgreSQL multi-state resource agent for Pacemaker
+ocf_heartbeat_pgsqlms - A PostgreSQL multi-state resource agent for Pacemaker
+
+=head1 SYNOPSIS
+
+B<pgsqlms> [start | stop | monitor | promote | demote | notify | reload | methods | meta-data | validate-all]
+
+=head1 DESCRIPTION
+
+Resource script for PostgreSQL in replication. It manages PostgreSQL servers using streaming replication as an HA resource.
 
 =cut
 
@@ -57,6 +65,7 @@ my $start_opts   = $ENV{'OCF_RESKEY_start_opts'} || $start_opts_default;
 my $maxlag       = $ENV{'OCF_RESKEY_maxlag'} || $maxlag_default;
 my $recovery_tpl = $ENV{'OCF_RESKEY_recovery_template'}
     || "$pgdata/recovery.conf.pcmk";
+
 
 # PostgreSQL commands path
 my $PGCTL      = "$bindir/pg_ctl";
@@ -923,6 +932,81 @@ sub _confirm_stopped {
 #### OCF FUNCS
 
 
+
+=head1 SUPPORTED PARAMETERS
+
+=over
+
+=item B<pgdata>
+
+Location of the PGDATA of your instance
+
+(optional, string, default "/var/lib/pgsql/data")
+
+=item B<pghost>
+
+The socket directory or IP address to use to connect to the local instance
+
+(optional, string, default "/tmp")
+
+=item B<pgport>
+
+The port to connect to the local instance
+
+(optional, integer, default "5432")
+
+=item B<bindir>
+
+Location of the PostgreSQL binaries.
+
+(optional, string, default "/usr/bin")
+
+=item B<system_user>
+
+The system owner of your instance's process
+
+(optional, string, default "postgres")
+
+=item B<recovery_template>
+
+The local template that will be copied as the C<PGDATA/recovery.conf> file.
+This template file must exists on all node.
+
+(optional, string, default "$PGDATA/recovery.conf.pcmk")
+
+=item B<maxlag>
+
+Maximum lag allowed on a standby before we set a negative master score on it.
+The calculation is based on the difference between the current xlog location on
+the master and the write location on the standby.
+
+(optional, integer, default "0" disables this feature)
+
+=item B<datadir>
+
+Path to the directory set in C<data_directory> from your postgresql.conf file.
+This parameter has same default than PostgreSQL itself: the C<pgdata> parameter
+value.
+
+Unless you have a special PostgreSQL setup and you understand this parameter,
+B<ignore it>
+
+(optional, string, default to the value of C<pgdata>)
+
+=item B<start_opts>
+
+Additional arguments given to the postgres process on startup. See
+"postgres --help" for available options. Useful when the postgresql.conf file
+is not in the data directory (PGDATA), eg.:
+
+  -c config_file=/etc/postgresql/9.3/main/postgresql.conf
+
+(optinal, string, default "")
+
+=back
+
+=cut
+
 sub ocf_meta_data {
     print qq{<?xml version="1.0"?>
         <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
@@ -1020,7 +1104,6 @@ sub ocf_meta_data {
           <actions>
             <action name="start" timeout="60" />
             <action name="stop" timeout="60" />
-            <action name="status" timeout="20" />
             <action name="reload" timeout="20" />
             <action name="promote" timeout="30" />
             <action name="demote" timeout="120" />
@@ -1036,6 +1119,65 @@ sub ocf_meta_data {
     };
     return;
 }
+
+
+=head1 SUPPORTED ACTIONS
+
+This resource agent supports the following actions (operations):
+
+=over
+
+=item B<start>
+
+Starts the resource. Suggested minimum timeout: 60.
+
+=item B<stop>
+
+Stops the resource. Suggested minimum timeout: 60.
+
+=item B<reload>
+
+Suggested minimum timeout: 20.
+
+=item B<promote>
+
+Promotes the resource to the Master role. Suggested minimum timeout: 30.
+
+=item B<demote>
+
+Demotes the resource to the Slave role. Suggested minimum timeout: 120.
+
+=item B<monitor (Master role)>
+
+Performs a detailed status check. Suggested minimum timeout: 10.
+Suggested interval: 15.
+
+=item B<monitor (Slave role)>
+
+Performs a detailed status check. Suggested minimum timeout: 10.
+Suggested interval: 16.
+
+=item B<notify>
+
+Suggested minimum timeout: 60
+
+=item B<meta-data>
+
+Retrieves resource agent metadata (internal use only).
+Suggested minimum timeout: 5.
+
+=item B<methods>
+
+Suggested minimum timeout: 5.
+
+=item B<validate-all>
+
+Performs a validation of the resource configuration.
+Suggested minimum timeout: 5.
+
+=back
+
+=cut
 
 sub ocf_methods {
     print q{
@@ -2009,3 +2151,50 @@ for ( $OCF_ACTION ) {
 }
 
 exit $exit_code;
+
+
+=head1 EXAMPLE CRM SHELL
+
+The following is an example configuration for a pgsqlms resource using the
+crm(8) shell:
+
+  primitive pgsqld pgsqlms                                                 \
+    params pgdata="/var/lib/postgresql/9.6/main"                           \
+      bindir="/usr/lib/postgresql/9.6/bin"                                 \
+      pghost="/var/run/postgresql"                                         \
+      recovery_template="/etc/postgresql/9.6/main/recovery.conf.pcmk"      \
+      start_opts="-c config_file=/etc/postgresql/9.6/main/postgresql.conf" \
+    op start timeout=60s                                                   \
+    op stop timeout=60s                                                    \
+    op promote timeout=30s                                                 \
+    op demote timeout=120s                                                 \
+    op monitor interval=15s timeout=10s role="Master"                      \
+    op monitor interval=16s timeout=10s role="Slave"                       \
+    op notify timeout=60s
+
+  ms pgsql-ha pgsqld meta notify=true
+
+
+=head1 EXAMPLE PCS
+
+The following is an example configuration for a pgsqlms resource using pcs(8):
+
+  pcs resource create pgsqld ocf:heartbeat:pgsqlms            \
+    bindir=/usr/pgsql-9.6/bin pgdata=/var/lib/pgsql/9.6/data  \
+    op start timeout=60s                                      \
+    op stop timeout=60s                                       \
+    op promote timeout=30s                                    \
+    op demote timeout=120s                                    \
+    op monitor interval=15s timeout=10s role="Master"         \
+    op monitor interval=16s timeout=10s role="Slave"          \
+    op notify timeout=60s --master notify=true
+
+=head1 SEE ALSO
+
+http://clusterlabs.org/
+
+=head1 AUTHOR
+
+Jehan-Guillaume de Rorthais and Mael Rimbault.
+
+=cut
