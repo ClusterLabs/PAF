@@ -31,9 +31,10 @@ find "%{buildroot}" -type f -name .packlist -delete
 %files
 %defattr(-,root,root,0755)
 %doc README.md 
+%doc CHANGELOG.md 
 %license LICENSE
-%{_mandir}/man1/*.1*
 %{_mandir}/man3/*.3*
+%{_mandir}/man7/*.7*
 %{_ocfroot}/resource.d/heartbeat/pgsqlms
 %{_ocfroot}/lib/heartbeat/OCF_ReturnCodes.pm
 %{_ocfroot}/lib/heartbeat/OCF_Directories.pm
