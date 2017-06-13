@@ -3,9 +3,18 @@ LICENSE
 MANIFEST			This list of files
 README.md
 INSTALL.md
+CHANGELOG.md
 lib/OCF_Directories.pm.PL
 lib/OCF_Functions.pm
 lib/OCF_ReturnCodes.pm
 script/pgsqlms
+resource-agents-paf.spec
+debian/changelog
+debian/compat
+debian/control
+debian/copyright
+debian/docs
+debian/rules
+debian/source/format
 t/pgsqlms
 t/README
