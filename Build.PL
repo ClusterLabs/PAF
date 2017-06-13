@@ -6,10 +6,12 @@ use warnings;
 use File::Spec;
 use Storable;
 use Module::Build;
+use Pod::Man;
 
 my $lib_ocf_root = '/usr/lib/ocf';
 my $ocft_confs   = '/usr/share/resource-agents/ocft/configs';
 my $lib_ocf_dirs;
+my $man7_dir;
 my $ocf_dirs;
 my %ocf_dirs;
 
@@ -35,6 +37,9 @@ my $build = Module::Build->new(
     tests_files        => {
         't/pgsqlms' => 'tests/pgsqlms'
     },
+    man7_files         => {
+        'ocf_heartbeat_pgsqlms.7' => 'man7/ocf_heartbeat_pgsqlms.7'
+    },
     get_options        => {
         with_ocf_root   => {
             type  => '=s',
@@ -47,6 +52,7 @@ my $build = Module::Build->new(
     },
     add_to_cleanup     => [
         'lib/OCF_Directories.pm',
+        'ocf_heartbeat_pgsqlms.7'
     ],
     meta_merge         => {
         resources => {
@@ -56,6 +62,28 @@ my $build = Module::Build->new(
         }
   },
 );
+
+# The pgsqlms man page must be generated in man7, not man1.
+# We create a new man7 install path, and disable the man1 generation.
+
+# build man7 page
+Pod::Man->new(
+    'release' => $build->dist_version,
+    'section' => 7,
+    'center'  => 'OCF resource agents',
+    'name'    => 'OCF_HEARTBEAT_PGSQLMS'
+)->parse_from_file( 'script/pgsqlms', 'ocf_heartbeat_pgsqlms.7' );
+
+$man7_dir = $build->install_destination( 'bindoc' );
+$man7_dir =~ s@man1@man7@;
+
+$build->install_path( 'man7' => $man7_dir );
+$build->add_build_element('man7');
+
+# we set the bindoc dirs list to an empty list so Module::Build can not find
+# script/pgsqlms and create a man1 page
+$build->bindoc_dirs( [] );
+
 
 # Check given ocf_root or default values
 for my $dir (
