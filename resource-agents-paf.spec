@@ -8,9 +8,8 @@ License: PostgreSQL
 Group: Applications/Databases
 Url: http://dalibo.github.io/PAF/
 
-Source0: https://github.com/dalibo/PAF/releases/download/%{_tag}/PAF-%{_tag}.tgz
+Source0: https://github.com/dalibo/PAF/archive/%{_tag}.tar.gz
 BuildArch: noarch
-#BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires: resource-agents perl perl-Module-Build
 Provides: resource-agents-paf = %{version}
 
