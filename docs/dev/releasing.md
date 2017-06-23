@@ -1,6 +1,6 @@
 # Releasing
 
-## Source code
+## Source code
 
 Edit varable `$VERSION` in the following files:
 
@@ -51,7 +51,7 @@ git archive --prefix=PAF-$TAG/ -o /tmp/PAF-$TAG.tgz $TAG
 
 ## Building the RPM file
 
-### Installation
+### Installation
 
 ```
 yum group install "Development Tools"
@@ -59,7 +59,7 @@ yum install rpmdevtools
 useradd makerpm
 ```
 
-### Building the package
+### Building the package
 
 ```
 su - makerpm
@@ -80,7 +80,7 @@ apt-get install dh-make devscripts libmodule-build-perl resource-agents
 ```
 
 
-### Building the package
+### Building the package
 
 Package to install on your debian host to build the builder environment
 
@@ -95,6 +95,6 @@ debuild -i -us -uc -b
 
 Don't forget to upload the package on github release page.
 
-## Documentation
+## Documentation
 
 Update the "quick start" documentation pages with the links to the new packges  

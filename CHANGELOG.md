@@ -1,3 +1,26 @@
+# PAF v2.2 beta1
+
+Release date: WIP
+
+__WARNING__: This version is only compatible with at least
+Pacemaker 1.1.13 using a corosync 2.x stack.
+
+Changelog since 2.1:
+
+* new: support PostgreSQL 10
+* new: add the maxlag parameter to exclude lagging slaves from promotion, Thomas Reiss
+* new: support for multiple pgsqlms resources in the same cluster
+* new: provide comprehensive error messages to crm_mon
+* fix: follow the resource agent man page naming policy and section
+* fix: add documentation to the pgsqlms man page
+* fix: do not rely on crm_failcount, suggested on the clusterlabs lists
+* misc: improve the RPM packaging
+* misc: check Pacemaker compatibility and resource setup
+* misc: enforce the election process by including timelines comparison
+* misc: various code cleanup, factorization and module improvement
+
+
+
 # PAF v2.1.0
 
 Release date: 2016-12-23
