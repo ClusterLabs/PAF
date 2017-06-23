@@ -1,4 +1,4 @@
-%global _tag v2.2_beta1
+%global _tag 2.2_beta1
 %global _ocfroot /usr/lib/ocf
 Name: resource-agents-paf
 Version: 2.2~beta1
@@ -8,7 +8,7 @@ License: PostgreSQL
 Group: Applications/Databases
 Url: http://dalibo.github.io/PAF/
 
-Source0: https://github.com/dalibo/PAF/archive/%{_tag}.tar.gz
+Source0: https://github.com/dalibo/PAF/archive/v%{_tag}.tar.gz
 BuildArch: noarch
 BuildRequires: resource-agents perl perl-Module-Build
 Provides: resource-agents-paf = %{version}
