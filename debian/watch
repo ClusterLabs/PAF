@@ -1,0 +1,3 @@
+version=3
+opts=filenamemangle=s/.+\/v?(\d\S+)\.tar\.gz/PAF-$1\.tar\.gz/,uversionmangle=s/_beta/~beta/;s/_alpha/~alpha/;s/_rc/~rc/ \
+  https://github.com/dalibo/PAF/releases .*/v?(\d\S+)\.tar\.gz
