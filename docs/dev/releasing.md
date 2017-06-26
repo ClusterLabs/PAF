@@ -15,11 +15,16 @@ In `Build.PL`, search and edit the following line:
 dist_version       => '1.0.0'
 ```
 
+For beta or rc release, set `release_status => 'testing'`, otherwise set it to
+`stable`.
+
 In `resource-agents-paf.spec`:
   * update the tag in the `_tag` variable (first line)
   * update the version in `Version:`
   * edit the changelog
     * date format: `LC_TIME=C date +"%a %b %d %Y"`
+  * take care of the `Release` field if there is multiple version of the package
+    for the same version of PAF
 
 In `debian/`, edit the `changelog` file
 
