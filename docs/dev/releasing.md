@@ -15,13 +15,26 @@ In `Build.PL`, search and edit the following line:
 dist_version       => '1.0.0'
 ```
 
+For beta or rc release, set `release_status => 'testing'`, otherwise set it to
+`stable`.
+
 In `resource-agents-paf.spec`:
   * update the tag in the `_tag` variable (first line)
   * update the version in `Version:`
   * edit the changelog
     * date format: `LC_TIME=C date +"%a %b %d %Y"`
+  * take care of the `Release` field if there is multiple version of the package
+    for the same version of PAF
 
 In `debian/`, edit the `changelog` file
+
+## Commit the changes
+
+```
+git commit -am 'vX.Y.0 release'
+```
+
+For beta or rc release use `vX.Y_betaN` or `vX.Y_rcN`, eg. `v2.2_beta1`.
 
 ## Tagging and building tar file
 
@@ -31,6 +44,8 @@ git tag $TAG
 git push --tags
 git archive --prefix=PAF-$TAG/ -o /tmp/PAF-$TAG.tgz $TAG
 ```
+
+For beta or rc release use `vX.Y_betaN` or `vX.Y_rcN`, eg. `v2.2_beta1`.
 
 ## Release on github
 
@@ -86,12 +101,14 @@ Package to install on your debian host to build the builder environment
 
 ```
 VER=1.0.0
-wget "https://github.com/dalibo/PAF/releases/download/v${VER/\~/_}/PAF-v${VER/\~/_}.tgz" -O resource-agents-paf_${VER}.orig.tar.gz
+wget "https://github.com/dalibo/PAF/archive/v${VER/\~/_}.tar.gz" -O resource-agents-paf_${VER}.orig.tar.gz
 mkdir resource-agents-paf-$VER
 tar zxf resource-agents-paf_${VER}.orig.tar.gz -C "resource-agents-paf-$VER" --strip-components=1
 cd resource-agents-paf-${VER}
 debuild -i -us -uc -b
 ```
+
+For beta or rc release, use `VER=X.Y~betaN` or `VER=X.Y~rcN`.
 
 Don't forget to upload the package on github release page.
 
