@@ -1,16 +1,17 @@
-%global _tag v2.2_beta1
+%global _tag 2.2_beta1
 %global _ocfroot /usr/lib/ocf
 Name: resource-agents-paf
 Version: 2.2~beta1
-Release: 1
+Release: 2
 Summary: PostgreSQL resource agent for Pacemaker
 License: PostgreSQL
 Group: Applications/Databases
 Url: http://dalibo.github.io/PAF/
 
-Source0: https://github.com/dalibo/PAF/archive/%{_tag}.tar.gz
+Source0: https://github.com/dalibo/PAF/archive/v%{_tag}.tar.gz
 BuildArch: noarch
 BuildRequires: resource-agents perl perl-Module-Build
+Requires: perl, resource-agents, pacemaker >= 1.1.13, corosync >= 2.0.0
 Provides: resource-agents-paf = %{version}
 
 %description
@@ -41,6 +42,9 @@ find "%{buildroot}" -type f -name .packlist -delete
 %{_datadir}/resource-agents/ocft/configs/pgsqlms
 
 %changelog
+* Mon Jun 26 2017 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.2beta1-2
+- add dependencies on Pacemaker and Corosync versions
+
 * Mon Jun 26 2017 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.2beta1-1
 - 2.2_beta1 beta release
 

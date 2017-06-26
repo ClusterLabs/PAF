@@ -1,4 +1,5 @@
-resource-agents-paf (2.2~beta1-2) unstable; urgency=medium
+
+resource-agents-paf (2.2~beta1-3) unstable; urgency=medium
 
   * d/control:
     - Bump Standards-Version to 4.0.0 (no change required)
@@ -6,6 +7,12 @@ resource-agents-paf (2.2~beta1-2) unstable; urgency=medium
   * d/watch: Add watch file to look for new releases on github.
 
  -- Adrian Vondendriesch <adrian.vondendriesch@credativ.de>  Mon, 26 Jun 2017 16:55:28 +0200
+
+resource-agents-paf (2.2~beta1-2) unstable; urgency=low
+
+  * add dependencies on Pacemaker and Corosync versions
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Mon, 26 Jun 2017 16:50:00 +0100
 
 resource-agents-paf (2.2~beta1-1) unstable; urgency=low
 
