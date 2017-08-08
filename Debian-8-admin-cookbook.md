@@ -15,6 +15,8 @@ Topics:
 * [PAF update](#paf-update)
 * [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
 * [Adding a node](#adding-a-node)
+* [Removing a node](#removing-a-node)
+* [Forbidding a PAF resource on a node](#forbidding-a-paf-resource-on-a-node)
 
 
 ## Starting or stopping the cluster
@@ -34,6 +36,26 @@ Here is the command to stop the cluster on the local node it is executed:
 It stops or move away all the resources on the node, then stops Pacemaker and
 Corosync.
 
+
+To avoid moving your resources around during cluster shutdown, either put the
+cluster in maintenance mode or ask the cluster to stop the resource first. Eg.:
+
+* maintenance mode:
+  
+  ~~~
+  # crm configure property maintenance-mode=true
+  # crm cluster stop
+  ~~~
+* stopping the resource:
+  
+  ~~~
+  # crm resource stop pgsql-ha
+  # crm cluster stop
+  ~~~
+  Note that the first command will stop PostgreSQL on **all nodes**. No need to
+  run it everywhere.
+
+Don't forget on cluster start to run the opposite commands.
 
 ## Swapping master and slave roles between nodes
 
@@ -287,12 +309,108 @@ We can now start the cluster on `srv3`!
 # crm cluster start
 ```
 
-After some time checking the integration of `srv3` in the cluster using `crm_mon`
-or `crm status`, you probably find that your PosgreSQL standby is not started on
-the new node. We actually need to allow one more clone in the cluster:
+After some time checking cluster using `crm_mon` or `crm status`, you should
+find of `srv3` appearing in the cluster.
+
+If your PosgreSQL standby is not started on the new node, maybe the cluster has
+been setup with a hard `clone-max` value. Check with:
 
 ```
-# crm resource meta pgsql-ha set clone-max 3
+# crm resource meta pgsql-ha show clone-max
 ```
+
+If you get a value either:
+* remove it if you don't mind having a clone on each node:
+  
+  ~~~
+  # crm resource meta pgsql-ha delete clone-max
+  ~~~
+* set it to the needed value:
+  
+  ~~~
+  # crm resource meta pgsql-ha set clone-max 3
+  ~~~
 
 Your standby instance should start shortly.
+
+
+## Removing a node
+
+This chapter explains how to remove a node called `srv3` from a three node
+cluster.
+
+The first command will put the node in standby. It stops __all__ resources on
+the node:
+
+```
+# crm node standby srv3
+```
+
+Next command simply remove the node from the cluster. It stops Pacemaker
+on `srv3̀`, remove the cluster setup from it and reconfigure other nodes:
+
+```
+# crm cluster remove srv3
+INFO: Remove node from cluster
+INFO: Nodes: srv3, srv2, srv1
+OK: Check nodes
+OK: Validate parameters
+OK: Remove node from cluster
+```
+
+On __all the nodes__, edit the `/etc/corosync/corosync.conf` file:
+
+* remove the old node from the `nodelist` block
+  
+  > __NOTE__: do not forget parameter `ring1_addr` if corosync is set up to use
+  > multiple network for redundancy.
+  {: .notice}
+* In the `quorum` block, set the `two_node` parameter if you cluster has only
+  two nodes left and adjust the `expected_votes`:
+  
+  ~~~
+  quorum {
+    provider: corosync_votequorum
+    two_node: 1
+    expected_votes: 2
+  }
+  ~~~
+
+> __WARNING__:Again, make sure your `/etc/corosync/corosync.conf` files are
+> exactly the same on **all** the nodes.
+{: .warning}
+
+Reload the corosync configuration on all the nodes if needed (it shouldn't, but
+it doesn't hurt anyway):
+
+```
+# corosync-cfgtool -R
+```
+
+If you choose to set a specific `clone-max` attribute to the `pgsql-ha`
+resource, update it. You **don't** need to update it if it is not set (see
+previous chapter).
+
+```
+# crm resource meta pgsql-ha set clone-max 2
+```
+
+## Forbidding a PAF resource on a node
+
+In this chapter, we need to set up a node where no PostgreSQL instance of your
+cluster is supposed to run. That might be that PostgreSQL is not installed on
+this node, the instance is part of a different resource cluster, etc.
+
+The following command forbid your multi-state PostgreSQL resource
+called `pgsql-ha` to run on node called `srv3`:
+
+```
+# crm configure location forbid-pgsqlha-on-srv3 pgsql-ha resource-discovery=never rule -inf: \#uname eq srv3
+```
+
+This creates constraint location associated to a rule allowing us to
+avoid ( `score=-INFINITY` ) the node `srv3` ( `\#uname eq srv3` ) for
+resource `pgsql-ha`. The `resource-discovery=never` is mandatory here as it
+forbid the "probe" action the CRM is usually running to discovers the state of
+a resource on a node. On a node where your PostgreSQL cluster is not running,
+this "probe" action will fail, leading to bad cluster reactions.

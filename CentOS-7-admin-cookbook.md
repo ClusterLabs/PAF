@@ -342,19 +342,33 @@ only fence `srv3`:
 # pcs constraint location fence_vm_srv3 avoids srv3=INFINITY
 ```
 
-We can now start the cluster on `srv3`!
+We can now start the cluster on `srv3`:
 
 ```
 # pcs cluster start
 ```
 
-After some time checking the integration of `srv3` in the cluster using `crm_mon`
-or `pcs status`, you probably find that your PosgreSQL standby is not started on
-the new node. We actually need to allow one more clone in the cluster:
+After some time checking cluster using `crm_mon` or `pcs status`, you should
+find of `srv3` appearing in the cluster.
+
+If your PosgreSQL standby is not started on the new node, maybe the cluster has
+been setup with a hard `clone-max` value. Check with:
 
 ```
-# pcs resource meta pgsql-ha clone-max=3
+# pcs resource show pgsql-ha
 ```
+
+If you get a value either:
+* remove it if you don't mind having a clone on each node:
+  
+  ~~~
+  # pcs resource meta pgsql-ha clone-max=
+  ~~~
+* set it to the needed value:
+  
+  ~~~
+  # pcs resource meta pgsql-ha clone-max=3
+  ~~~
 
 Your standby instance should start shortly.
 
@@ -382,7 +396,9 @@ srv1: Corosync updated
 srv2: Corosync updated
 ```
 
-The last command change the maximum clone allowed in the cluster:
+If you choose to set a specific `clone-max` attribute to the `pgsql-ha`
+resource, update it. You **don't** need to update it if it is not set (see
+previous chapter).
 
 ```
 # pcs resource meta pgsql-ha clone-max=2
