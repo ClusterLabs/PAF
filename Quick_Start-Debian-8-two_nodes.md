@@ -379,25 +379,9 @@ use the cluster client `crmsh` to setup everything.
 
 ## Cluster resource creation and management
 
-This setup creates three different resources: `pgsql-ha`, `pgsql-master-ip`
-and `fence_vm_xxx`.
-
-The `pgsql-ha` resource represents all the PostgreSQL instances of your cluster
-and controls where is the primary and where is the standby.
-
-The `pgsql-master-ip` is located on the node hosting the PostgreSQL master
-resource.
-
-The last resources `fence_vm_xxx` are STONITH resources, used to manage fencing.
-We create one STONITH resource for each node. Each fencing resource will not be
-allowed to run on the node it is supposed to stop. We are using the
-`fence_virsh` fencing agent, which is power fencing agent allowing to power on
-or off a virtual machine through the `virsh` command. For more information
-about fencing, see documentation `docs/FENCING.md` in the source code or
-online:
-[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
-
-First of all, let's start with some basic setup of the cluster:
+First of all, let's start with some basic setup of the cluster. Run
+the following command from **one** node only (the cluster takes care of
+broadcasting the configuration on all nodes):
 
 ```
 crm conf <<EOC
@@ -406,15 +390,47 @@ rsc_defaults migration-threshold=5
 EOC
 ```
 
-Then, we must start populating it with the STONITH resources (this setup is
-only provided as an example, and must be adapted to the fencing agent used in
-your configuration):
+In this quick start, we creates three different resources: `pgsql-ha`,
+`pgsql-master-ip` and `fence_vm_xxx`.
+
+The `pgsql-ha` resource controls all the PostgreSQL instances of your cluster
+and decides where is the primary and where are the standbys.
+
+The `pgsql-master-ip` resource controls the `pgsql-vip` IP address. It is
+started on the node hosting the PostgreSQL master resource.
+
+The last resources `fence_vm_xxx` are STONITH resources to manage fencing.
+This quick start uses the `fence_virsh` fencing agent, allowing to power on or
+off a virtual machine using the `virsh` command through a ssh connexion to the
+hypervisor. For more information about fencing, see documentation
+`docs/FENCING.md` in the source code or online:
+[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+
+> **WARNING**: unless you build your PoC cluster using libvirt for VM
+> management, there's great chances you will need to use a different STONITH
+> agent. The stonith setup is provided as a simple example, be prepared to
+> adjust it.
+{: .warning}
+
+Now you've been warned, let's populating the cluster with some sample STONITH
+resources using virsh over ssh (`fence_virsh` fencing agent). First, we need
+to allow ssh password-less authentication to `<user>@192.168.122.1` so
+these fencing resource can work. Again, this is specific to this setup.
+Depending on your fencing topology, you might not need this step. Run on all
+node:
+
+~~~
+ssh-copy-id <user>@192.168.122.1
+~~~
+
+We can now create one STONITH resource for each node and each fencing
+resource will not be allowed to run on the node it is supposed to fence:
 
 ```
 crm conf<<EOC
 primitive fence_vm_srv1 stonith:fence_virsh                   \
   params pcmk_host_check="static-list" pcmk_host_list="srv1"  \
-         ipaddr="192.168.2.1" login="ioguix"                  \
+         ipaddr="192.168.2.1" login="<user>"                  \
          identity_file="/root/.ssh/id_rsa"                    \
          port="srv1-d8" action="off"                          \
   op monitor interval=10s
@@ -422,7 +438,7 @@ location fence_vm_srv1-avoids-srv1 fence_vm_srv1 -inf: srv1
 
 primitive fence_vm_srv2 stonith:fence_virsh                   \
   params pcmk_host_check="static-list" pcmk_host_list="srv2"  \
-         ipaddr="192.168.2.1" login="ioguix"                  \
+         ipaddr="192.168.2.1" login="<user>"                  \
          identity_file="/root/.ssh/id_rsa"                    \
          port="srv2-d8" action="off"                          \
   op monitor interval=10s
@@ -438,6 +454,7 @@ the same time:
   3. the IP address that must be started on the PostgreSQL master node
   4. the collocation of the master IP address with the PostgreSQL master
      instance
+  5. the ordering constraints between the IP address and the PostgreSQL master
 
 ```
 crm conf <<EOC
@@ -470,6 +487,7 @@ primitive pgsql-master-ip IPaddr2           \
 # 4. colocation of the pgsql-ha master and the master IP address
 colocation ip-with-master inf: pgsql-master-ip pgsql-ha:Master
 
+# 5. ordering constraints
 order promote-then-ip Mandatory:         \
   pgsql-ha:promote pgsql-master-ip:start \
   sequential=true symmetrical=false
@@ -480,9 +498,11 @@ order demote-then-stop-ip Mandatory:   \
 
 EOC
 ```
-> **WARNING**: in step 4, the start/stop and promote/demote order for these
-> resources must be asymetrical: we __must__ keep the master IP on the master
-> during its demote process.
+
+> **WARNING**: in step 5, the start/stop and promote/demote order for these
+> resources must be asymetrical: we __MUST__ keep the master IP on the master
+> during its demote process so the standbies receive everything during the
+> master shutdown.
 {: .warning}
 
 Note that the values for `timeout` and `interval` on each operation are based

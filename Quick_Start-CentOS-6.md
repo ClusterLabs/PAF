@@ -273,24 +273,8 @@ use the cluster client `pcs` to setup everything.
 
 ## Cluster resource creation and management
 
-This setup creates three different resources: `pgsql-ha`, `pgsql-master-ip`
-and `fence_vm_xxx`.
-
-The `pgsql-ha` resource represents all the PostgreSQL instances of your cluster
-and controls where is the primary and where are the standbys.
-The `pgsql-master-ip` is located on the node hosting the PostgreSQL master
-resource.
-The last resources `fence_vm_xxx` are STONITH resources, used to manage fencing.
-We create one STONITH resource for each node. Each fencing resource will not be
-allowed to run on the node it is supposed to stop. We are using the
-`fence_virsh` fencing agent, which is power fencing agent allowing to power on
-or off a virtual machine through the `virsh` command. For more information
-about fencing, see documentation `docs/FENCING.md` in the source code or
-online:
-[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
-
 First of all, let's create an empty CIB file and fill it with some basic setup.
-We will push to the cluster once we are completely done:
+We will push to the cluster once we are completely done with this chapter:
 
 ```
 pcs cluster cib cluster1.xml
@@ -298,14 +282,46 @@ pcs -f cluster1.xml resource defaults migration-threshold=5
 pcs -f cluster1.xml resource defaults resource-stickiness=10
 ```
 
-Then, we must start populating it with the STONITH resources (this setup is
-only provided as an example, and must be adapted to the fencing agent used in
-your configuration):
+In this quick start, we creates three different resources: `pgsql-ha`,
+`pgsql-master-ip` and `fence_vm_xxx`.
+
+The `pgsql-ha` resource controls all the PostgreSQL instances of your cluster
+and decides where is the primary and where are the standbys.
+
+The `pgsql-master-ip` resource controls the `pgsql-vip` IP address. It is
+started on the node hosting the PostgreSQL master resource.
+
+The last resources `fence_vm_xxx` are STONITH resources to manage fencing.
+This quick start uses the `fence_virsh` fencing agent, allowing to power on or
+off a virtual machine using the `virsh` command through a ssh connexion to the
+hypervisor. For more information about fencing, see documentation
+`docs/FENCING.md` in the source code or online:
+[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+
+> **WARNING**: unless you build your PoC cluster using libvirt for VM
+> management, there's great chances you will need to use a different STONITH
+> agent. The stonith setup is provided as a simple example, be prepared to
+> adjust it.
+{: .warning}
+
+Now you've been warned, let's populating the cluster with some sample STONITH
+resources using virsh over ssh (`fence_virsh` fencing agent). First, we need
+to allow ssh password-less authentication to `<user>@192.168.122.1` so
+these fencing resource can work. Again, this is specific to this setup.
+Depending on your fencing topology, you might not need this step. Run on all
+node:
 
 ```
-pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="root" port="srv1-c6" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="root" port="srv2-c6" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="root" port="srv3-c6" action="off" identity_file="/root/.ssh/id_rsa"
+ssh-copy-id <user>@192.168.122.1
+```
+
+We can now create one STONITH resource for each node and each fencing
+resource will not be allowed to run on the node it is supposed to fence:
+
+```
+pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="<user>" port="srv1-c6" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="<user>" port="srv2-c6" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="<user>" port="srv3-c6" action="off" identity_file="/root/.ssh/id_rsa"
 pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv3 avoids srv3=INFINITY

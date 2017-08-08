@@ -16,7 +16,7 @@ The cluster we are about to build includes three servers called `srv1`,
 interface, `192.168.123.5x/24` on the second one.
 
 The IP address `192.168.122.50`, called `pgsql-vip` in this tutorial, will be set
-on the server hosting the master PostgreSQL intance.
+on the server hosting the master PostgreSQL instance.
 
 Considering the firewall, we have to allow the network traffic related to the
 cluster and PostgreSQL to go through:
@@ -78,7 +78,7 @@ yum install -y https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-a
 ## PostgreSQL setup
 
 > **WARNING**: building PostgreSQL standby is not the main subject here. The
-> following steps are __**quick and dirty**__. They lack of security, WAL
+> following steps are __**QUICK AND DIRTY**__. They lack of security, WAL
 > retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
 > for a proper setup.
 {: .warning}
@@ -264,26 +264,8 @@ use the cluster client `pcs` to setup everything.
 
 ## Cluster resource creation and management
 
-This setup creates three different resources: `pgsql-ha`, `pgsql-master-ip`
-and `fence_vm_xxx`.
-
-The `pgsql-ha` resource represents all the PostgreSQL instances of your cluster
-and controls where is the primary and where are the standbys.
-
-The `pgsql-master-ip` is located on the node hosting the PostgreSQL master
-resource.
-
-The last resources `fence_vm_xxx` are STONITH resources, used to manage fencing.
-We create one STONITH resource for each node. Each fencing resource will not be
-allowed to run on the node it is supposed to stop. We are using the
-`fence_virsh` fencing agent, which is power fencing agent allowing to power on
-or off a virtual machine through the `virsh` command. For more information
-about fencing, see documentation `docs/FENCING.md` in the source code or
-online:
-[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
-
 First of all, let's create an empty CIB file and fill it with some basic setup.
-We will push to the cluster once we are completely done:
+We will push to the cluster once we are completely done with this chapter:
 
 ```
 pcs cluster cib cluster1.xml
@@ -291,14 +273,46 @@ pcs -f cluster1.xml resource defaults migration-threshold=5
 pcs -f cluster1.xml resource defaults resource-stickiness=10
 ```
 
-Then, we must start populating it with the STONITH resources. Replace
-`<username>` with the system user name on the hypervisor able to manage your
-virtual machine: 
+In this quick start, we creates three different resources: `pgsql-ha`,
+`pgsql-master-ip` and `fence_vm_xxx`.
+
+The `pgsql-ha` resource controls all the PostgreSQL instances of your cluster
+and decides where is the primary and where are the standbys.
+
+The `pgsql-master-ip` resource controls the `pgsql-vip` IP address. It is
+started on the node hosting the PostgreSQL master resource.
+
+The last resources `fence_vm_xxx` are STONITH resources to manage fencing.
+This quick start uses the `fence_virsh` fencing agent, allowing to power on or
+off a virtual machine using the `virsh` command through a ssh connexion to the
+hypervisor. For more information about fencing, see documentation
+`docs/FENCING.md` in the source code or online:
+[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+
+> **WARNING**: unless you build your PoC cluster using libvirt for VM
+> management, there's great chances you will need to use a different STONITH
+> agent. The stonith setup is provided as a simple example, be prepared to
+> adjust it.
+{: .warning}
+
+Now you've been warned, let's populating the cluster with some sample STONITH
+resources using virsh over ssh (`fence_virsh` fencing agent). First, we need
+to allow ssh password-less authentication to `<user>@192.168.122.1` so
+these fencing resource can work. Again, this is specific to this setup.
+Depending on your fencing topology, you might not need this step. Run on all
+node:
 
 ```
-pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="<username>" port="srv1-c7" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="<username>" port="srv2-c7" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="<username>" port="srv3-c7" action="off" identity_file="/root/.ssh/id_rsa"
+ssh-copy-id <user>@192.168.122.1
+```
+
+We can now create one STONITH resource for each node and each fencing
+resource will not be allowed to run on the node it is supposed to fence:
+
+```
+pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="<user>" port="srv1-c7" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="<user>" port="srv2-c7" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="<user>" port="srv3-c7" action="off" identity_file="/root/.ssh/id_rsa"
 pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv3 avoids srv3=INFINITY
@@ -339,9 +353,10 @@ pcs -f cluster1.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
 
 We now define the collocation between `pgsql-ha` and `pgsql-master-ip`.
 
-> **WARNING**: the start/stop and promote/demote order for these resources must
-> be asymetrical: we __must__ keep the master IP on the master during its demote
-> process.
+> **WARNING**: the start/stop and promote/demote order for these
+> resources must be asymetrical: we __MUST__ keep the master IP on the master
+> during its demote process so the standbies receive everything during the
+> master shutdown.
 {: .warning}
 
 ```
