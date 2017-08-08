@@ -335,9 +335,7 @@ pcs -f cluster1.xml resource create pgsqld ocf:heartbeat:pgsqlms \
     op notify timeout=60s
 
 # pgsql-ha
-pcs -f cluster1.xml resource master pgsql-ha pgsqld \
-    master-max=1 master-node-max=1                  \
-    clone-max=3 clone-node-max=1 notify=true
+pcs -f cluster1.xml resource master pgsql-ha pgsqld notify=true
 ```
 
 Note that the values for `timeout` and `interval` on each operation are based

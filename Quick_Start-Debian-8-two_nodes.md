@@ -475,9 +475,7 @@ primitive pgsqld pgsqlms                                                      \
   op notify timeout=60s
 
 # 2. resource pgsql-ha
-ms pgsql-ha pgsqld                          \
-  meta master-max=1 master-node-max=1       \
-  clone-max=2 clone-node-max=1 notify=true
+ms pgsql-ha pgsqld meta notify=true
 
 # 3. the master IP address
 primitive pgsql-master-ip IPaddr2           \
