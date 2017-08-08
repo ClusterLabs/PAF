@@ -1,87 +1,91 @@
 ---
 layout: default
-title: PostgreSQL Automatic Failover - Quick start Debian 8
+title: PostgreSQL Automatic Failover - Quick start Debian 9 using crm
 ---
 
-# Quick Start Debian 8 - Two Nodes
+# Quick Start Debian 9 using crm
 
-This quick start tutorial is based on Debian 8.4, using the `crmsh` cluster
-client and `PostgreSQL 9.6`.
-
-The focus will be on setting up a two node cluster. The specific stuff is in 
-the "Corosync" [part of this page](#corosync) and is not restricted to Debian 8.
-
-## Repository setup
-
-The Debian HA team missed the freeze time of Debian 8 (Jessie). They couldn't
-publish the Pacemaker, Corosync and related packages on time. They did publish
-them later in Debian 9 (strecth) and backport them officially for Debian 8. So
-We need to setup the backport repository to install the Pacemaker stack under
-Debian 8 (adapt the URL to your closest mirror):
-
-```
-cat <<EOF >> /etc/apt/sources.list.d/jessie-backports.list
-deb http://ftp2.fr.debian.org/debian/ jessie-backports main
-EOF
-```
-
-About PostgreSQL, this tutorial uses the PGDG repository maintained by the
-PostgreSQL community (and actually Debian maintainers). Here is how to add it:
-
-```
-cat <<EOF >> /etc/apt/sources.list.d/pgdg.list
-deb http://apt.postgresql.org/pub/repos/apt/ jessie-pgdg main
-EOF
-```
-
-Now, update your local cache:
-
-```
-apt-get update
-apt-get install pgdg-keyring
-```
+This quick start tutorial is based on Debian 9.1, using Pacemaker 1.1.16 and
+the `crm` command version 2.3.2.
 
 ## Network setup
 
-The cluster we are about to build includes two servers called `srv1` and `srv2`. 
-Each of them have two network interfaces `eth1` and `eth2`. IP
-addresses of these servers are `192.168.2.10x/24` on the first interface,
-`192.168.3.10x/24` on the second one.
+The cluster we are about to build includes three servers called `srv1`,
+`srv2` and `srv3`. Each of them have two network interfaces `eth0` and
+`eth1`. IP addresses of these servers are `192.168.122.6x/24` on the first
+interface, `192.168.123.6x/24` on the second one.
 
-The IP address `192.168.2.100`, called `pgsql-vip` in this tutorial, will be set
+The IP address `192.168.122.60`, called `pgsql-vip` in this tutorial, will be set
 on the server hosting the master PostgreSQL instance.
 
-During the cluster setup, we use the node names in various places, make sure
-all your servers names can be resolved to the correct IPs. We usually set this
-in the `/etc/hosts` file:
+During the cluster setup, we use the node names in various places,
+make sure all your server hostnames can be resolved to the correct IPs. We
+usually set this in the `/etc/hosts` file:
 
-```
-cat <<EOF >> /etc/hosts
-192.168.2.100 pgsql-vip
-192.168.2.101 srv1
-192.168.2.102 srv2
-192.168.3.101 srv1-alt
-192.168.3.102 srv2-alt
+~~~
+192.168.122.60 pgsql-vip
+192.168.122.61 srv1
+192.168.122.62 srv2
+192.168.122.63 srv3
+192.168.123.61 srv1-alt
+192.168.123.62 srv2-alt
+192.168.123.63 srv3-alt
+~~~
+
+Now, the three servers should be able to ping each others, eg.:
+
+~~~
+root@srv1:~# for s in srv1 srv2 srv3; do ping -W1 -c1 $s; done| grep icmp_seq
+64 bytes from srv1 (192.168.122.61): icmp_seq=1 ttl=64 time=0.028 ms
+64 bytes from srv2 (192.168.122.62): icmp_seq=1 ttl=64 time=0.296 ms
+64 bytes from srv3 (192.168.122.63): icmp_seq=1 ttl=64 time=0.351 ms
+~~~
+
+## Repository setup
+
+To install PostgreSQL, this tutorial uses the PGDG repository maintained by the
+PostgreSQL community (and actually Debian maintainers). Here is how to add it:
+
+~~~
+cat <<EOF >> /etc/apt/sources.list.d/pgdg.list
+deb http://apt.postgresql.org/pub/repos/apt/ stretch-pgdg main
 EOF
-```
+~~~
+
+Now, update your local apt cache:
+
+~~~
+apt install ca-certificates
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add 
+apt update
+apt install pgdg-keyring
+~~~
+
 
 ## PostgreSQL and Cluster stack installation
 
-Let install everything we need for our cluster:
+Let's install everything we need: PostgreSQL, Pacemaker and cluster related
+packages:
 
-```
-apt-get install -t jessie-backports pacemaker crmsh
+~~~
+apt install --no-install-recommends postgresql-9.6 postgresql-contrib-9.6 \
+    postgresql-client-9.6 pacemaker fence-agents crmsh net-tools
+~~~
 
-apt-get install postgresql-9.6 postgresql-contrib-9.6 postgresql-client-9.6
-```
+We add the `--no-install-recommends` because the apt tools are setup by default
+to install all recommended packages in addition to the usual dependences. This
+might be fine in most case, but we want to keep this quick start small, easy
+and clear. Installing recommended packages requires some more attention on
+other subjects not related to this document (eg. setting up some IPMI daemon).
 
-We can now install the "PostgreSQL Automatic Failover" (PAF) resource agent:
+Next, we need to install the "PostgreSQL Automatic Failover" (PAF) resource
+agent:
 
-```
+~~~
 wget 'https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-agents-paf_2.1.0-1_all.deb'
 dpkg -i resource-agents-paf_2.1.0-1_all.deb
-apt-get -f install
-```
+apt -f install
+~~~
 
 By default, Debian set up the instances to put the temporary activity
 statistics inside a sub folder of `/var/run/postgresql/`. This sub folder is
@@ -92,32 +96,32 @@ some other packages or operating system. That means that this required sub
 folder set up in `stats_temp_directory` is never created and leads to error on
 instance startup by Pacemaker.
 
-To creating this sub folder on system initialization, we need to extend the
+To create this sub folder on system initialization, we need to extend the
 existing `systemd-tmpfiles` configuration for `postgresql` to add it. In our
 environment `stats_temp_directory` is set
 to `/var/run/postgresql/9.6-main.pg_stat_tmp`, so we create the following
 file:
 
-```
+~~~
 cat <<EOF > /etc/tmpfiles.d/postgresql-part.conf
 # Directory for PostgreSQL temp stat files
 d /var/run/postgresql/9.6-main.pg_stat_tmp 0700 postgres postgres - -
 EOF
-```
+~~~
 
 If you don't want to reboot your system to take this file in consideration,
 just run the following command:
 
-```
+~~~
 systemd-tmpfiles --create /etc/tmpfiles.d/postgresql-part.conf
-```
+~~~
 
 
 ## PostgreSQL setup
 
 > **WARNING**: building PostgreSQL standby is not the main subject here. The
-> following steps are __**quick and dirty**__. They lack of security, WAL
-> retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
+> following steps are __**QUICK AND DIRTY, VERY DIRTY**__. They lack of
+> security, WAL retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
 > for a proper setup.
 {: .warning}
 
@@ -129,9 +133,9 @@ of the cluster, PAF detects the master based on its shutdown status.
 Moreover, it requires a `recovery.conf` template ready to use. You can create
 a `recovery.conf` file suitable to your needs, the only requirements are:
 
-* have `standby_mode = on`
-* have `recovery_target_timeline = 'latest'`
-* a `primary_conninfo` with an `application_name` set to the node name
+  * have `standby_mode = on`
+  * have `recovery_target_timeline = 'latest'`
+  * a `primary_conninfo` with an `application_name` set to the node name
 
 Last but not least, make sure each instance will not be able to replicate with
 itself! A scenario exists where the master IP address `pgsql-vip` will be on
@@ -145,11 +149,11 @@ the same node than a standby for a very short lap of time!
 {: .notice}
 
 Here are some quick steps to build your primary PostgreSQL instance and its
-standbys. The next steps suppose the primary PostgreSQL instance is on `srv1`.
+standbys. This quick start considers `srv1` is the preferred master.
 
 On all nodes:
 
-```
+~~~
 su - postgres
 
 cd /etc/postgresql/9.6/main/
@@ -165,8 +169,8 @@ EOP
 
 cat <<EOP >> pg_hba.conf
 # forbid self-replication
+host replication postgres 192.168.122.60/32 reject
 host replication postgres $(hostname -s) reject
-host replication postgres $(hostname -s)-alt reject
 
 # allow any standby connection
 host replication postgres 0.0.0.0/0 trust
@@ -174,25 +178,25 @@ EOP
 
 cat <<EOP > recovery.conf.pcmk
 standby_mode = on
-primary_conninfo = 'host=192.168.2.100 application_name=$(hostname -s)'
+primary_conninfo = 'host=192.168.122.60 application_name=$(hostname -s)'
 recovery_target_timeline = 'latest'
 EOP
 
 exit
-```
+~~~
 
 On `srv1`, the master, restart the instance and give it the master IP address:
 
-```
+~~~
 systemctl restart postgresql@9.6-main
 
-ip addr add 192.168.2.100/24 dev eth0
-```
+ip addr add 192.168.122.60/24 dev eth0
+~~~
 
-Now, on the standby (srv2), we have to cleanup the instance
+Now, on each standby (`srv2` and `srv3` here), we have to cleanup the instance
 created by the package and clone the primary. E.g.:
 
-```
+~~~
 systemctl stop postgresql@9.6-main
 su - postgres
 
@@ -204,23 +208,24 @@ cp /etc/postgresql/9.6/main/recovery.conf.pcmk ~postgres/9.6/main/recovery.conf
 exit
 
 systemctl start postgresql@9.6-main
-```
+~~~
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
 disable them, as Pacemaker will take care of starting/stopping everything for
 you. Start with your master:
 
-```
+~~~
 systemctl stop postgresql@9.6-main
 systemctl disable postgresql@9.6-main
 echo disabled > /etc/postgresql/9.6/main/start.conf
-```
+~~~
 
 And remove the master IP address from `srv1`:
 
-```
-ip addr del 192.168.2.100/24 dev eth0
-```
+~~~
+ip addr del 192.168.122.60/24 dev eth0
+~~~
+
 
 ## Cluster setup
 
@@ -237,144 +242,126 @@ systemctl disable pacemaker
 ```
 
 
-### Corosync
+### Cluster creation
 
-The cluster communications and quorum (votes) rely on Corosync to work. So this
-is the first service to setup to be able to build your cluster on top of it.
+This guide uses the cluster management tool `crm` to ease the creation and
+setup of a cluster. It allows to create the cluster from command line, without
+editing configuration files or XML by hands.
 
-The cluster configuration client `crmsh` is supposed to be able to take care of
-this, but this feature was broken when this tutorial was written.
-See [the related bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=819545).
+`crm` relies heavily on SSH to transfer files between nodes and execute remote
+commands. It requires the system user `root` to be able to connect to all
+remote nodes without password. The easiest way to go is to generate a SSH keys
+on each node and put the public part in the `~root/.ssh/authorized_keys` file
+on other nodes.
 
-First, stop Corosync and Pacemaker on all nodes:
+On all nodes:
 
-```
-systemctl stop corosync.service pacemaker.service
-```
+~~~
+ssh-keygen # do no set any password
+ssh-copy-id srv1
+ssh-copy-id srv2
+ssh-copy-id srv3
+~~~
 
-Here is the content of the `/etc/corosync/corosync.conf` file suitable to
-the cluster as we described it so far:
+We can now create our cluster:
 
-```
-totem {
-  version: 2
+~~~
+crm cluster init srv1 srv2 srv3
+~~~
 
-  crypto_cipher: none
-  crypto_hash: none
+This command creates the `/etc/corosync/corosync.conf` file and propagate it
+everywhere. This file must **always** be the same among all nodes. For more
+information about this configuration file, see the `corosync.conf(5)` manual
+page.
 
-  rrp_mode: passive
+You can now start your cluster! Run the following command on all nodes:
 
-  interface {
-    ringnumber: 0
-    bindnetaddr: 192.168.2.0
-    mcastport: 5405
-    ttl: 1
-  }
-  interface {
-    ringnumber: 1
-    bindnetaddr: 192.168.3.0
-    mcastport: 5405
-    ttl: 1
-  }
-  transport: udpu
-}
-
-nodelist {
-  node {
-    ring0_addr: srv1
-    ring1_addr: srv1-alt
-  }
-  node {
-    ring0_addr: srv2
-    ring1_addr: srv2-alt
-  }
-}
-
-logging {
-  # to_logfile: yes
-  # logfile: /var/log/corosync/corosync.log
-  # timestamp: on
-  to_syslog: yes
-  syslog_facility: daemon
-  logger_subsys {
-    subsys: QUORUM
-    debug: off
-  }
-}
-
-quorum {
-  provider: corosync_votequorum
-  two_node: 1
-  expected_votes: 2
-  wait_for_all: 1
-}
-```
-
-A few notes about the two node specific configuration:
-
-* `two_node: 1` is requiered for two node cluster.
-* `expected_votes: 2` is when two_node is chosen, but I like things to be
-  explicit.
-* `wait_for_all: 1` is the default with two_node. when starting from scratch,
-  prevent the cluster from becoming quorate until all of the nodes have joined
-  in.
-
-For more information about this configuration file, see the `corosync.conf`
-manual page. Make sure this file is strictly the same on each node.
-
-We can now start Pacemaker on every node of the cluster:
-
-```
-systemctl start pacemaker.service
-```
-
-Here is a command to check everything is working correctly:
-
-```
-root@srv1:~# corosync-cmapctl | grep 'members.*ip'
-runtime.totem.pg.mrp.srp.members.3232266853.ip (str) = r(0) ip(192.168.2.101) r(1) ip(192.168.3.101)
-runtime.totem.pg.mrp.srp.members.3232266854.ip (str) = r(0) ip(192.168.2.102) r(1) ip(192.168.3.102) 
-```
-
-or
-
-```
-root@srv2:~# corosync-quorumtool 
-Quorum information
-------------------
-Date:             Wed Jan  4 20:02:47 2017
-Quorum provider:  corosync_votequorum
-Nodes:            2
-Node ID:          3232236134
-Ring ID:          8
-Quorate:          Yes
-
-Votequorum information
-----------------------
-Expected votes:   2
-Highest expected: 2
-Total votes:      2
-Quorum:           1  
-Flags:            2Node Quorate WaitForAll 
-
-Membership information
-----------------------
-    Nodeid      Votes Name
-3232236133          1 srv1
-3232236134          1 srv2 (local)
-```
+~~~
+crm cluster start
+~~~
 
 After some seconds of startup and cluster membership stuff, you should be able
-to see your tow nodes up in `crm_mon`:
+to see your three nodes up in `crm_mon` (or `crm status`):
 
-```
+~~~
 root@srv1:~# crm_mon -n1D
 Node srv1: online
 Node srv2: online
-```
+Node srv3: online
+~~~
 
-We can now feed this cluster with some resources to keep available. This guide
-use the cluster client `crmsh` to setup everything.
+
+> **WARNING**: `crm` does not support redundant rings configuration in corosync.
+> To avoid having your network being a SPoF, either setup some redundancy on
+> network link level or edit by hands the corosync configuration to add a
+> second ring using the following commands: 
+>
+> ~~~
+> crm corosync edit
+> crm corosync push
+> ~~~
+>
+> Here is a sample diff-formated edition of `/etc/corosync/corosync.conf` to
+> add the second ring:
+>
+> ~~~
+> @@ -16,10 +16,12 @@
+>  	interface {
+>  		ringnumber: 0
+>  		bindnetaddr: 192.168.122.0
+> -		mcastaddr: 239.19.196.75
+> -		mcastport: 5405
+> -		ttl: 1
+>  	}
+> +	interface {
+> +		ringnumber: 1
+> +		bindnetaddr: 192.168.123.0
+> +	}
+> +	rrp_mode: passive
+>  	transport: udpu
+>  }
+>  
+> @@ -41,16 +43,19 @@
+>  
+>      node {
+>          ring0_addr: srv1
+> +        ring1_addr: srv1-alt
+>          nodeid: 1
+>      }
+>  
+>      node {
+>          ring0_addr: srv3
+> +        ring1_addr: srv3-alt
+>          nodeid: 2
+>      }
+>  
+>      node {
+>          ring0_addr: srv2
+> +        ring1_addr: srv2-alt
+>          nodeid: 3
+>      }
+> 
+> ~~~
+>
+> You will need to restart the cluster after such a change. Run on all node:
+>
+> ~~~
+> crm cluster stop
+> crm cluster start
+> ~~~
+{: .warning}
+
+
+Here is a command to check everything is working correctly:
+
+~~~
+root@srv1:~# corosync-cmapctl | grep 'members.*ip'
+runtime.totem.pg.mrp.srp.members.1.ip (str) = r(0) ip(192.168.122.61) r(1) ip(192.168.123.61)
+runtime.totem.pg.mrp.srp.members.2.ip (str) = r(0) ip(192.168.122.63) r(1) ip(192.168.123.63)
+runtime.totem.pg.mrp.srp.members.3.ip (str) = r(0) ip(192.168.122.62) r(1) ip(192.168.123.62)
+~~~
+
+We can now feed this cluster with some resources to keep available.
 
 
 ## Cluster resource creation and management
@@ -383,12 +370,12 @@ First of all, let's start with some basic setup of the cluster. Run
 the following command from **one** node only (the cluster takes care of
 broadcasting the configuration on all nodes):
 
-```
+~~~
 crm conf <<EOC
 rsc_defaults resource-stickiness=10
 rsc_defaults migration-threshold=5
 EOC
-```
+~~~
 
 In this quick start, we creates three different resources: `pgsql-ha`,
 `pgsql-master-ip` and `fence_vm_xxx`.
@@ -426,27 +413,36 @@ ssh-copy-id <user>@192.168.122.1
 We can now create one STONITH resource for each node and each fencing
 resource will not be allowed to run on the node it is supposed to fence:
 
-```
+~~~
 crm conf<<EOC
 primitive fence_vm_srv1 stonith:fence_virsh                   \
   params pcmk_host_check="static-list" pcmk_host_list="srv1"  \
-         ipaddr="192.168.2.1" login="<user>"                  \
+         ipaddr="192.168.122.1" login="<user>"                \
          identity_file="/root/.ssh/id_rsa"                    \
-         port="srv1-d8" action="off"                          \
+         port="srv1-d9" action="off"                          \
   op monitor interval=10s
 location fence_vm_srv1-avoids-srv1 fence_vm_srv1 -inf: srv1
 
 primitive fence_vm_srv2 stonith:fence_virsh                   \
   params pcmk_host_check="static-list" pcmk_host_list="srv2"  \
-         ipaddr="192.168.2.1" login="<user>"                  \
+         ipaddr="192.168.122.1" login="<user>"                \
          identity_file="/root/.ssh/id_rsa"                    \
-         port="srv2-d8" action="off"                          \
+         port="srv2-d9" action="off"                          \
   op monitor interval=10s
 location fence_vm_srv2-avoids-srv2 fence_vm_srv2 -inf: srv2
-```
 
-The following setup adds a bunch of resources and constraints all together in
-the same time:
+primitive fence_vm_srv3 stonith:fence_virsh                   \
+  params pcmk_host_check="static-list" pcmk_host_list="srv3"  \
+         ipaddr="192.168.122.1" login="<user>"                \
+         identity_file="/root/.ssh/id_rsa"                    \
+         port="srv3-d9" action="off"                          \
+  op monitor interval=10s
+location fence_vm_srv3-avoids-srv3 fence_vm_srv3 -inf: srv3
+EOC
+~~~
+
+Now the fencing is working, we can add all other resources and constraints all
+together in the same time:
 
   1. the PostgreSQL `pgsqld` resource
   2. the multistate `pgsql-ha` responsible to clone `pgsqld` everywhere and
@@ -456,7 +452,7 @@ the same time:
      instance
   5. the ordering constraints between the IP address and the PostgreSQL master
 
-```
+~~~
 crm conf <<EOC
 
 # 1. resource pgsqld
@@ -475,19 +471,17 @@ primitive pgsqld pgsqlms                                                      \
   op notify timeout=60s
 
 # 2. resource pgsql-ha
-ms pgsql-ha pgsqld                          \
-  meta master-max=1 master-node-max=1       \
-  clone-max=2 clone-node-max=1 notify=true
+ms pgsql-ha pgsqld meta notify=true
 
 # 3. the master IP address
 primitive pgsql-master-ip IPaddr2           \
-  params ip=192.168.2.100 cidr_netmask=24 \
+  params ip=192.168.122.60 cidr_netmask=24 \
   op monitor interval=10s
 
 # 4. colocation of the pgsql-ha master and the master IP address
 colocation ip-with-master inf: pgsql-master-ip pgsql-ha:Master
 
-# 5. ordering constraints
+# 5. ordering constraint
 order promote-then-ip Mandatory:         \
   pgsql-ha:promote pgsql-master-ip:start \
   sequential=true symmetrical=false
@@ -497,7 +491,7 @@ order demote-then-stop-ip Mandatory:   \
   sequential=true symmetrical=false
 
 EOC
-```
+~~~
 
 > **WARNING**: in step 5, the start/stop and promote/demote order for these
 > resources must be asymetrical: we __MUST__ keep the master IP on the master
