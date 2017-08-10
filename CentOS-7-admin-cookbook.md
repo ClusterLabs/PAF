@@ -453,7 +453,14 @@ Start the cluster:
 # pcs cluster start --all
 ~~~
 
-If needed, adjust the `stonith-watchdog-timeout` cluster property:
+After some seconds, the following command should return true:
+
+~~~
+# pcs property show | grep have-watchdog
+ have-watchdog: true
+~~~
+
+Adjust the `stonith-watchdog-timeout` cluster property:
 
 ~~~~
 # pcs property set stonith-watchdog-timeout=10s
@@ -461,13 +468,6 @@ If needed, adjust the `stonith-watchdog-timeout` cluster property:
 
 A good value for `stonith-watchdog-timeout` is the double
 of `SBD_WATCHDOG_TIMEOUT`.
-
-After some seconds, the following command should return true:
-
-~~~
-# pcs property show | grep have-watchdog
- have-watchdog: true
-~~~
 
 Now, if you kill the sbd process, the node should reset itself in less
 than `SBD_WATCHDOG_TIMEOUT` seconds:
