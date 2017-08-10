@@ -77,7 +77,6 @@ root@srv1:~# for s in srv1 srv2 srv3; do ping -W1 -c1 $s; done| grep icmp_seq
 
 ## PostgreSQL and Cluster stack installation
 
-
 Run this whole chapter on ALL nodes.
 
 Let's install everything we need: PostgreSQL, Pacemaker and cluster related
@@ -136,7 +135,7 @@ systemd-tmpfiles --create /etc/tmpfiles.d/postgresql-part.conf
 ## PostgreSQL setup
 
 > **WARNING**: building PostgreSQL standby is not the main subject here. The
-> following steps are __**QUICK AND DIRTY, VERY DIRTY**__. They lack of
+> following steps are __**quick and dirty, VERY DIRTY**__. They lack of
 > security, WAL retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
 > for a proper setup.
 {: .warning}
@@ -286,8 +285,8 @@ ssh-copy-id srv3
 
 ## Cluster creation
 
-The tool crm is able to create and start the whole cluster for us. From one of
-the nodes, run the following command:
+The `crm` cli tool is able to create and start the whole cluster for us. From
+one of the nodes, run the following command:
 
 ~~~
 crm cluster init srv1 srv2 srv3
@@ -322,7 +321,9 @@ Node srv3: online
 ~~~
 
 
-> **WARNING**: `crm` does not support redundant rings configuration in corosync.
+> **WARNING**: make sure you have a redundant network at system level. This is a
+> __**CRITICAL**__ part of your cluster. `crm` does not support redundant rings
+> configuration in corosync.
 > To avoid having your network being a SPoF, either setup some redundancy on
 > network link level (better) or edit by hands the corosync configuration to
 > add a second ring (good enough) using the following commands:
@@ -383,7 +384,7 @@ Node srv3: online
 {: .warning}
 
 > **WARNING**: whatever you edit in your `/etc/corosync/corosync.conf` file,
-> __**ALWAYS**__ make sure all the noeds in your cluster has the exact same
+> __**ALWAYS**__ make sure all the nodes in your cluster has the exact same
 > copy of the file.
 {: .warning}
 
@@ -396,7 +397,6 @@ runtime.totem.pg.mrp.srp.members.1.ip (str) = r(0) ip(192.168.122.61) r(1) ip(19
 runtime.totem.pg.mrp.srp.members.2.ip (str) = r(0) ip(192.168.122.63) r(1) ip(192.168.123.63)
 runtime.totem.pg.mrp.srp.members.3.ip (str) = r(0) ip(192.168.122.62) r(1) ip(192.168.123.62)
 ~~~
-
 
 Now the cluster run, let's start with some basic setup of the cluster. Run
 the following command from **one** node only (the cluster takes care of
@@ -451,8 +451,8 @@ connexion to the hypervisor.
 > adjust it.
 {: .warning}
 
-Now you've been warned, again, let's populating the cluster with some sample
-STONITH resources using virsh over ssh. First, we need to allow ssh
+Now you've been warned again and again, let's populating the cluster with some
+sample STONITH resources using virsh over ssh. First, we need to allow ssh
 password-less authentication to `<user>@192.168.122.1` so these fencing
 resource can work. Again, this is specific to this setup. Depending on your
 fencing topology, you might not need this step. Run on all node:
@@ -461,7 +461,7 @@ fencing topology, you might not need this step. Run on all node:
 ssh-copy-id <user>@192.168.122.1
 ~~~
 
-Check the ssh connection is working as expected.
+Check the ssh connections are working as expected.
 
 We can now create one STONITH resource for each node. Each fencing
 resource will not be allowed to run on the node it is supposed to fence:
@@ -495,10 +495,13 @@ location fence_vm_srv3-avoids-srv3 fence_vm_srv3 -inf: srv3
 EOC
 ~~~
 
+Using `crm_mon` You should see the three resources appearing in your cluster
+and being dispatched on nodes.
+
 
 ## Cluster resources
 
-In this last chapter we create three different resources: `pgsqld`, `pgsql-ha`
+In this last chapter we create three resources: `pgsqld`, `pgsql-ha`
 and `pgsql-master-ip`.
 
 The `pgsqld` defines the properties of a PostgreSQL instance: where it is
