@@ -16,6 +16,7 @@ Topics:
 * [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
 * [Adding a node](#adding-a-node)
 * [Removing a node](#removing-a-node)
+* [Setting up a watchdog](#setting-up-a-watchdog)
 * [Forbidding a PAF resource on a node](#forbidding-a-paf-resource-on-a-node)
 
 
@@ -394,6 +395,150 @@ previous chapter).
 ```
 # crm resource meta pgsql-ha set clone-max 2
 ```
+
+## Setting up a watchdog
+
+First, read [the watchdog chapter]({{ site.baseurl }}/fencing.html#using-a-watchdog-device)
+of the "How to fence your node" documentation page for some theory.
+
+We now explain how to setup a watchdog device as a fencing method in
+Pacemaker. The `i6300esb` watchdog "hardware" has been added to the virtual
+machines in our demo cluster. This hardware is correctly discovered on boot by
+the kernel:
+
+~~~
+# journalctl -b|grep i6300esb 
+août 09 10:36:50 srv2 kernel: i6300esb: Intel 6300ESB WatchDog Timer Driver v0.05
+août 09 10:36:50 srv2 kernel: i6300esb: initialized (0xffffc900000fa000). heartbeat=30 sec (nowayout=0)
+~~~
+
+> **NOTE**: in your test environment, you could use a software watchdog from the
+> Linux kernel called `softdog`. This is fine as far as this is just for demo
+> purpose or very last possible solution. You should definitely rely on a
+> hardware watchdog which is not tied to the operating system.
+{: .notice}
+
+Install and enable `sbd`. This small deamon is the glue between the watchdog
+device and the inter-communication with Pacemaker:
+
+~~~
+# apt-get install sbd
+# systemctl enable sbd.service
+~~~
+
+Edit `/etc/default/sbd` and make sure you have:
+
+* the parameter `SBD_PACEMAKER=true` uncommented
+* the parameter `SBD_WATCHDOG_DEV` pointing to the correct device
+
+A watchdog device can only be handled by one process. Under Debian, Corosync
+has been compiled with watchdog support and steal the watchdog device before
+sbd can catch it, leading to a failure during sbd start:
+
+~~~
+# journalctl -u corosync|grep WD
+août 09 10:38:29 srv1 corosync[778]: [WD    ] The Watchdog timeout is 6 seconds
+août 09 10:38:29 srv1 corosync[778]: [WD    ] The tickle timeout is 3000 ms
+août 09 10:38:29 srv1 corosync[778]: [WD    ] Watchdog /dev/watchdog is now been tickled by corosync.
+août 09 10:38:29 srv1 corosync[778]: [WD    ] i6300ESB timer
+août 09 10:38:29 srv1 corosync[778]: [WD    ] The Watchdog timeout is 6 seconds
+août 09 10:38:29 srv1 corosync[778]: [WD    ] The tickle timeout is 3000 ms
+août 09 10:38:29 srv1 corosync[778]: [WD    ] resource load_15min missing a recovery key.
+août 09 10:38:29 srv1 corosync[778]: [WD    ] resource memory_used missing a recovery key.
+août 09 10:38:29 srv1 corosync[778]: [WD    ] no resources configured.
+
+# grep -E 'sbd.*error' /var/log/syslog 
+Aug  9 10:38:29 srv1 sbd[25998]:    error: watchdog_init: Cannot open watchdog device '/dev/watchdog': Device or resource busy (16)
+~~~
+
+We need to deactivate watchdog from Corosync:
+
+~~~
+# crm corosync edit
+~~~
+
+Add the following block at the end of your configuration:
+
+~~~
+resources {
+    watchdog_device: off
+}
+~~~
+
+Synchronize the corosync configuration on all nodes:
+
+~~~
+# crm corosync push
+~~~
+
+We can now restart the cluster to set everything up. The watchdog capability
+is detected by the cluster manager on each node during the cluster startup. Run
+on one of the nodes:
+
+~~~
+# crm resource stop pgsql-ha
+# crm cluster run "crm cluster stop"
+~~~
+
+Start the cluster:
+
+~~~
+# crm cluster start
+# ssh srv2 crm cluster start
+# ssh srv3 crm cluster start
+~~~
+
+After some seconds, the following equivalent commands should return true:
+
+~~~
+# crm configure show | grep have-watchdog
+ have-watchdog: true \
+
+# crm_attribute -qn have-watchdog
+true
+~~~
+
+Adjust the `stonith-watchdog-timeout` cluster property:
+
+~~~~
+# crm configure property stonith-watchdog-timeout=10s
+~~~~
+
+A good value for `stonith-watchdog-timeout` is the double
+of `SBD_WATCHDOG_TIMEOUT` (set in `/etc/default/sbd`) or sbd parameter `-1`
+(set in parameter `SBD_OPTS` in `/etc/default/sbd`) which is set by default to
+5 seconds .
+
+Now, if you kill the sbd process, the node should reset itself in less
+than `SBD_WATCHDOG_TIMEOUT` seconds:
+
+~~~
+# killall -9 sbd
+~~~
+
+Using the following command should ask the remote node to fence itself using
+its watchdog (if no other fencing device exist):
+
+~~~
+# stonith_admin -F srv1
+~~~
+
+If you stop Pacemaker but not Corosync or simulate a resource failing to
+stop or a resource fatal error, the node should fence itself immediately.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Forbidding a PAF resource on a node
 
