@@ -7,6 +7,8 @@ title: PostgreSQL Automatic Failover - Quick start CentOS 7
 
 This quick start tutorial is based on CentOS 7.2, using the `pcs` command.
 
+* [Cluster resources]()
+
 
 ## Network setup
 
