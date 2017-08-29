@@ -15,6 +15,7 @@ debian/control
 debian/copyright
 debian/docs
 debian/rules
+debian/watch
 debian/source/format
 t/pgsqlms
 t/README
