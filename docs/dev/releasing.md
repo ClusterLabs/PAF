@@ -20,13 +20,15 @@ For beta or rc release, set `release_status => 'testing'`, otherwise set it to
 
 In `resource-agents-paf.spec`:
   * update the tag in the `_tag` variable (first line)
-  * update the version in `Version:`
+  * update the version in `Version:`. for beta or rc release, use X.Y~betaZ or X.Y~rcZ
   * edit the changelog
     * date format: `LC_TIME=C date +"%a %b %d %Y"`
   * take care of the `Release` field if there is multiple version of the package
     for the same version of PAF
 
 In `debian/`, edit the `changelog` file
+
+Edit the `CHANGELOG.md` file.
 
 ## Commit the changes
 
