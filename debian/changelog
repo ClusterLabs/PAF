@@ -1,3 +1,10 @@
+resource-agents-paf (2.2~rc1-1) unstable; urgency=low
+
+  * 2.2_rc1 release candidate
+  * no change since beta1
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Tue, 29 Aug 2017 23:15:00 +0200
+
 resource-agents-paf (2.2~beta1-3) unstable; urgency=medium
 
   * d/control:

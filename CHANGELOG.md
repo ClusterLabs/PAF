@@ -1,4 +1,4 @@
-# PAF v2.2 beta1
+# PAF v2.2 rc1
 
 Release date: WIP
 
