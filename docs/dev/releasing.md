@@ -116,4 +116,13 @@ Don't forget to upload the package on github release page.
 
 ## Documentation
 
-Update the "quick start" documentation pages with the links to the new packges  
+Update the "quick start" documentation pages with the links to the new packages  
+
+
+## Community
+
+* if this is a first beta or a release:
+  - submit a news on postgrsql.org website
+  - submit a mail on pgsql-announce mailing list
+* submit a mail to the users@clusterlabs.org mailing list
+* twitt, blog, ...
