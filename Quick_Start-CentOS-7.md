@@ -83,7 +83,7 @@ yum install -y pacemaker postgresql96 postgresql96-contrib postgresql96-server r
 Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ~~~
-yum install -y https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-agents-paf-2.1.0-1.noarch.rpm
+yum install -y https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
 ~~~
 
 

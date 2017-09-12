@@ -140,7 +140,7 @@ maintenance mode and update PAF, eg.:
 
 ```
 # pcs property set maintenance-mode=true
-# yum install -y https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-agents-paf-2.1.0-1.noarch.rpm
+# yum install -y https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
 # pcs property set maintenance-mode=false
 ```
 
@@ -218,7 +218,7 @@ You can check the recurring action are disabled (`enabled=false` bellow):
 Now, update PAF, eg.:
 
 ```
-# yum install -y https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-agents-paf-2.1.0-1.noarch.rpm
+# yum install -y https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
 ```
 
 We can now enable the recurrent actions:

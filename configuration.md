@@ -148,12 +148,13 @@ Here are the parameter for such resources:
 
   * `master-max`: number of PostgreSQL resources that can be set as primary at
     a given time. The only meaningful value here is `1`, do not set it to
-    anything else.
+    anything else. If not given, the default value is `1`.
   * `clone-max`: maximum number of nodes allowed to run a PostgreSQL resource,
-    primary or standby.
+    primary or standby. If not given, the default value is the number of node in
+    the cluster.
   * `clone-node-max`: maximum number of PostgreSQL resources that can run _on a
     single node_. The only meaningful value here is `1`, do not set it to
-    anything else.
+    anything else. If not given, the default value is `1`.
 
 
 ## Other considerations
@@ -171,11 +172,18 @@ you should refer to the
 
 ## Full examples
 
-See the [CentOS 6]({{ site.baseurl }}/Quick_Start-CentOS-6.html),
-[CentOS 7]({{ site.baseurl }}/Quick_Start-CentOS-7.html) and 
-[Debian 8]({{ site.baseurl }}/Quick_Start-Debian-8.html) Quick starts for full
-examples of cluster and resource creation and configuration.
+See the Quick starts for full examples of cluster, resource creation and
+configuration:
 
+* [CentOS 6]({{ site.baseurl }}/Quick_Start-CentOS-6.html),
+* [CentOS 7]({{ site.baseurl }}/Quick_Start-CentOS-7.html) and 
+* [Debian 8]({{ site.baseurl }}/Quick_Start-Debian-8.html) .
+* [Debian 9]({{ site.baseurl }}/Quick_Start-Debian-9-crm.html)
 
+## Cookbooks
 
+Somes cookbooks are aailable to help you manage your cluster. See:
+
+* [Cookbook for CentOS 7]({{ site.baseurl }}/CentOS-7-admin-cookbook.html) (using `pcs`)
+* [Cookbook for Debian 8]({{ site.baseurl }}/Debian-8-admin-cookbook.html) (using `crm`)
 

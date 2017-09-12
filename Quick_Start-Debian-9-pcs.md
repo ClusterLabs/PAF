@@ -1,9 +1,9 @@
 ---
 layout: default
-title: PostgreSQL Automatic Failover - Quick start Debian 9 using crm
+title: PostgreSQL Automatic Failover - Quick start Debian 9 using pcs
 ---
 
-# Quick Start Debian 9 using crm
+# Quick Start Debian 9 using pcs
 
 This quick start tutorial is based on Debian 9.1, using Pacemaker 1.1.16 and
 the `crm` command version 2.3.2.

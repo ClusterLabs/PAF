@@ -78,8 +78,8 @@ apt-get install postgresql-9.6 postgresql-contrib-9.6 postgresql-client-9.6
 We can now install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
-wget 'https://github.com/dalibo/PAF/releases/download/v2.1.0/resource-agents-paf_2.1.0-1_all.deb'
-dpkg -i resource-agents-paf_2.1.0-1_all.deb
+wget 'https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-1_all.deb'
+dpkg -i resource-agents-paf_2.2.0-1_all.deb
 apt-get -f install
 ```
 
