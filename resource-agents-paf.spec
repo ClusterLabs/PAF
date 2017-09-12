@@ -1,7 +1,7 @@
-%global _tag 2.2_rc1
+%global _tag 2.2.0
 %global _ocfroot /usr/lib/ocf
 Name: resource-agents-paf
-Version: 2.2~rc1
+Version: 2.2.0
 Release: 1
 Summary: PostgreSQL resource agent for Pacemaker
 License: PostgreSQL
@@ -42,6 +42,9 @@ find "%{buildroot}" -type f -name .packlist -delete
 %{_datadir}/resource-agents/ocft/configs/pgsqlms
 
 %changelog
+* Tue Sep 12 2017 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.2.0-1
+- 2.2.0 major release
+
 * Tue Aug 29 2017 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.2rc1-1
 - 2.2_rc1 release candidate
 
