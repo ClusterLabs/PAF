@@ -1,3 +1,9 @@
+resource-agents-paf (2.2.0-2) unstable; urgency=low
+
+  * add CHANGELOG.md to the package
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Tue, 12 Sep 2017 22:40:00 +0200
+
 resource-agents-paf (2.2.0-1) unstable; urgency=low
 
   * 2.2.0 major release
