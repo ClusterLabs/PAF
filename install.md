@@ -21,34 +21,34 @@ This manual explains the steps to install it correctly on your system.
 
 A RPM file is available for each release. You should be able to find them on the
 release page of the project hosted on github:
-[https://github.com/dalibo/PAF/releases](https://github.com/dalibo/PAF/releases)
+[https://github.com/ClusterLabs/PAF/releases](https://github.com/ClusterLabs/PAF/releases)
 
 To install the lastest version of PostgreSQL Automatic Failover, go to the
 following link:
-[https://github.com/dalibo/PAF/releases/latest](https://github.com/dalibo/PAF/releases/latest)
+[https://github.com/ClusterLabs/PAF/releases/latest](https://github.com/ClusterLabs/PAF/releases/latest)
 
 Copy the link to the associated RPM file, and feed it to `yum install`. For
 instance (replace `X.Y.Z` and `n` by their latest values):
 
 ```
-yum install https://github.com/dalibo/PAF/releases/download/vX.Y.Z/resource-agents-paf-X.Y.Z-n.noarch.rpm
+yum install https://github.com/ClusterLabs/PAF/releases/download/vX.Y.Z/resource-agents-paf-X.Y.Z-n.noarch.rpm
 ```
 
 ## Using Debian packages
 
 A Debian package is available for each release. You should be able to find them
 on the release page of the project hosted on github:
-[https://github.com/dalibo/PAF/releases](https://github.com/dalibo/PAF/releases)
+[https://github.com/ClusterLabs/PAF/releases](https://github.com/ClusterLabs/PAF/releases)
 
 To install the lastest version of PostgreSQL Automatic Failover, go to the
 following link:
-[https://github.com/dalibo/PAF/releases/latest](https://github.com/dalibo/PAF/releases/latest)
+[https://github.com/ClusterLabs/PAF/releases/latest](https://github.com/ClusterLabs/PAF/releases/latest)
 
 Copy the link to the associated DEB file, download it, then install it
 using `dpkg`. As instance (replace `X.Y.Z` and `n` by their latest values):
 
 ```
-wget 'https://github.com/dalibo/PAF/releases/download/vX.Y.Z/resource-agents-paf_X.Y.Z-n_all.deb'
+wget 'https://github.com/ClusterLabs/PAF/releases/download/vX.Y.Z/resource-agents-paf_X.Y.Z-n_all.deb'
 dpkg -i resource-agents-paf_X.Y.Z-n_all.deb
 ```
 
@@ -70,7 +70,7 @@ resource agents. Under Debian, RHEL and their derivatives, you need the
 ### Building
 
 The latest version of PostgreSQL Automatic Failover can be downloaded from
-[https://github.com/dalibo/PAF/releases/latest](https://github.com/dalibo/PAF/releases/latest).
+[https://github.com/ClusterLabs/PAF/releases/latest](https://github.com/ClusterLabs/PAF/releases/latest).
 
 Unpack the source and go to the `PAF-X.Y.Z` folder. To build and install the
 resource agent, run:

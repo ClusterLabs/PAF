@@ -78,7 +78,7 @@ apt-get install postgresql-9.6 postgresql-contrib-9.6 postgresql-client-9.6
 We can now install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
-wget 'https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-1_all.deb'
+wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-2_all.deb'
 dpkg -i resource-agents-paf_2.2.0-1_all.deb
 apt-get -f install
 ```
@@ -404,7 +404,7 @@ This quick start uses the `fence_virsh` fencing agent, allowing to power on or
 off a virtual machine using the `virsh` command through a ssh connexion to the
 hypervisor. For more information about fencing, see documentation
 `docs/FENCING.md` in the source code or online:
-[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+[http://clusterlabs.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 
 > **WARNING**: unless you build your PoC cluster using libvirt for VM
 > management, there's great chances you will need to use a different STONITH

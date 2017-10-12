@@ -97,8 +97,8 @@ Next, we need to install the "PostgreSQL Automatic Failover" (PAF) resource
 agent:
 
 ~~~
-wget 'https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-1_all.deb'
-dpkg -i resource-agents-paf_2.2.0-1_all.deb
+wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-2_all.deb'
+dpkg -i resource-agents-paf_2.2.0-2_all.deb
 apt -f install
 ~~~
 
@@ -424,7 +424,7 @@ One of the most important resource in your cluster is the one able to fence a
 node. Please, stop reading this quick start and read our fencing
 documentation page before building your cluster. Take a deep breath, and open
 `docs/FENCING.md` in the source code of PAF or read online:
-[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+[http://clusterlabs.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 
 > **WARNING**: I really mean it. You need fencing. PAF is expecting fencing to
 > work in your cluster. Without fencing, you will experience cluster refusing
@@ -464,7 +464,10 @@ ssh-copy-id <user>@192.168.122.1
 Check the ssh connections are working as expected.
 
 We can now create one STONITH resource for each node. Each fencing
-resource will not be allowed to run on the node it is supposed to fence:
+resource will not be allowed to run on the node it is supposed to fence.
+Note that in the `port` argument of the following commands, `srv[1-3]-d9` are 
+the names of the virutal machines as known by libvirtd side. See manpage 
+fence_virsh(8) for more infos.
 
 ~~~
 crm conf<<EOC

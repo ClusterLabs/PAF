@@ -76,7 +76,7 @@ yum install -y corosync pacemaker postgresql93 postgresql93-contrib postgresql93
 Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ```
-yum install -y https://github.com/dalibo/PAF/releases/download/v1.1.0/resource-agents-paf-1.1.0-1.noarch.rpm
+yum install -y https://github.com/ClusterLabs/PAF/releases/download/v1.1.0/resource-agents-paf-1.1.0-1.noarch.rpm
 ```
 
 ## PostgreSQL setup
@@ -296,7 +296,7 @@ This quick start uses the `fence_virsh` fencing agent, allowing to power on or
 off a virtual machine using the `virsh` command through a ssh connexion to the
 hypervisor. For more information about fencing, see documentation
 `docs/FENCING.md` in the source code or online:
-[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+[http://clusterlabs.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 
 > **WARNING**: unless you build your PoC cluster using libvirt for VM
 > management, there's great chances you will need to use a different STONITH

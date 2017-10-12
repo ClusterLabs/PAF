@@ -83,7 +83,7 @@ yum install -y pacemaker postgresql96 postgresql96-contrib postgresql96-server r
 Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
 ~~~
-yum install -y https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
+yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
 ~~~
 
 
@@ -305,7 +305,7 @@ One of the most important resource in your cluster is the one able to fence a
 node. Please, stop reading this quick start and read our fencing
 documentation page before building your cluster. Take a deep breath, and open
 `docs/FENCING.md` in the source code of PAF or read online:
-[http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+[http://clusterlabs.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 
 > **WARNING**: I really mean it. You need fencing. PAF is expecting fencing to
 > work in your cluster. Without fencing, you will experience cluster refusing

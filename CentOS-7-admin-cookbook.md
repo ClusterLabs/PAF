@@ -140,7 +140,7 @@ maintenance mode and update PAF, eg.:
 
 ```
 # pcs property set maintenance-mode=true
-# yum install -y https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
+# yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
 # pcs property set maintenance-mode=false
 ```
 
@@ -218,7 +218,7 @@ You can check the recurring action are disabled (`enabled=false` bellow):
 Now, update PAF, eg.:
 
 ```
-# yum install -y https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
+# yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
 ```
 
 We can now enable the recurrent actions:
@@ -328,7 +328,7 @@ it doesn't hurt anyway):
 # pcs cluster reload corosync
 ```
 
-Fencing is mandatory. See: [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+Fencing is mandatory. See: [http://clusterlabs.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 Either edit the existing fencing resources to handle the new node if applicable,
 or add a new one being able to do it. In the example, we are using
 the `fence_virsh` fencing agent to create a dedicated fencing resource able to

@@ -7,7 +7,7 @@ title: PostgreSQL Automatic Failover - Support
 
 ## Problem Reports
 
-Please use the issue system in the github project page: [https://github.com/dalibo/PAF/issues](https://github.com/dalibo/PAF/issues)
+Please use the issue system in the github project page: [https://github.com/ClusterLabs/PAF/issues](https://github.com/ClusterLabs/PAF/issues)
 
 ## Mailing-lists
 
@@ -19,7 +19,8 @@ The archives are are available on [https://www.postgresql.org/list/pgsql-general
 
 ## Commercial support
 
-Dalibo, as the sponsor of the project, can provide enterprise grade support services for PostgreSQL and PAF. See [http://www.dalibo.com](http://www.dalibo.com).
+Companies close to you can be found:
 
-Other companies close to you can be found on the [PostgreSQL Professional Services](http://www.postgresql.org/support/professional_support) page on the website of PostgreSQL.
+* on the [PostgreSQL Professional Services](http://www.postgresql.org/support/professional_support) page on the website of PostgreSQL.
+* in the [Professional Support](http://clusterlabs.org/help.html) chapter on the website of Pacemaker.
 

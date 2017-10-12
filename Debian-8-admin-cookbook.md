@@ -109,8 +109,8 @@ maintenance mode and update PAF, eg.:
 
 ```
 # crm configure property maintenance-mode=true
-# wget 'https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-1_all.deb'
-# dpkg -i resource-agents-paf_2.2.0-1_all.deb
+# wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-2_all.deb'
+# dpkg -i resource-agents-paf_2.2.0-2_all.deb
 # crm configure property maintenance-mode=false
 ```
 
@@ -171,8 +171,8 @@ Edit these operations in your favorite editor using:
 Now, update PAF, eg.:
 
 ```
-# wget 'https://github.com/dalibo/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-1_all.deb'
-# dpkg -i resource-agents-paf_2.2.0-1_all.deb
+# wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-2_all.deb'
+# dpkg -i resource-agents-paf_2.2.0-2_all.deb
 ```
 
 We can now enable the recurrent actions:
@@ -286,7 +286,7 @@ it doesn't hurt anyway):
 # corosync-cfgtool -R
 ```
 
-Fencing is mandatory. See: [http://dalibo.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+Fencing is mandatory. See: [http://clusterlabs.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
 Either edit the existing fencing resources to handle the new node if applicable,
 or add a new one being able to do it. In the example, we are using
 the `fence_virsh` fencing agent to create a dedicated fencing resource able to
