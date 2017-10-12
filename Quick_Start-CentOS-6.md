@@ -316,7 +316,10 @@ ssh-copy-id <user>@192.168.122.1
 ```
 
 We can now create one STONITH resource for each node and each fencing
-resource will not be allowed to run on the node it is supposed to fence:
+resource will not be allowed to run on the node it is supposed to fence.
+Note that in the `port` argument of the following commands, `srv[1-3]-c6` are 
+the names of the virutal machines as known by libvirtd side. See manpage 
+fence_virsh(8) for more infos.
 
 ```
 pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="<user>" port="srv1-c6" action="off" identity_file="/root/.ssh/id_rsa"

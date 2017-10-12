@@ -340,7 +340,10 @@ ssh-copy-id <user>@192.168.122.1
 Check the ssh connections are working as expected.
 
 We can now create one STONITH resource for each node. Each fencing
-resource will not be allowed to run on the node it is supposed to fence:
+resource will not be allowed to run on the node it is supposed to fence.
+Note that in the `port` argument of the following commands, `srv[1-3]-c7` are 
+the names of the virutal machines as known by libvirtd side. See manpage 
+fence_virsh(8) for more infos.
 
 ~~~
 pcs cluster cib cluster1.xml

@@ -424,7 +424,10 @@ ssh-copy-id <user>@192.168.122.1
 ~~~
 
 We can now create one STONITH resource for each node and each fencing
-resource will not be allowed to run on the node it is supposed to fence:
+resource will not be allowed to run on the node it is supposed to fence.
+Note that in the `port` argument of the following commands, `srv[1-3]-d8` are 
+the names of the virutal machines as known by libvirtd side. See manpage 
+fence_virsh(8) for more infos.
 
 ```
 crm conf<<EOC
