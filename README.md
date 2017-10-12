@@ -80,5 +80,5 @@ can set:
      (default: 0, which disables this feature)
 
 For a demonstration about how to setup a cluster, see
-[http://dalibo.github.com/PAF/documentation.html](http://dalibo.github.com/PAF/documentation.html).
+[http://clusterlabs.github.io/PAF/documentation.html](http://clusterlabs.github.io/PAF/documentation.html).
 

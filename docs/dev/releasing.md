@@ -51,7 +51,7 @@ For beta or rc release use `vX.Y_betaN` or `vX.Y_rcN`, eg. `v2.2_beta1`.
 
 ## Release on github
 
-  - go to https://github.com/dalibo/PAF/tags
+  - go to https://github.com/ClusterLabs/PAF/tags
   - edit the release notes for the new tag
   - set "PAF $VERSION" as title, eg. "PAF 1.0.0"
   - here is the format of the release node itself:
@@ -62,7 +62,7 @@ For beta or rc release use `vX.Y_betaN` or `vX.Y_rcN`, eg. `v2.2_beta1`.
       * item 2
       * ...
       
-      See http://dalibo.github.io/PAF/documentation.html
+      See http://clusterlabs.github.io/PAF/documentation.html
   - upload the tar file
   - save
 
@@ -81,7 +81,7 @@ useradd makerpm
 ```
 su - makerpm
 rpmdev-setuptree
-git clone https://github.com/dalibo/PAF.git
+git clone https://github.com/ClusterLabs/PAF.git
 spectool -R -g PAF/resource-agents-paf.spec
 rpmbuild -ba PAF/resource-agents-paf.spec
 ```
@@ -103,7 +103,7 @@ Package to install on your debian host to build the builder environment
 
 ```
 VER=1.0.0
-wget "https://github.com/dalibo/PAF/archive/v${VER/\~/_}.tar.gz" -O resource-agents-paf_${VER}.orig.tar.gz
+wget "https://github.com/ClusterLabs/PAF/archive/v${VER/\~/_}.tar.gz" -O resource-agents-paf_${VER}.orig.tar.gz
 mkdir resource-agents-paf-$VER
 tar zxf resource-agents-paf_${VER}.orig.tar.gz -C "resource-agents-paf-$VER" --strip-components=1
 cd resource-agents-paf-${VER}

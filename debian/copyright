@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: paf
-Source: https://github.com/dalibo/PAF/
+Source: https://github.com/ClusterLabs/PAF/
 
 Files: *
 Copyright: 2016-2017 Jehan-Guillaume de Rorthais <jgdr@dalibo.com>

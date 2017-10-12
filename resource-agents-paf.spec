@@ -6,9 +6,9 @@ Release: 1
 Summary: PostgreSQL resource agent for Pacemaker
 License: PostgreSQL
 Group: Applications/Databases
-Url: http://dalibo.github.io/PAF/
+Url: http://clusterlabs.github.io/PAF/
 
-Source0: https://github.com/dalibo/PAF/archive/v%{_tag}.tar.gz
+Source0: https://github.com/ClusterLabs/PAF/archive/v%{_tag}.tar.gz
 BuildArch: noarch
 BuildRequires: resource-agents perl perl-Module-Build
 Requires: perl, resource-agents, pacemaker >= 1.1.13, corosync >= 2.0.0

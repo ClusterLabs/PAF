@@ -57,9 +57,9 @@ my $build = Module::Build->new(
     ],
     meta_merge         => {
         resources => {
-            'homepage'   => 'http://dalibo.github.io/PAF/',
-            'repository' => 'https://github.com/dalibo/PAF',
-            'bugtracker' => 'https://github.com/dalibo/PAF/issues'
+            'homepage'   => 'http://clusterlabs.github.io/PAF/',
+            'repository' => 'https://github.com/ClusterLabs/PAF',
+            'bugtracker' => 'https://github.com/ClusterLabs/PAF/issues'
         }
   },
 );
