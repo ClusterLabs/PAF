@@ -286,8 +286,8 @@ the following command from **one** node only (the cluster takes care of
 broadcasting the configuration on all nodes):
 
 ~~~
-pcs -f cluster1.xml resource defaults migration-threshold=5
-pcs -f cluster1.xml resource defaults resource-stickiness=10
+pcs resource defaults migration-threshold=5
+pcs resource defaults resource-stickiness=10
 ~~~
 
 This sets two default values for resources we create in the next chapter:
@@ -333,6 +333,7 @@ resource can work. Again, this is specific to this setup. Depending on your
 fencing topology, you might not need this step. Run on all node:
 
 ~~~
+ssh-keygen
 ssh-copy-id <user>@192.168.122.1
 ~~~
 
