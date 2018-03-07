@@ -19,6 +19,7 @@ Topics:
 * [Removing a node](#removing-a-node)
 * [Setting up a watchdog](#setting-up-a-watchdog)
 * [Forbidding a PAF resource on a node](#forbidding-a-paf-resource-on-a-node)
+* [Adding IPs on slaves nodes](#adding-ips-on-slaves-nodes)
 
 
 ## Starting or stopping the cluster
@@ -338,7 +339,7 @@ only fence `srv3`:
 # pcs stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" \
     pcmk_host_list="srv3" ipaddr="192.168.122.1"                             \
     login="<username>" port="srv3-c7" identity_file="/root/.ssh/id_rsa"      \
-    action="off" 
+    action="off"
 # pcs constraint location fence_vm_srv3 avoids srv3=INFINITY
 ```
 
@@ -506,3 +507,61 @@ resource `pgsql-ha`. The `resource-discovery=never` is mandatory here as it
 forbid the "probe" action the CRM is usually running to discovers the state of
 a resource on a node. On a node where your PostgreSQL cluster is not running,
 this "probe" action will fail, leading to bad cluster reactions.
+
+
+## Adding IPs on slaves nodes
+
+In this chapter, we are using a three node cluster with one PostgreSQL master
+instance and two standbys instances.
+
+As usual, we start from the cluster created in the quick start documentation:
+* one master resource called `pgsql-ha`
+* an IP address called `pgsql-master-ip` linked to the `pgsql-ha` master role
+
+See the [Quick Start CentOS 7]({{ site.baseurl}}/Quick_Start-CentOS-7.html#cluster-resources)
+for more informations.
+
+We want to create two IP addresses with the following properties:
+* start on a standby node
+* avoid to start on the same standby node than the other one
+* move to the available standby node should a failure occurs to the other one
+* move to the master if there is no standby alive
+
+To make this possible, we have to play with the resources co-location scores.
+
+First, let's add two `IPaddr2` resources called `pgsql-ip-stby1` and
+`pgsql-ip-stby2` holding IP addresses `192.168.122.49` and `192.168.122.48`:
+
+~~~
+# pcs resource create pgsql-ip-stby1 ocf:heartbeat:IPaddr2  \
+  cidr_netmask=24 ip=192.168.122.49 op monitor interval=10s \
+
+# pcs resource create pgsql-ip-stby2 ocf:heartbeat:IPaddr2  \
+  cidr_netmask=24 ip=192.168.122.48 op monitor interval=10s \
+~~~
+
+We want both IP addresses to avoid co-locating with each other. We add
+a co-location constraint so `pgsql-ip-stby2` avoids `pgsql-ip-stby1` with a
+score of `-5`:
+
+~~~
+# pcs constraint colocation add pgsql-ip-stby2 with pgsql-ip-stby1 -5
+~~~
+
+> **NOTE**: that means the cluster manager have to start `pgsql-ip-stby1` first
+> to decide where `pgsql-ip-stby2` should start according to the new scores in
+> the cluster. Also, that means that whenever you move `pgsql-ip-stby1` to
+> another node, the cluster might have to stop `pgsql-ip-stby2` first and
+> restart it elsewhere depending on new scores.
+{: .notice}
+
+Now, we add similar co-location constraints to define that each IP address
+prefers to run on a node with a slave of `pgsql-ha`:
+
+~~~
+# pcs constraint colocation add pgsql-ip-stby1 with slave pgsql-ha 10
+# pcs constraint order start pgsql-ha then start pgsql-ip-stby1 kind=Mandatory
+
+# pcs constraint colocation add pgsql-ip-stby2 with slave pgsql-ha 10
+# pcs constraint order start pgsql-ha then start pgsql-ip-stby2 kind=Mandatory
+~~~
