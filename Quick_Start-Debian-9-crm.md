@@ -22,8 +22,9 @@ Table of contents:
 
 ## Repository setup
 
-To install PostgreSQL, this tutorial uses the PGDG repository maintained by the
-PostgreSQL community (and actually Debian maintainers). Here is how to add it:
+To install PostgreSQL and PAF, this tutorial uses the PGDG repository
+maintained by the PostgreSQL community (and actually Debian maintainers). Here
+is how to add it:
 
 ~~~
 cat <<EOF >> /etc/apt/sources.list.d/pgdg.list
@@ -79,28 +80,20 @@ root@srv1:~# for s in srv1 srv2 srv3; do ping -W1 -c1 $s; done| grep icmp_seq
 
 Run this whole chapter on ALL nodes.
 
-Let's install everything we need: PostgreSQL, Pacemaker and cluster related
-packages:
+Let's install everything we need: PostgreSQL, Pacemaker, cluster related
+packages and PAF
 
 ~~~
 apt install --no-install-recommends pacemaker fence-agents crmsh net-tools
 apt install postgresql-9.6 postgresql-contrib-9.6 postgresql-client-9.6
+apt install resource-agents-paf
 ~~~
 
 We add the `--no-install-recommends` because the apt tools are setup by default
 to install all recommended packages in addition to the usual dependences. This
-might be fine in most case, but we want to keep this quick start small, easy
+is recommanded in most case, but we want to keep this quick start small, easy
 and clear. Installing recommended packages requires some more attention on
 other subjects not related to this document (eg. setting up some IPMI daemon).
-
-Next, we need to install the "PostgreSQL Automatic Failover" (PAF) resource
-agent:
-
-~~~
-wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-2_all.deb'
-dpkg -i resource-agents-paf_2.2.0-2_all.deb
-apt -f install
-~~~
 
 By default, Debian set up the instances to put the temporary activity
 statistics inside a sub folder of `/var/run/postgresql/`. This sub folder is
