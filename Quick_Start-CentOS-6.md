@@ -6,6 +6,15 @@ title: PostgreSQL Automatic Failover - Quick start CentOS 7
 
 This quick start tutorial is based on CentOS 6.7, using the `pcs` command.
 
+Table of contents:
+
+* [Network setup](#network-setup)
+* [PostgreSQL and Cluster stack installation](#postgresql-and-cluster-stack-installation)
+* [PostgreSQL setup](#postgresql-setup)
+* [Cluster setup](#cluster-setup)
+* [Cluster resource creation and management](#cluster-resource-creation-and-management)
+* [Adding a node to the cluster](#adding-a-node-to-the-cluster)
+* [Conclusion](#conclusion)
 
 ## Network setup
 
@@ -452,3 +461,13 @@ And you can now exit your maintenance mode:
 ```
 pcs property set maintenance-mode=false
 ```
+
+## Conclusion
+
+Now you know the basics to build a Pacemaker cluster hosting some PostgreSQL
+instance replicating with each others, you should probably check:
+
+* [how to set up properly the PostgreSQL replication](https://www.postgresql.org/docs/current/static/high-availability.html)
+* this quick start show you how to implement network redundancy in Corosync,
+  but it best fits in the operating system layer. Documentation about how to
+  setup network bonding or teaming are popular on internet.

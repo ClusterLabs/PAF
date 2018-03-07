@@ -18,7 +18,7 @@ Table of contents:
 * [Cluster creation](#cluster-creation)
 * [Node fencing](#node-fencing)
 * [Cluster resources](#cluster-resources)
-
+* [Conclusion](#conclusion)
 
 ## Repository setup
 
@@ -572,3 +572,15 @@ Note that the values for `timeout` and `interval` on each operation are based
 on the minimum suggested value for PAF Resource Agent. These values should be
 adapted depending on the context.
 
+
+## Conclusion
+
+Now you know the basics to build a Pacemaker cluster hosting some PostgreSQL
+instance replicating with each others, you should probably check:
+
+* [how to set up properly the PostgreSQL replication](https://www.postgresql.org/docs/current/static/high-availability.html)
+* this quick start show you how to implement network redundancy in Corosync,
+  but it best fits in the operating system layer. Documentation about how to
+  setup network bonding or teaming are popular on internet.
+* have a look at our basic
+  [administration cookbooks for Debian using crm]({{ site.baseurl}}/Debian-8-admin-cookbook.html).

@@ -38,6 +38,9 @@ apt-get update
 apt-get install pgdg-keyring
 ```
 
-You can follow up with next steps from chapter "Network setup" in the
+Depending on the tool you want to use, you can follow up with next steps from
+chapter "Network setup" in the
 ["Quick Start Debian 9 using crm"]({{ site.baseurl}}/Quick_Start-Debian-9-crm.html#network-setup)
-documentation page.
+documentation page or the
+["Quick Start Debian 9 using pcs"]({{ site.baseurl}}/Quick_Start-Debian-9-pcs.html#network-setup)
+one.

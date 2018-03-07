@@ -42,4 +42,5 @@ We currently provide the following quick starts:
   * [quick start with Debian 8]({{ site.baseurl }}/Quick_Start-Debian-8.html)
   * [quick start with Debian 8 in a two node cluster]({{ site.baseurl }}/Quick_Start-Debian-8-two_nodes.html)
   * [quick start with Debian 9 using crm]({{ site.baseurl }}/Quick_Start-Debian-9-crm.html)
+  * [quick start with Debian 9 using pcs]({{ site.baseurl }}/Quick_Start-Debian-9-pcs.html)
 

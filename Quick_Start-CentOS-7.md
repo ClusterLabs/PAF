@@ -14,7 +14,7 @@ This quick start tutorial is based on CentOS 7.2, using the `pcs` command.
 * [Cluster creation](#cluster-creation)
 * [Node fencing](#node-fencing)
 * [Cluster resources](#cluster-resources)
-
+* [Conclusion](#conclusion)
 
 ## Network setup
 
@@ -439,3 +439,15 @@ We can now push our CIB to the cluster, which will start all the magic stuff:
 pcs cluster cib-push cluster1.xml
 ~~~
 
+
+## Conclusion
+
+Now you know the basics to build a Pacemaker cluster hosting some PostgreSQL
+instance replicating with each others, you should probably check:
+
+* [how to set up properly the PostgreSQL replication](https://www.postgresql.org/docs/current/static/high-availability.html)
+* this quick start show you how to implement network redundancy in Corosync,
+  but it best fits in the operating system layer. Documentation about how to
+  setup network bonding or teaming are popular on internet.
+* have a look at our basic
+  [administration cookbooks for CentOS 7 using pcs]({{ site.baseurl}}/CentOS-7-admin-cookbook.html).
