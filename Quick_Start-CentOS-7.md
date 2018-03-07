@@ -77,13 +77,9 @@ and the PostgreSQL version you need.
 We can now install everything we need for our cluster:
 
 ~~~
-yum install -y pacemaker postgresql96 postgresql96-contrib postgresql96-server resource-agents pcs fence-agents-all fence-agents-virsh
-~~~
-
-Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
-
-~~~
-yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
+yum install -y postgresql96 postgresql96-contrib postgresql96-server \
+               pacemaker resource-agents resource-agents-paf pcs     \
+               fence-agents-all fence-agents-virsh
 ~~~
 
 
