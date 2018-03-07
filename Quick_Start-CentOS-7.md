@@ -208,7 +208,7 @@ This guide uses the cluster management tool `pcsd` provided by RHEL to ease the
 creation and setup of a cluster. It allows to create the cluster from command
 line, without editing configuration files or XML by hands.
 
-`pcsd` uses the hacluster system user to work and communicate with other
+`pcsd` uses the `hacluster` system user to work and communicate with other
 members of the cluster. We need to set a password to this user so it can
 authenticate to other nodes easily. As cluster management commands can be run on
 any member of the cluster, it is recommended to set the same password everywhere
@@ -337,8 +337,8 @@ Check the ssh connections are working as expected.
 
 We can now create one STONITH resource for each node. Each fencing
 resource will not be allowed to run on the node it is supposed to fence.
-Note that in the `port` argument of the following commands, `srv[1-3]-c7` are 
-the names of the virutal machines as known by libvirtd side. See manpage 
+Note that in the `port` argument of the following commands, `srv[1-3]-c7` are
+the names of the virutal machines as known by libvirtd side. See manpage
 fence_virsh(8) for more infos.
 
 ~~~
