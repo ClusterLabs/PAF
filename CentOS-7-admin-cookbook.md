@@ -545,7 +545,7 @@ a co-location constraint so `pgsql-ip-stby2` avoids `pgsql-ip-stby1` with a
 score of `-5`:
 
 ~~~
-# pcs constraint colocation add pgsql-ip-stby2 with pgsql-ip-stby1 -5
+# pcs constraint colocation add pgsql-ip-stby2 with pgsql-ip-stby1 -20
 ~~~
 
 > **NOTE**: that means the cluster manager have to start `pgsql-ip-stby1` first
@@ -559,9 +559,12 @@ Now, we add similar co-location constraints to define that each IP address
 prefers to run on a node with a slave of `pgsql-ha`:
 
 ~~~
-# pcs constraint colocation add pgsql-ip-stby1 with slave pgsql-ha 10
+# pcs constraint colocation add pgsql-ip-stby1 with slave pgsql-ha 100
 # pcs constraint order start pgsql-ha then start pgsql-ip-stby1 kind=Mandatory
 
-# pcs constraint colocation add pgsql-ip-stby2 with slave pgsql-ha 10
+# pcs constraint colocation add pgsql-ip-stby2 with slave pgsql-ha 100
 # pcs constraint order start pgsql-ha then start pgsql-ip-stby2 kind=Mandatory
+
+# pcs constraint colocation add pgsql-ip-stby1 with pgsql-ha 50
+# pcs constraint colocation add pgsql-ip-stby2 with pgsql-ha 50
 ~~~
