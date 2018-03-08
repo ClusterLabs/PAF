@@ -542,7 +542,7 @@ First, let's add two `IPaddr2` resources called `pgsql-ip-stby1` and
 
 We want both IP addresses to avoid co-locating with each other. We add
 a co-location constraint so `pgsql-ip-stby2` avoids `pgsql-ip-stby1` with a
-score of `-5`:
+score of `-20` (higher than the stickiness of the cluster):
 
 ~~~
 # pcs constraint colocation add pgsql-ip-stby2 with pgsql-ip-stby1 -20
@@ -557,6 +557,13 @@ score of `-5`:
 
 Now, we add similar co-location constraints to define that each IP address
 prefers to run on a node with a slave of `pgsql-ha`:
+* colocations `with slave pgsql-ha 100` means the IP will prefer to bind with a
+  slave
+* colocations `with pgsql-ha 50` means that the IP will prefer to bind with a
+  Master __OR__ a Standby
+
+We give higher priority to the slaves with the `100` score, but should the
+slaves be stopped, the `50` score push the IP to move to the master.
 
 ~~~
 # pcs constraint colocation add pgsql-ip-stby1 with slave pgsql-ha 100
