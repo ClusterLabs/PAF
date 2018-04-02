@@ -438,6 +438,8 @@ primitive fence_vm_srv2 stonith:fence_virsh                   \
          port="srv2-d8" action="off"                          \
   op monitor interval=10s
 location fence_vm_srv2-avoids-srv2 fence_vm_srv2 -inf: srv2
+
+EOC
 ```
 
 The following setup adds a bunch of resources and constraints all together in
