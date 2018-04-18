@@ -54,6 +54,7 @@ Fencing examples:
 
 - [Node fencing using a PDU](#node-fencing-using-a-pdu)
 - [Node fencing using libvirtd and virsh](#node-fencing-using-libvirtd-and-virsh)
+- [Virtual machine fencing using Proxmox API](#virtual-machine-fencing-using-proxmox-api)
 - [Resource fencing using SNMP](#resource-fencing-using-snmp)
 - [Using a watchdog device](#using-a-watchdog-device)
 
@@ -206,6 +207,79 @@ PING ha2 (10.10.10.51) 56(84) bytes of data.
 rtt min/avg/max/mdev = 1.548/1.548/1.548/0.000 ms
 ```
 
+## Virtual machine fencing using Proxmox API
+
+If you use virtual machine hosted on Proxmox hypervisor, you can use the fencing agent
+`fence_pve`.
+
+This agent uses [Promox API](https://pve.proxmox.com/wiki/Proxmox_VE_API) to control virtual
+machines or containers.
+
+First, you should create a dedicated user with *VM.PowerMgmt*
+permission ([Permission Management](https://pve.proxmox.com/wiki/User_Management#pveum_permission_management)).
+
+In this example, the user (`hauser`) has the role *PVEVMUser*, which allows to :
+
+  * view
+  * backup
+  * config CDROM
+  * VM console
+  * VM power management
+
+Maybe you should create your own role with restricted privileges.
+
+Then you can add your VMs to a pool (for example `fence`) and finaly give permissions on
+the path `/pool/fence/` to the user. Note: On promox, a user is designated by his full path `user@realm` (here `hauser@pve`).
+
+So in this example :
+
+Virtual machines are in the pool `fence` and the user `hauser@pve` has the role *PVEVMUser* for the path
+`/pool/fence/`.
+
+You must ensure all your VMs can reach Proxmox nodes, you can try with:
+
+`fence_pve --vmtype lxc  --ip=192.168.10.1 --username=hauser@pve --password=hauser --plug 111 --action=status`
+
+Where:
+
+  * vmtype: is virtual machine type. lxc or qemu (default).
+  * ip: hypervisor ip address
+  * username: full username
+  * password: user's password
+  * plug: container's id
+  * action: show container's status
+
+If the container is running you should obtain: `Status: ON`.
+
+You can list all containers available with list action:
+
+```
+fence_pve --vmtype lxc  -a 192.168.10.1 -l hauser@pve -p hauser --plug 111   -o list
+109,paf-1
+111,paf-3
+110,paf-2
+```
+
+Other actions are available, such as: on, off, reboot (default).
+
+Once your have checked all your VMs can reach Proxmox host, you must check on, off and reboot actions.
+Then you can add fencing resources to your cluster. For example with pcs :
+
+```
+pcs stonith create fence_vm_paf1 fence_pve pcmk_host_list="paf-1" pcmk_host_check="static-list" \
+  ipaddr="192.168.10.1" node_name="sd-89884" login="hauser@pve" passwd="hauser" port="109" \
+  power_wait="10" vmtype="lxc"
+pcs stonith create fence_vm_paf2 fence_pve pcmk_host_list="paf-2" pcmk_host_check="static-list" \
+  ipaddr="192.168.10.1" node_name="sd-89884" login="hauser@pve" passwd="hauser" port="110" \
+  power_wait="10" vmtype="lxc"
+pcs stonith create fence_vm_paf3 fence_pve pcmk_host_list="paf-3" pcmk_host_check="static-list" \
+  ipaddr="192.168.10.1" node_name="sd-89884" login="hauser@pve" passwd="hauser" port="111" \
+  power_wait="10" vmtype="lxc"
+```
+
+Notice the `node_name` parameter corresponding to proxmox host and `power_wait`. Without this last
+parameter the fencing agent do not wait between off/on for reboot action. So the container do not start
+because proxmox do not had time to shutdown container.
 
 ## Resource fencing using SNMP
 
