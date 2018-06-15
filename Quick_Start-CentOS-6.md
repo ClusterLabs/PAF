@@ -331,9 +331,15 @@ the names of the virutal machines as known by libvirtd side. See manpage
 fence_virsh(8) for more infos.
 
 ```
-pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" login="<user>" port="srv1-c6" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" login="<user>" port="srv2-c6" action="off" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" login="<user>" port="srv3-c6" action="off" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh                 \
+  pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" \
+  login="<user>" port="srv1-c6" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh                 \
+  pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" \
+  login="<user>" port="srv2-c6" identity_file="/root/.ssh/id_rsa"
+pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh                 \
+  pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" \
+  login="<user>" port="srv3-c6" identity_file="/root/.ssh/id_rsa"
 pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv3 avoids srv3=INFINITY

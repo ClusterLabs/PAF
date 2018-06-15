@@ -467,22 +467,19 @@ crm conf<<EOC
 primitive fence_vm_srv1 stonith:fence_virsh                   \
   params pcmk_host_check="static-list" pcmk_host_list="srv1"  \
          ipaddr="192.168.122.1" login="<user>"                \
-         identity_file="/root/.ssh/id_rsa"                    \
-         port="srv1-d9" action="off"                          \
+         identity_file="/root/.ssh/id_rsa" port="srv1-d9"     \
   op monitor interval=10s
 
 primitive fence_vm_srv2 stonith:fence_virsh                   \
   params pcmk_host_check="static-list" pcmk_host_list="srv2"  \
          ipaddr="192.168.122.1" login="<user>"                \
-         identity_file="/root/.ssh/id_rsa"                    \
-         port="srv2-d9" action="off"                          \
+         identity_file="/root/.ssh/id_rsa" port="srv2-d9"     \
   op monitor interval=10s
 
 primitive fence_vm_srv3 stonith:fence_virsh                   \
   params pcmk_host_check="static-list" pcmk_host_list="srv3"  \
          ipaddr="192.168.122.1" login="<user>"                \
-         identity_file="/root/.ssh/id_rsa"                    \
-         port="srv3-d9" action="off"                          \
+         identity_file="/root/.ssh/id_rsa" port="srv3-d9"     \
   op monitor interval=10s
 
 location fence_vm_srv1-avoids-srv1 fence_vm_srv1 -inf: srv1

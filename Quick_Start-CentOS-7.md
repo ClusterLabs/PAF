@@ -346,17 +346,17 @@ pcs cluster cib cluster1.xml
 pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh \
   pcmk_host_check="static-list" pcmk_host_list="srv1"        \
   ipaddr="192.168.122.1" login="<user>" port="srv1-c7"       \
-  action="off" identity_file="/root/.ssh/id_rsa"
+  identity_file="/root/.ssh/id_rsa"
 
 pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh \
   pcmk_host_check="static-list" pcmk_host_list="srv2"        \
   ipaddr="192.168.122.1" login="<user>" port="srv2-c7"       \
-  action="off" identity_file="/root/.ssh/id_rsa"
+  identity_file="/root/.ssh/id_rsa"
 
 pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh \
   pcmk_host_check="static-list" pcmk_host_list="srv3"        \
   ipaddr="192.168.122.1" login="<user>" port="srv3-c7"       \
-  action="off" identity_file="/root/.ssh/id_rsa"
+  identity_file="/root/.ssh/id_rsa"
 
 pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
