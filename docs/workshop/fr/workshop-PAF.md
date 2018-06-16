@@ -43,11 +43,12 @@ parfaite pour une erreur humaine et une indisponibilité prolongée.
 
 De même, chaque élément doit être redondé. La loi de Murphy énonce que « tout ce
 qui peut mal tourner, tournera mal ». Cette loi se vérifie très fréquemment. Les
-incidents se manifestent rarement là où on les attend le plus. Il faut
+incidents se manifestent rarement là où on ne les attend le plus. Il faut
 réellement tout redonder:
 
 * chaque application ou service doit avoir une procédure de bascule
-* CPU (multi-socket) FIXME : je doute que plusieurs socket CPU constitue de la redondance), mémoire (multi-slot, ECC), disques (niveaux de RAID) 
+* CPU (multi-socket), mémoire (multi-slot, ECC), disques (niveaux de RAID)
+* redondance du SAN
 * plusieurs alimentations électriques par serveur, plusieurs sources
   d'alimentation
 * plusieurs équipements réseaux, liens réseaux redondés, cartes réseaux,
@@ -57,8 +58,8 @@ réellement tout redonder:
 * plusieurs administrateurs comprenant et maîtrisant chaque brique du cluster
 * ...
 
-S'il reste un seul `Single Point of Failure` dans l'architecture, c'est ce
-point qui un jour où l'autre subira une défaillance.
+S'il reste un seul `Single Point of Failure` dans l'architecture, ce point
+subira un jour où l'autre une défaillance.
 
 :::
 
@@ -66,6 +67,7 @@ point qui un jour où l'autre subira une défaillance.
 
 ## Fencing
 
+* difficulté de déterminer l'origine d'un incident de façon logicielle
 * chaque brique doit toujours être dans un état déterminé
 * garantie de pouvoir sortir du système un élément défaillant
 * implémenté dans Pacemaker au travers du daemon `stonithd`
@@ -93,12 +95,12 @@ situations de `split brain` où deux instances PostgreSQL sont accessibles en
 les données entre ces deux instances peut devenir un véritable calvaire et
 provoquer une ou plusieurs indisponibilités.
 
-Ne sous-estimez jamais le pouvoir de chaque brique d'innover en terme
-d'incident au sein votre cluster pour provoquer une partition des nœuds entre
-eux. En voici quelques exemples:
+Ne sous-estimez jamais le pouvoir d'innovation en terme d'incident des briques
+de votre cluster pour provoquer une partition des nœuds entre eux. En voici
+quelques exemples:
 <https://aphyr.com/posts/288-the-network-is-reliable>
 
-À noter que PAF est pensé et construit pour les cluster configurés avec le
+À noter que PAF est pensé et construit pour les clusters configurés avec le
 fencing. En cas d'incident, il y a de fortes chances qu'une bascule n'ait jamais
 lieu pour un cluster dépourvu de fencing.
 
@@ -120,12 +122,12 @@ Augmenter la complexité d'un cluster augmente aussi le nombre de défaillances
 possibles. Entre deux solutions, la solution la plus simple sera souvent la
 meilleure et la plus pérenne.
 
-Par exemple, cet incident de Gocardless où l'article indique que l'automatisation
-réduit la connaissance de l'architecture. Au fil du temps il est difficile de
-maintenir une documentation à jour, des équipes correctement formées :
+L'incident décrit par de Gocardless dans le lien ci-après est un bon exemple.
+L'article indique que l'automatisation réduit la connaissance de
+l'architecture. Au fil du temps il est difficile de maintenir une documentation
+à jour, des équipes correctement formées :
 
 [Incident review: API and Dashboard outage on 10 October 2017](https://gocardless.com/blog/incident-review-api-and-dashboard-outage-on-10th-october/)
-
 
 > **Automation erodes knowledge**
 
@@ -269,11 +271,12 @@ localement au travers de cette API HTTP. Les commandes sollicitant cette API
 peuvent être la création du cluster lui-même, son démarrage, son arrêt, sa
 destruction, l'ajout ou la suppression d'un nœud, etc.
 
-Bien que `pcs` se répande petit à petit sur les distributions Debian et
-dérivés, `crmsh` est encore utilisé en priorité sous Suse, Debian et Ubuntu
-et reste un très bon choix.
+En 2018, `pcs` a fini d'être intégré à Debian. `crmsh` est encore utilisé
+en priorité sous Suse, mais reste souvent utilisé sur les Debian et Ubuntu
+par choix historique et reste un très bon choix, pour peu que l'administrateur
+ne l'utilise pas pour interagir avec le système lui même.
 
-Ce workshop se base sur une distribution CentOS 7 et sur l'outil `pcs`.
+**Ce workshop se base sur une distribution CentOS 7 et sur l'outil `pcs`**.
 
 :::
 
@@ -307,7 +310,7 @@ dérivés est la suivante:
 * Debian 9
   * corosync 2.x
   * Pacemaker 1.1.x
-  * client d'administration `crmsh` 2.x
+  * client d'administration `crmsh` 2.x ou le couple `pcsd`et `pcs`
 
 ::: notes
 
@@ -322,6 +325,10 @@ ne devrait pas être corrigée, la branche 3.x étant désormais la branche
 principale du projet. La version 3.0 de `crmsh` supporte l'initialisation d'un
 cluster sous Debian mais avec un peu d'aide manuelle et quelques erreurs
 d'intégration.
+
+L'utilisation de `pcsd` et `pcs` est désormais pleinement fonctionne sous
+Debian. Voir à ce propos:
+<https://clusterlabs.github.io/PAF/Quick_Start-Debian-9-pcs.html>
 
 :::
 
@@ -405,7 +412,8 @@ Beaucoup d'autres outils sont installés sur toutes les distributions, mais
 sont destinés à des utilisations très pointues, de debug ou aux agents eux-même.
 
 Les outils d'administration `pcs` et `crm` reposent fortement sur l'ensemble de
-ces binaires et permet d'utiliser une interface unifiée et commune à ceux-ci.
+ces binaires et permettent d'utiliser une interface unifiée et commune à
+ceux-ci.
 
 :::
 
@@ -451,7 +459,7 @@ Cette commande permet de créer un cluster nommé "cluster_tp", composé des
 trois nœuds `hanode1`, `hanode2` et `hanode3`.
 
 Le fichier de configuration de Corosync `/etc/corosync/corosync.conf` est
-créé et propagé automatiquement sur tous ces nœuds.
+créé et propagé automatiquement sur tous ces nœuds par `pcsd`.
 
 :::
 
@@ -465,7 +473,7 @@ créé et propagé automatiquement sur tous ces nœuds.
 ::: notes
 
 Une fois le cluster créé, ce dernier n'est pas démarré automatiquement. La
-commande suivante permet donc de démarrer les services Pacemaker et Corosync
+commande suivante permet de démarrer les services Pacemaker et Corosync
 sur tous les nœuds du cluster :
 
 ~~~console
@@ -528,8 +536,8 @@ avant de le réintégrer au cluster suite à un incident.
 # systemctl disable pacemaker
 ~~~
 
-Le daemon `pcsd` s'occupe de propager les configurations et commandes sur tous
-les nœuds. Ce dernier peut être lancé automatiquement au démarrage :
+Le daemon `pcsd` s'occupe seulement de propager les configurations et commandes
+sur tous les nœuds. Ce dernier peut être lancé automatiquement au démarrage :
 
 ~~~console
 # systemctl enable pcsd
@@ -687,6 +695,7 @@ présentés dans le wiki de Pacemaker:
 ## Cluster Information Base (CIB)
 
 * configuration du cluster
+* géré par le processus du même nom
 * fichier au format XML
 * état des différentes ressources
 * synchronisé automatiquement entre les noeuds
@@ -703,6 +712,10 @@ En fonction de cet ensemble d'états et du paramétrage fourni, le cluster
 détermine l'état idéal de chaque ressource qu'il gère
 (démarré/arrêté/promu et sur quel serveur) et calcule les transitions
 permettant d'atteindre cet état.
+
+Le processus `cib` est chargé d'appliquer les modifications dans la CIB, de
+conserver les information transitoires en mémoire (statuts, certains scores,
+etc) et de notifier les autres processus de ces modifications si nécessaire.
 
 Le contenu de la CIB est historisé puis systématiquement synchronisé entre les
 nœuds à chaque modification. Ces fichiers sont stockés dans
@@ -738,6 +751,10 @@ création du cluster. Il est recommandé de limiter ce nombre de fichier grâce
 aux paramètres ''pe-error-series-max'', ''pe-warn-series-max'' et
 ''pe-input-series-max''.
 
+Il n'est pas recommandé d'éditer la CIB directement en XML. Préférez
+toujours utiliser les commandes de haut niveau proposées par `pcs` ou `crm`.
+En dernier recours, utilisez l'outil `cibadmin`.
+
 -----
 
 ## TP
@@ -754,9 +771,9 @@ Les fichiers sont stockés dans `/var/lib/pacemaker/cib`.
   * Identifier la dernière version de la CIB
   * Comparer avec `cibadmin --query`
 
-FIXME : il y a une section status en plus avec cibadmin?
-
-Emplacement de la CIB, ouverture pour observer les différentes parties, cibadmin
+Vous devriez observer une section "<status>" supplémentaire dans le document
+XML présenté par cibadmin. Cette section contient l'état du cluster et est
+uniquement conservée en mémoire.
 
 :::
 
@@ -765,12 +782,6 @@ Emplacement de la CIB, ouverture pour observer les différentes parties, cibadmi
 ## Designated Controler (DC) - Diagramme global
 
 ![Diagramme DC](medias/pcmk_diag1-dc.png)
-
-::: notes
-
-FIXME
-
-:::
 
 -----
 
@@ -807,12 +818,6 @@ C'est le DC qui maintient l'état primaire de la CIB ("master copy").
 ## Policy Engine (PEngine) - Diagramme global
 
 ![Diagramme PEngine](medias/pcmk_diag1-pengine.png)
-
-::: notes
-
-FIXME
-
-:::
 
 -----
 
@@ -851,14 +856,14 @@ Dans cet exemple chaque flèche impose une dépendance et un ordre entre les
 actions. Pour qu'une action soit déclenchée, toutes les actions
 précédentes doivent être exécutées et réussies. Les textes en jaune sont
 des "actions virtuelles", simples points de passage permettant de synchroniser
-les actions entre elles. Les textes en noir représentent des actions à
-exécuter sur l'un des nœuds du cluster.
+les actions entre elles avant de poursuivre les suivantes. Les textes en noir
+représentent des actions à exécuter sur l'un des nœuds du cluster.
 
 Le format des textes est le suivant: `<resource>_<action>_<interval>`
 
 Une action avec un intervalle à 0 est une action ponctuelle ("start", "stop",
 etc). Une action avec un intervalle supérieur à 0 est une action récurrente,
-type "monitor".
+tel que "monitor".
 
 Dans cet exemple:
 
@@ -868,7 +873,7 @@ Dans cet exemple:
 * l'action 4 est réalisée une fois que les actions 1, 2 et 3 sont validées
 * l'action 5 est exécutée n'importe quand
 * l'action 5 interrompt l'exécution récurrente de l'action monitor sur la
-  ressource drbd0:0 sur le serveur "frigg"
+  ressource drbd0:0 du serveur "frigg"
 * l'action 7 est exécutée après que 5 et 6 soient validées
 * l'action 7 effectue un demote de la ressource "drbd0:0" sur "frigg" (qui
   n'est donc plus supervisée)
@@ -895,9 +900,9 @@ TP pengine
 
 ::: notes
 
-* Sur quels noeuds est lancé le processus pengine?
-* Où se trouvent les logs?
-* Quelle différences observer entre les différents noeuds (identifier le DC)?
+* Sur quels noeuds est lancé le processus pengine ?
+* Où se trouvent les logs ?
+* Quelle différences observer entre les différents noeuds (identifier le DC) ?
 
 :::
 
@@ -908,12 +913,6 @@ TP pengine
 
 ![Diagramme CRM](medias/pcmk_diag1-crmd.png)
 
-::: notes
-
-FIXME
-
-:::
-
 -----
 
 
@@ -921,7 +920,7 @@ FIXME
 
 * CRMd, démon local à chaque noeud
 * chargé du pilotage des événements
-* reçoit des instructions de PEngine (DC) ou du DC
+* reçoit des instructions de PEngine s'il est DC ou du CRMd DC distant
 * transmet les actions à réaliser aux seins des transitions
   * au démon LRMd local
   * au démon STONITHd local
@@ -932,11 +931,12 @@ FIXME
 
 Le CRMd est le démon local à chaque noeud qui pilote les événements.
 Il peut soit être actif (DC), et donc être chargé de l'ensemble du pilotage
-du cluster, soit passif, et attendre que le DC lui fournisse des instructions.
+du cluster, soit passif, et attendre que le CRMd DC lui fournisse des
+instructions.
 
 Lorsque des instructions lui sont transmises, il les communique
 aux démons LRMd et/ou STONITHd locaux pour qu'ils exécutent les actions
-appropriées après des ressources agents et fencing agents.
+appropriées auprès des ressources agents et fencing agents.
 
 Une fois l'action réalisée, le CRMd récupère le statut de l'action (via son
 code retour) et le transmet au CRMd DC qui en valide la cohérence avec ce qui
@@ -970,18 +970,12 @@ TP CRM
 
 ![Diagramme Fencing](medias/pcmk_diag1-fencing.png)
 
-::: notes
-
-FIXME
-
-:::
-
 -----
 
 ## STONITHd
 
 * gestionnaire des agents de fencing (FA)
-* utilise l'API des fencing agent pour exécuter les actions demandée
+* utilise l'API des fencing agent pour exécuter les actions demandées
 * reçoit des commandes du CRMd et les passe aux FA
 * renvoie le code de retour de l'action au CRMd
 * capable de gérer plusieurs niveau de fencing avec ordre de priorité
@@ -1005,14 +999,27 @@ agents de fencing (FA).
 
 ::: notes
 
-Attention au FA qui dépend du noeud cible !
+Attention aux FA qui dépendent du nœud cible !
 
 Exemple classique : la carte IPMI. Si le serveur a une coupure électrique le
 FA (la carte IPMI donc) n'est plus joignable. Pacemaker ne peut pas savoir si
 le fencing a fonctionné, ce qui empêche toute bascule.
 
-Il est conseillé de chaîner plusieurs FA si la méthode de fencing est un
+Il est conseillé de chaîner plusieurs FA si la méthode de fencing
 présente un SPoF: IPMI, rack d'alimentation, switch...
+
+Voici les actions disponibles de l'API des FA:
+
+* `off`: implémentation obligatoire. Permet d'isoler la ressource ou le serveur
+* `on`: libère la ressource ou démarre le serveur
+* `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon
+  exécute les actions off et on.
+* `status`: permet de vérifier la disponibilité de l'agent de fecing et le
+  statu du dispositif concerné: on ou off
+* `monitor`: permet de vérifier la disponibilité de l'agent de fencing
+* `list`: permet de vérifier la disponibilité de l'agent de fencing et de
+  lister l'ensemble des dispositifs que l'agent est capable d'isoler (cas d'un
+  hyperviseur, d'un PDU, etc)
 
 :::
 
@@ -1028,6 +1035,9 @@ Installer les FA : `yum install -y fence-agents fence-agents-virsh`
 
 Lister les FA à l'aide de la commande `pcs resource agents stonith` ou `stonith_admin -V -I`
 
+Nous abordons la création d'une ressource de fencing plus loin dans ce
+workshop.
+
 :::
 
 -----
@@ -1035,12 +1045,6 @@ Lister les FA à l'aide de la commande `pcs resource agents stonith` ou `stonith
 ## Local Resource Manager et Resources Agent - Diagramme global
 
 ![Diagramme LRM et ressources](medias/pcmk_diag1-resource.png)
-
-::: notes
-
-FIXME
-
-:::
 
 -----
 
@@ -1066,7 +1070,7 @@ Le LRMd reçoit un code de retour de l'agent, qu'il transmet au CRMd, lequel
 mettra à jour la CIB pour que cette information soit partagée au niveau du
 cluster.
 
-Le CRMd demande au LRMd d'exécuter les actions désignées comme récurrente
+Le CRMd demande au LRMd d'exécuter les actions désignées comme récurrentes
 dans la configuration. Une fois l'instruction passée, le LRMd est responsable
 de la bonne exécution récurrente de l'action et ne reviendra vers le CRMd que
 si le code retour de l'action varie.
@@ -1101,30 +1105,30 @@ Vous trouverez la liste des types supportés à l'adresse suivante:
 Dans les spécifications OCF, un agent a le choix parmi dix codes retours
 différents pour définir l'état de sa ressource:
 
-* OCF_SUCCESS (0)
-* OCF_ERR_GENERIC (1)
-* OCF_ERR_ARGS (2)
-* OCF_ERR_UNIMPLEMENTED (3)
-* OCF_ERR_PERM (4)
-* OCF_ERR_INSTALLED (5)
-* OCF_ERR_CONFIGURED (6)
-* OCF_NOT_RUNNING (7)
-* OCF_RUNNING_MASTER (8)
-* OCF_FAILED_MASTER (9)
+* `OCF_SUCCESS` (0)
+* `OCF_ERR_GENERIC` (1)
+* `OCF_ERR_ARGS` (2)
+* `OCF_ERR_UNIMPLEMENTED` (3)
+* `OCF_ERR_PERM` (4)
+* `OCF_ERR_INSTALLED` (5)
+* `OCF_ERR_CONFIGURED` (6)
+* `OCF_NOT_RUNNING` (7)
+* `OCF_RUNNING_MASTER` (8)
+* `OCF_FAILED_MASTER` (9)
 
 Voici les actions disponibles aux RA implémentant la spec OCF:
 
-* start: démarre la ressource
-* stop: arrête la ressource
-* monitor: vérifie l'état de la ressource
-* validate-all: valide la configuration de la ressource
-* meta-data: présente les capacités de l'agent au cluster
-* promote: promote la ressource slave en master
-* demote: démote la ressource master en slave
-* migrate_to: actions à réaliser pour déplacer une ressource vers un autre nœud
-* migrate_from: actions à réaliser pour déplacer une ressource vers le nœud
+* `start`: démarre la ressource
+* `stop`: arrête la ressource
+* `monitor`: vérifie l'état de la ressource
+* `validate-all`: valide la configuration de la ressource
+* `meta-data`: présente les capacités de l'agent au cluster
+* `promote`: promote la ressource slave en master
+* `demote`: démote la ressource master en slave
+* `migrate_to`: actions à réaliser pour déplacer une ressource vers un autre nœud
+* `migrate_from`: actions à réaliser pour déplacer une ressource vers le nœud
   local
-* notify: action à exécuter lorsque le cluster notifie l'agent des actions
+* `notify`: action à exécuter lorsque le cluster notifie l'agent des actions
   le concernant au sein du cluster
 
 Les agents type systemd ou sysV sont souvent limités aux seules actions
@@ -1132,7 +1136,7 @@ Les agents type systemd ou sysV sont souvent limités aux seules actions
 
 Les RA implémentant les actions "promote" et "demote" pilotent des ressources
 "multistate": une ressource est alors clonée sur autant de nœuds que
-demandé, démarré en tant que slave, puis le cluster décide quel(s) slave(s)
+demandé, démarrée en tant que slave, puis le cluster décide quel(s) slave(s)
 peut être promu master.
 
 Le ressource agent PAF utilise intensément toutes ces actions, sauf "migrate_to"
@@ -1145,16 +1149,25 @@ implémenté dans Pacemaker pour les ressource multistate).
 
 ## TP
 
-* lister les RA existants
+* installer les //resource agents//
+* lister les RA installés à l'aide de `pcs`
+* afficher les information relatives à l'agent `dummy`
+* afficher les information relatives à l'agent `pgsql`
 
 ::: notes
 
-* `yum install -y resource-agents`
-* `pcs resource agents`
+Installer le paquet `resource-agents` qui installe un grand nombre de RA par
+défaut: `yum install -y resource-agents`
 
-Afficher les informations concernant l'agent *dummy* : `pcs resource describe <agent>`
+Il est possible de lister les RA installés avec la commande suivante:
+`pcs resource agents`
 
-Afficher les informations concernant l'agent *pgsql*. (Montrer la tonnes d'options sans s'attarder dessus)
+Chaque agent embarque sa propre documentation qui est accessible à l'aide de
+la commande `pcs resource describe <agent>`.
+
+Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de
+PAF. Vous pouvez lister l'ensemble de ses options grâce à la commande 
+`pcs resource describe pgsql`.
 
 :::
 
