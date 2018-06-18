@@ -755,6 +755,8 @@ Il n'est pas recommandé d'éditer la CIB directement en XML. Préférez
 toujours utiliser les commandes de haut niveau proposées par `pcs` ou `crm`.
 En dernier recours, utilisez l'outil `cibadmin`.
 
+:::
+
 -----
 
 ## TP
@@ -771,7 +773,7 @@ Les fichiers sont stockés dans `/var/lib/pacemaker/cib`.
   * Identifier la dernière version de la CIB
   * Comparer avec `cibadmin --query`
 
-Vous devriez observer une section "<status>" supplémentaire dans le document
+Vous devriez observer une section "\<status\>" supplémentaire dans le document
 XML présenté par cibadmin. Cette section contient l'état du cluster et est
 uniquement conservée en mémoire.
 
@@ -1778,6 +1780,7 @@ création d'une première ressource en HA
 ~~~
 
 créer une ressource dummy1 utilisant le RA Dummy:
+
 * customiser le paramètre `state`
 * vérifier son état toutes les 10 secondes
 * positionner son attribut `migration-threshold` (surcharge la valeur par défaut du cluster)
@@ -1841,6 +1844,7 @@ dummy2
 ::: notes
 
 ajouter une ressource dummy2:
+
 * ne doit jamais démarrer sur le même noeud que dummy1 (contrainte de localisation)
 * customiser le paramètre `state`
 * vérifier son état toutes les 10 secondes
@@ -2387,10 +2391,12 @@ cib_process_replace:  Replaced 0.85.23 with 0.91.0 from hanode1
 ~~~
 
 Identifier le DC et les actions du pgengine :
+
 * Décide du monitor des ressources => identifier les actions du lrmd de chaque noeud
 * Observer le comportement de PAF et lire le diagramme de monitor en //
 
 Décrire le démarrage :
+
   1. Action monitor
   2. Demarrage en mode standby. Qui déclenche les action? => le lrmd
   3. Notify
