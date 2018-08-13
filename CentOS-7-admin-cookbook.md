@@ -155,65 +155,34 @@ will still be in charge of other resources.
 
 Considers the PostgreSQL multistate resource is called `pgsql-ha`.
 
-First forbid the cluster resource manager to react on unexpected status by
-putting the resource in unmanaged mode:
+The following command achieve two goals. The first one forbids the cluster resource manager to react on unexpected
+status by putting the resource in unmanaged mode (`unmanage pgsql-ha`). The second one stops the monitor actions for
+this resources (`--monitor`).
 
 ```
-# pcs resource unmanage pgsql-ha
+# pcs resource unmanage pgsql-ha --monitor
 ```
 
-Notice `(unmanaged)` appeared in `crm_mon` and the meta
-attribute `is-managed=false` appeared for the `pgsql-ha` resource in this
-command:
+Notice `(unmanaged)` appeared in `crm_mon`. In the following command, the meta attribute `is-managed=false` appeared
+for the `pgsql-ha` resource and `enabled=false` appeared for the monitor actions:
 
 ```
 # pcs resource show pgsql-ha
  Master: pgsql-ha
-  Meta Attrs: master-max=1 master-node-max=1 clone-max=3 clone-node-max=1 notify=true is-managed=false
+  Meta Attrs: notify=true
   Resource: pgsqld (class=ocf provider=heartbeat type=pgsqlms)
-   Attributes: bindir=/usr/pgsql-9.4/bin pgdata=/var/lib/pgsql/9.4/data
-   Operations: start interval=0s timeout=60s (pgsqld-start-interval-0s)
-               stop interval=0s timeout=60s (pgsqld-stop-interval-0s)
-               promote interval=0s timeout=30s (pgsqld-promote-interval-0s)
-               demote interval=0s timeout=120s (pgsqld-demote-interval-0s)
-               monitor role=Master timeout=10s interval=15s (pgsqld-monitor-interval-15s)
-               monitor role=Slave timeout=10s interval=16s (pgsqld-monitor-interval-16s)
+   Attributes: bindir=/usr/pgsql-10/bin pgdata=/var/lib/pgsql/10/data
+   Meta Attrs: is-managed=false
+   Operations: demote interval=0s timeout=120s (pgsqld-demote-interval-0s)
+               methods interval=0s timeout=5 (pgsqld-methods-interval-0s)
+               monitor enabled=false interval=15s role=Master timeout=10s (pgsqld-monitor-interval-15s)
+               monitor enabled=false interval=16s role=Slave timeout=10s (pgsqld-monitor-interval-16s)
                notify interval=0s timeout=60s (pgsqld-notify-interval-0s)
-```
+               promote interval=0s timeout=30s (pgsqld-promote-interval-0s)
+               reload interval=0s timeout=20 (pgsqld-reload-interval-0s)
+               start interval=0s timeout=60s (pgsqld-start-interval-0s)
+               stop interval=0s timeout=60s (pgsqld-stop-interval-0s)
 
-Now, we need to stop the recurring operations so the Local Resource Manager will
-not run a command during the update. In our demo, we only have the two
-monitor commands (id `pgsqld-monitor-interval-15s`
-and `pgsqld-monitor-interval-16s`).
-
-Run the following commands to disable each of them:
-
-```
-# pcs resource update pgsqld op monitor role=Master timeout=10s interval=15s enabled=false
-# pcs resource update pgsqld op monitor role=Slave timeout=10s interval=16s enabled=false
-```
-
-> __WARNING__: you __MUST__ give __ALL__ the options of the recurring command,
-> even if you update only one of them. If you forget one option, `pcs` will
-> create a new resource operation with the default value for this option.
-> Copy/editing the output of `pcs resource show ...` for the operation you
-> update is often a good idea.
->
-> You could fallback to the low level command as well to disable your
-> operations if you prefer. Eg.:
->
-> ```
-> # cibadmin --modify --xml-text '<op id="pgsqld-monitor-interval-15s" enabled="false"/>'
-> # cibadmin --modify --xml-text '<op id="pgsqld-monitor-interval-16s" enabled="false"/>'
-> ```
-{: .warning}
-
-You can check the recurring action are disabled (`enabled=false` bellow):
-
-```
-# pcs resource show pgsql-ha|grep enabled
-  monitor role=Master timeout=10s interval=15s enabled=false (pgsqld-monitor-interval-15s)
-  monitor role=Slave timeout=10s interval=16s enabled=false (pgsqld-monitor-interval-16s)
 ```
 
 Now, update PAF, eg.:
@@ -222,21 +191,28 @@ Now, update PAF, eg.:
 # yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
 ```
 
-We can now enable the recurrent actions:
+We can now put the resource in `managed` mode again and enable the monitor actions:
 
 ```
-# pcs resource update pgsqld op monitor role=Master timeout=10s interval=15s enabled=true
-# pcs resource update pgsqld op monitor role=Slave timeout=10s interval=16s enabled=true
+# pcs resource manage pgsql-ha --monitor
 ```
 
-Monitor action should be executed immediately and report no errors. Check that
-everything is running correctly in `crm_mon` and your log files.
-
-We can now put the resource in `managed` mode again:
-
-```
-# pcs resource manage pgsql-ha
-```
+> __NOTE__: you might want to enable monitor action first to check everything is going fine before getting back the
+> control to the cluster. You can enable the monitor actions using the following commands (you __must__ to set all
+> parameters related to the action):
+>
+> ```
+> # pcs resource update pgsqld op monitor role=Master timeout=10s interval=15s enabled=true
+> # pcs resource update pgsqld op monitor role=Slave timeout=10s interval=16s enabled=true
+> ```
+>
+> Monitor action should be executed immediately and report no errors. Check that everything is running correctly in
+> `crm_mon` and your log files before enabling the resource itself (without the `--monitor`):
+> 
+> ```
+> # pcs resource manage pgsql-ha
+> ```
+{: .notice}
 
 
 ## PostgreSQL minor upgrade
