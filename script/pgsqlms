@@ -767,6 +767,11 @@ sub _check_locations {
         # Exclude the current node.
         next if $node eq $nodename;
 
+        # do not warn if the master score is already set to -1000.
+        # this avoid log flooding (gh #138)
+        $node_score = _get_master_score( $node );
+        next if $node_score eq '-1000';
+
         ocf_log( 'warning', '"%s" is not connected to the primary', $node );
         _set_master_score( '-1000', $node );
     }
