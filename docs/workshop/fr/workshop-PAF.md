@@ -2532,7 +2532,7 @@ FIXME
 ## Détail d'un failover
 
 1. fencing du noeud hébergeant l'instance primaire en échec si nécessaire
-2. tentative de promotion du secondaire ayant le LSN le plus élevé au dernier monitors
+2. tentative de promotion du secondaire ayant le LSN le plus élevé au dernier monitor
   1. comparaison des LSN actuels entre les secondaires
   2. poursuite de la promotion si le secondaire élu est toujours le plus avancé
   3. annulation de la promotion ("soft error") sinon pour déclencher une nouvelle transition
