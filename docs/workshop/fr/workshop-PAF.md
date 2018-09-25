@@ -1420,7 +1420,7 @@ Afficher et modifier la valeur du paramétrage par défaut des ressources suivan
 * resource-stickiness : 1
 
 ~~~console
-[root@Host-001 ~]# pcs resource defaults
+# pcs resource defaults
 No defaults set
 # pcs resource defaults migration-threshold=3
 # pcs resource defaults resource-stickiness=1
@@ -1431,7 +1431,7 @@ resource-stickiness: 1
 
 Pour resetter une valeur par defaut:
 ~~~console
-[root@Host-001 ~]# pcs resource defaults resource-stickiness=
+# pcs resource defaults resource-stickiness=
 Warning: Defaults do not apply to resources which override them with their own defined values
 ~~~
 
@@ -2204,7 +2204,7 @@ Configuration de l'instance:
 root# su - postgres
 postgres$ echo "listen_addresses = '*'" >> ~postgres/10/data/postgresql.conf
 ~~~
-Note: avec postgres 10, la mise en place de la réplication a été facilitée par de nouvelles valeur par défaut pour
+Note: avec postgres 10, la mise en place de la réplication a été facilitée par de nouvelles valeurs par défaut pour
 wal_level, hot_standby, max_wal_sender, max_replication_slots
 
 Création du modèle de configuration `recovery.conf.pcmk` nécessaire à PAF:
@@ -2532,7 +2532,7 @@ FIXME
 ## Détail d'un failover
 
 1. fencing du noeud hébergeant l'instance primaire en échec si nécessaire
-2. tentative de promotion du secondaire ayant le LSN le plus élevé au dernier monitor
+2. tentative de promotion du secondaire ayant le LSN le plus élevé au dernier monitors
   1. comparaison des LSN actuels entre les secondaires
   2. poursuite de la promotion si le secondaire élu est toujours le plus avancé
   3. annulation de la promotion ("soft error") sinon pour déclencher une nouvelle transition
@@ -2611,8 +2611,6 @@ ou
 * version de PostgreSQL supportée 9.3+
 * le demote de l'instance primaire nécessite un arrêt
 * trop strict sur l'arrêt brutal d'une instance
-* ne gère pas plusieurs instances PostgreSQL sur un seul noeud
-* n'exclut pas une instance secondaire quel que soit son retard
 * pas de reconstruction automatique de l'ancien primaire après failover
 * pas de gestion des slots de réplication
 
@@ -2621,9 +2619,9 @@ ou
 Une incohérence entre l'état de l'instance et le controldata provoque une erreur fatale ! Ne __jamais__ utiliser
  `pg_ctl -m immediate stop` !
 
-Du fait de l'utilisation d'un attribut non persistant "lsn\_location" pour le choix de l'instance à promouvoir il n'est
-pas possible d'avoir plusieurs instances sur un seul noeud. Cela pourrait être adapté dans le code de l'agent en
-intégrant le nom unique de la ressource dans le nom de l'attribut.
+Limitations levees:
+* ne gère pas plusieurs instances PostgreSQL sur un seul noeud. Corrigé dans le commit 1a7d375.
+* n'exclut pas une instance secondaire quel que soit son retard. Ajout du parametre maxlag dans le commit a3bbfa3.
 
 :::
 
@@ -2658,7 +2656,7 @@ FIXME :
 [voir lien](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/s-config-testing-changes.html)
 
 **Attention**, si vous avez positionné le `failure-timeout` à une valeur basse (eg. 30s), certaines étapes de ce TP
-peuvent ne pas donner le résultat attendu si plus de 30s s'écoule entre deux étapes.
+peuvent ne pas donner le résultat attendu si plus de 30s s'écoulent entre deux étapes.
 
 Pour éviter cela, positionner ce paramètre par exemple à 4h :
 
@@ -3014,7 +3012,7 @@ OFFLINE: [ hanode3 ]
  pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
 ~~~
 
-La ressource `pgsqld` ne peut plus être déplacée nul part, à cause des échecs précédents sur `hanode1` et `hanode2`,
+La ressource `pgsqld` ne peut plus être déplacée nulle part, à cause des échecs précédents sur `hanode1` et `hanode2`,
 elle est donc arrêtée.
 
 Simuler le retour en ligne du noeud `hanode3` :
