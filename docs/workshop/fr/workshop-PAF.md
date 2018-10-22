@@ -390,7 +390,8 @@ L'utilisation de `pcs` nous permet de ne pas avoir à éditer la configuration d
 pré-requis à l'utilisation de `pcs` est que tous les daemons soient authentifiés les uns auprès des autres pour
 s'échanger des commandes au travers de leur API HTTP.
 
-L'authentification des membres et création du cluster se fait grâce à la commande suivante:
+L'authentification des membres et création du cluster se fait grâce à la commande suivante une fois `pcsd` démarre sur
+tous les noeuds:
 
 ~~~console
 # passwd hacluster
@@ -701,7 +702,7 @@ Les fichiers sont stockés dans `/var/lib/pacemaker/cib`.
 
   * Consulter le contenu de ce répertoire
   * Identifier la dernière version de la CIB
-  * Comparer avec `cibadmin --query`
+  * Comparer avec `cibadmin --query` et `pcs cluster cib`
 
 Vous devriez observer une section "\<status\>" supplémentaire dans le document XML présenté par cibadmin. Cette section
 contient l'état du cluster et est uniquement conservée en mémoire.
@@ -728,7 +729,7 @@ contient l'état du cluster et est uniquement conservée en mémoire.
 ::: notes
 
 Le *Designated Controler* est élu au sein du cluster une fois le groupe de communication établi au niveau de Corosync.
-Il est responsable du pilotage de l'ensemble du cluster.
+Il pilote l'ensemble du cluster.
 
 Il est responsable de:
 
@@ -983,7 +984,7 @@ Il est possible d'utiliser plusieurs types de RA différents au sein d'un même 
 * systemd...
 
 Vous trouverez la liste des types supportés à l'adresse suivante:
-<http://clusterlabs.org/doc/en-US/Pacemaker/1.1-pcs/html/Pacemaker_Explained/s-resource-supported.html>
+<http://clusterlabs.org/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/s-resource-supported.html>
 
 Les agents type systemd ou sysV sont souvent limités aux seules actions "start", "stop", "monitor".
 
@@ -1247,6 +1248,14 @@ Configuration globales
   * `no-quorum-policy=ignore` : désactiver la gestion du quorum (déconseillé !)
   * `stonith-enabled=false` : désactiver la gestion du fencing (déconseillé !)
 
+* Cas d'un cluster a deux noeuds : `two_node : 1`
+  * option héritée de CMAN
+  * requiers `expected-votes : 2`
+  * implique `wait_for_all : 1`. Ce parametre empeche le cluster d'établir une majorité tant que 
+    l'ensemble des noeuds n'est pas présent. Cela evite une partition au démarrage du cluster. (C'est la
+    valeur par défaut avec `two_nodes : 1`
+  * requiers un fencing hardware configuré sur la meme interface que le heartbeat
+
 ::: notes
 
 FIXME Expliquer :
@@ -1282,7 +1291,7 @@ FIXME
   * désactive les actions "monitor" sur cette ressource
   * aucune transition ne sera réalisée par le cluster
   * permet de réaliser des tâches de maintenance sur la **ressource**
-  * ou le noeud qui l'héberge
+    ou le noeud qui l'héberge
 
 ::: notes
 
@@ -1349,7 +1358,7 @@ FIXME : a développer? Expliquer pourquoi c'est complexe et risqué?
 
 ::: notes
 
-[Documentation associée](http://clusterlabs.org/doc/en-US/Pacemaker/1.1-pcs/html/Pacemaker_Explained/ch15.html)
+[Documentation associée](http://clusterlabs.org/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/ch15.html)
 
 Attention, la configuration "multi-sites" (ou "split site", ou "stretch cluster") a des contraintes particulières (
 [voir aussi la documentation Red Hat à ce propos](https://access.redhat.com/articles/27136#Support_Reqs) ).
@@ -1410,21 +1419,31 @@ Afficher et modifier la valeur du paramétrage par défaut des ressources suivan
 * migration-threshold : 3
 * resource-stickiness : 1
 
-~~~
-pcs property list --defaults |grep -E "(migration-threshold|resource-stickiness)"
- default-resource-stickiness: 0
-~~~
-
-FIXME Le paramètre migration-threshold n'est pas visible?
-
-
 ~~~console
+# pcs resource defaults
+No defaults set
 # pcs resource defaults migration-threshold=3
 # pcs resource defaults resource-stickiness=1
+# pcs resource defaults
+migration-threshold: 3
+resource-stickiness: 1
+~~~
+
+Pour resetter une valeur par defaut:
+~~~console
+# pcs resource defaults resource-stickiness=
+Warning: Defaults do not apply to resources which override them with their own defined values
 ~~~
 
 Controler que les modifications ont bien été prise en compte avec `pcs config show`. Consulter les logs pour voir les
 changements dans la CIB.
+
+Remarque: il existe une propriete du cluster `default-resource-stickiness`. Cette propriété est dépréciée, il faut utiliser
+les valeurs par defaut des ressources à la place.
+~~~
+pcs property list --defaults |grep -E "resource-stickiness"
+ default-resource-stickiness: 0
+~~~
 
 :::
 
@@ -1434,7 +1453,7 @@ changements dans la CIB.
 
 * dix actions disponibles dans l'API, toutes ne sont pas obligatoires
 * les FA peuvent isoler un seul nœud ou plusieurs en fonction de la méthode
-* tous les FA a un ensemble de paramètre en commun, plus des paramètres qui leur sont propre
+* tous les FA ont un ensemble de paramètres en commun, plus des paramètres qui leurs sont propres
 
 ::: notes
 
@@ -1681,7 +1700,10 @@ meta migration-threshold=3 failure-timeout=4h resource-stickiness=1
 
 controller le contenu du fichier dummy1.xml avant de pousser la configuration
 
-~~~console
+~~~ console
+# pcs cluster verify -V dummy1.xml  # controle la syntaxe
+# crm_simulate -S -x dummy1.xml     # simule l'effet de la commande sur le cluster
+
 # pcs cluster cib-push dummy1.xml
 ~~~
 
@@ -1743,6 +1765,9 @@ meta migration-threshold=3 failure-timeout=4h resource-stickiness=100
 
 # pcs -f dummy2.xml constraint colocation add dummy2 with dummy1 -INFINITY
 
+# pcs cluster verify -V dummy3.xml
+# crm_simulate -S -x dummy3.xml
+
 # pcs cluster cib-push dummy2.xml
 
 # pcs status
@@ -1793,13 +1818,28 @@ FIXME
 
 ## TP
 
-dummy3
+* créer un ressource dummy3 en spécifiant un interval de monitoring, ainsi que les paramètres migration-threshold failure-timeout et resource-stickiness
+* créer un group dummygroup qui regroupe les ressources dummy3 et dummy2 dans cet ordre
+* créer une contrainte d'ordre entre le démarrage de la ressource dummy1 et dummy3
+* redémarrer le cluster et se connecter sur le DC
+* observer l'ordre choisi par pengine pour le démarrage de l'ensemble des ressources
 
-::: notes
+~~~console
+# pcs cluster cib > dummy3.xml
 
-FIXME : créer un dummy3 avec regroupement et contraintes d'ordre ?
+# pcs -f dummy3.xml ressource create dummy3 ocf:pacemaker:Dummy state=/tmp/sub/dummy3.state op monitor interval=10s meta migration-threshold=3 failure-timeout=4h resource-stickiness=100
 
-:::
+# pcs -f dummy3.xml resource group add dummygroup dummy3 dummy2
+
+# pcs -f dummy3.xml constraint order start dummy1 then start dummy3 symmetrical=false kind=Mandatory
+Adding dummy1 dummy3 (kind: Mandatory) (Options: first-action=start then-action=start symmetrical=false)
+
+# pcs cluster verify -V dummy3.xml
+# crm_simulate -S -x dummy3.xml
+
+# pcs cluster cib-push dummy3.xml
+CIB updated
+~~~
 
 -----
 
@@ -1911,7 +1951,7 @@ failcounts
 # crm_mon -nf
 ~~~
 
-`dummy1` a migré vers `hanode2` sitôt le `failcount` dépassé
+`dummy1` a migré vers `hanode2` des que le `failcount` dépasse le `migration-threshold`.
 
 Regarder le failcount :
 
@@ -2163,8 +2203,9 @@ Configuration de l'instance:
 ~~~console
 root# su - postgres
 postgres$ echo "listen_addresses = '*'" >> ~postgres/10/data/postgresql.conf
-postgres$ echo "hot_standby = on" >> ~postgres/10/data/postgresql.conf
 ~~~
+Note: avec postgres 10, la mise en place de la réplication a été facilitée par de nouvelles valeurs par défaut pour
+wal_level, hot_standby, max_wal_sender, max_replication_slots
 
 Création du modèle de configuration `recovery.conf.pcmk` nécessaire à PAF:
 
@@ -2192,13 +2233,14 @@ host replication postgres $(hostname -s) reject
 host replication postgres 0.0.0.0/0 trust
 EOF
 postgres$ exit
-~~~console
+~~~
 
 Suite à cette configuration, nous pouvons démarrer l'instance principale et y associer l'adresse IP virtuelle choisie:
 
-~~~
+~~~console
 root# systemctl start postgresql-10
 root# ip addr add 192.168.122.110/24 dev eth0
+root# echo "192.168.122.110 ha-vip" >> /etc/hosts
 ~~~
 
 Cloner l'instance sur les serveurs secondaires :
@@ -2210,7 +2252,7 @@ postgres$ pg_basebackup -h ha-vip -D ~postgres/10/data/ -P
 
 Créer le modèle de `recovery.conf` nécessaire à PAF:
 
-~~~
+~~~console
 postgres$ cat <<EOF > ~postgres/recovery.conf.pcmk
 standby_mode = on
 primary_conninfo = 'host=192.168.122.110 application_name=$(hostname -s)'
@@ -2235,7 +2277,7 @@ root# systemctl start postgresql-10
 
 Vérifier le statut de la réplication depuis le serveur maître :
 
-~~~
+~~~console
 postgres=# SELECT * FROM pg_stat_replication;
 ~~~
 
@@ -2455,13 +2497,13 @@ Quel est l'ordre des opérations sur hanode1 et sur hanode2?
 Afficher les contraintes pour la ressource pgsql-ha
 
 ~~~console
-# pcs constraint
-
-Resource: pgsql-ha
-   Enabled on: hanode2 (score:INFINITY) (role: Master)
+# pcs constraint location show resource pgsql-ha
+Location Constraints:
+  Resource: pgsql-ha
+    Enabled on: hanode2 (score:INFINITY) (role: Master)
 ~~~
 
-Il faut penser à faire un clean sinon le score restera en place :
+Il faut penser à faire un clear sinon le score restera en place :
 
 ~~~
 pcs resource clear pgsql-ha
@@ -2569,8 +2611,6 @@ ou
 * version de PostgreSQL supportée 9.3+
 * le demote de l'instance primaire nécessite un arrêt
 * trop strict sur l'arrêt brutal d'une instance
-* ne gère pas plusieurs instances PostgreSQL sur un seul noeud
-* n'exclut pas une instance secondaire quel que soit son retard
 * pas de reconstruction automatique de l'ancien primaire après failover
 * pas de gestion des slots de réplication
 
@@ -2579,9 +2619,9 @@ ou
 Une incohérence entre l'état de l'instance et le controldata provoque une erreur fatale ! Ne __jamais__ utiliser
  `pg_ctl -m immediate stop` !
 
-Du fait de l'utilisation d'un attribut non persistant "lsn\_location" pour le choix de l'instance à promouvoir il n'est
-pas possible d'avoir plusieurs instances sur un seul noeud. Cela pourrait être adapté dans le code de l'agent en
-intégrant le nom unique de la ressource dans le nom de l'attribut.
+Limitations levees:
+* ne gère pas plusieurs instances PostgreSQL sur un seul noeud. Corrigé dans le commit 1a7d375.
+* n'exclut pas une instance secondaire quel que soit son retard. Ajout du parametre maxlag dans le commit a3bbfa3.
 
 :::
 
@@ -2616,7 +2656,7 @@ FIXME :
 [voir lien](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/s-config-testing-changes.html)
 
 **Attention**, si vous avez positionné le `failure-timeout` à une valeur basse (eg. 30s), certaines étapes de ce TP
-peuvent ne pas donner le résultat attendu si plus de 30s s'écoule entre deux étapes.
+peuvent ne pas donner le résultat attendu si plus de 30s s'écoulent entre deux étapes.
 
 Pour éviter cela, positionner ce paramètre par exemple à 4h :
 
@@ -2972,7 +3012,7 @@ OFFLINE: [ hanode3 ]
  pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
 ~~~
 
-La ressource `pgsqld` ne peut plus être déplacée nul part, à cause des échecs précédents sur `hanode1` et `hanode2`,
+La ressource `pgsqld` ne peut plus être déplacée nulle part, à cause des échecs précédents sur `hanode1` et `hanode2`,
 elle est donc arrêtée.
 
 Simuler le retour en ligne du noeud `hanode3` :
