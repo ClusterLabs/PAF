@@ -361,7 +361,7 @@ pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh \
 pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
 pcs -f cluster1.xml constraint location fence_vm_srv3 avoids srv3=INFINITY
-pcs cluster cib-push cluster1.xml
+pcs cluster cib-push scope=configuration cluster1.xml
 ~~~
 
 Using `crm_mon` You should see the three resources appearing in your cluster
@@ -436,7 +436,7 @@ pcs -f cluster1.xml constraint order demote pgsql-ha then stop pgsql-master-ip s
 We can now push our CIB to the cluster, which will start all the magic stuff:
 
 ~~~
-pcs cluster cib-push cluster1.xml
+pcs cluster cib-push scope=configuration cluster1.xml
 ~~~
 
 
