@@ -2,7 +2,7 @@
 subtitle : 'Workshop Pacemaker/PostgreSQL'
 title : 'Introduction à PostgreSQL Automatic Failover'
 
-licence : PostgreSQL                                                            
+licence : PostgreSQL
 author: Jehan-Guillaume de Rorthais, Maël Rimbault, Adrien Nayrat, Stefan Fercot
 revision: 0.2
 url : http://clusterlabs.github.io/PAF/
@@ -12,7 +12,7 @@ url : http://clusterlabs.github.io/PAF/
 #
 
 theme: white
-transition: None 
+transition: None
 transition-speed: fast
 progress: true
 slideNumber: true
@@ -85,7 +85,11 @@ de nouveau disponibles.
 
 Passer outre ce mécanisme, c'est s'exposer de façon certaine à des situations de `split brain` où deux instances
 PostgreSQL sont accessibles en écriture au sein du cluster, mais ne répliquent pas entre elles. Réconcilier les données
-entre ces deux instances peut devenir un véritable calvaire et provoquer une ou plusieurs indisponibilités.
+entre ces deux instances peut devenir un véritable calvaire et provoquer une ou plusieurs indisponibilités. Voici un
+exemple réel d'un tel évènement:
+<https://blog.github.com/2018-10-30-oct21-post-incident-analysis/>. Ici, une certaine quantité de donnée n'a pas été
+répliquée de l'ancien primaire vers le nouveau avant la bascule. En conséquence, plusieurs jours ont été nécessaire
+afin de réintégrer et réconscillier les données dans le cluster fraichement reconstruit.
 
 Ne sous-estimez jamais le pouvoir d'innovation en terme d'incident des briques de votre cluster pour provoquer une
 partition des nœuds entre eux. En voici quelques exemples: <https://aphyr.com/posts/288-the-network-is-reliable>
