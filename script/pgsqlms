@@ -785,8 +785,8 @@ sub _check_locations {
 
 # _check_switchover
 # check if the pgsql switchover to the localnode is safe.
-# This is supposed to be called **after** the master has been stopped or demote.
-# This sub check if the local standby received the shutdown checkpoint from the
+# This is supposed to be called **after** the master has been stopped or demoted.
+# This sub checks if the local standby received the shutdown checkpoint from the
 # old master to make sure it can take over the master role and the old master
 # will be able to catchup as a standby after.
 #
@@ -852,7 +852,7 @@ sub _check_switchover {
     }
 
     ocf_exit_reason(
-        'Did not received the shutdown checkpoint from the old master!' );
+        'Did not receive the shutdown checkpoint from the old master!' );
 
     return 1;
 }
@@ -1289,19 +1289,19 @@ sub pgsql_validate_all {
 
     # check pgdata
     if ( ! -d $pgdata ) {
-        ocf_exit_reason( 'PGDATA "%s" does not exists', $pgdata );
+        ocf_exit_reason( 'PGDATA "%s" does not exist', $pgdata );
         exit $OCF_ERR_ARGS;
     }
 
     # check datadir
     if ( ! -d $datadir ) {
-        ocf_exit_reason( 'data_directory "%s" does not exists', $datadir );
+        ocf_exit_reason( 'data_directory "%s" does not exist', $datadir );
         exit $OCF_ERR_ARGS;
     }
 
     # check PG_VERSION
     if ( ! -s "$datadir/PG_VERSION" ) {
-        ocf_exit_reason( 'PG_VERSION does not exists in "%s"', $datadir );
+        ocf_exit_reason( 'PG_VERSION does not exist in "%s"', $datadir );
         exit $OCF_ERR_ARGS;
     }
 
