@@ -1269,7 +1269,7 @@ sub pgsql_validate_all {
     $ans = qx{ $CRM_RESOURCE --resource "$OCF_RESOURCE_INSTANCE" \\
                  --meta --get-parameter notify 2>/dev/null };
     chomp $ans;
-    unless ( $ans eq 'true' ) {
+    unless ( lc($ans) =~ /^true$|^on$|^yes$|^y$|^1$/ ) {
         ocf_exit_reason(
             'You must set meta parameter notify=true for your master resource'
         );
