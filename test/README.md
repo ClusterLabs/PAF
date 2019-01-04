@@ -91,3 +91,18 @@ Find all existing VM created by vagrant on your system:
 ~~~
 vagrant global-status
 ~~~
+
+Shutdown all VM:
+
+~~~
+vagrant ssh -c "sudo pcs resource disable pgsql-ha --wait"
+vagrant halt
+~~~
+
+Restart cluster:
+
+~~~
+vagrant up
+vagrant ssh -c "sudo pcs cluster start --all"
+vagrant ssh -c "sudo pcs resource enable pgsql-ha --wait"
+~~~
