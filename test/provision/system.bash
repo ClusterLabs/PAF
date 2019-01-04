@@ -61,3 +61,7 @@ target="log-sink.${DOMAIN}" Port="514" Protocol="tcp")
 EOF
 
 systemctl restart rsyslog
+
+# remove management nameserver DNS from resolv.conf
+nmcli conn modify "System eth0" ipv4.dns "" ipv4.ignore-auto-dns yes
+nmcli conn up "System eth0"
