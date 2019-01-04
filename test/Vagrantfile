@@ -72,7 +72,7 @@ Vagrant.configure(2) do |config|
     end
 
     # setup master instance on first node
-    config.vm.define first_node do |node|
+    config.vm.define first_node, primary:true do |node|
         node.vm.provision 'pgsql-primary', type: 'shell',
             path: 'provision/pgsql-primary.bash',
             args: [ pgver, pgdata, master_ip, first_node, domain ]
