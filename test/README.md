@@ -28,48 +28,66 @@ vagrant plugin install vagrant-libvirt
 ~~~
 
 Pacemaker must be able to ssh to the libvirt host with no password using a user able
-to `virsh destroy $other_vm`. Copy `<PAF>/test/ssh/id_rsa.pub`
-inside `user@host:~/.ssh/authorized_keys`.
+to `virsh destroy $other_vm`. Here are the steps:
 
-The user might need to be in group `libvirt` and to add `uri_default='qemu:///system'`
-in its file `~<user>/.config/libvirt/libvirt.conf`. Eg.:
+* copy `<PAF>/test/ssh/id_rsa.pub` inside `user@host:~/.ssh/authorized_keys`
+* edit `ssh_login` in the `vagrant.yml` configuration file
+* user might need to be in group `libvirt`
+* user might need to add `uri_default='qemu:///system'` in its
+  file `~<user>/.config/libvirt/libvirt.conf`
+
+Here is a setup example:
 
 ~~~
 root$ usermod -a -G libvirt "$USER"
 root$ su - $USER
 user$ mkdir -p "${HOME}/.config/libvirt"
 user$ echo "uri_default='qemu:///system'" > "${HOME}/.config/libvirt/libvirt.conf"
-user$ cat "${HOME}/.git/PAF/test/ssh/id_rsa.pub" >> ${HOME}/.ssh/authorized_keys
+user$ git clone git@github.com:ioguix/PAF.git
+user$ cd PAF/test
+user$ cat "ssh/id_rsa.pub" >> "${HOME}/.ssh/authorized_keys"
+user$ echo "ssh_login: $USER" >> vagrant.yml
 ~~~
 
 ## Creating the cluster
 
 To create the cluster, run:
 
-  make all
+~~~
+make all
+~~~
 
 After some minutes and tons of log messages, you can connect to your servers using eg.:
 
-  vagrant ssh srv1
-  vagrant ssh log-sink
+~~~
+vagrant ssh srv1
+vagrant ssh log-sink
+~~~
 
 ## Destroying the cluster
 
 To destroy your cluster, run:
 
-  vagrant destroy -f
+~~~
+vagrant destroy -f
+~~~
+
 
 ## Customization
 
-You can edit file `vagrant.conf.rb`:
+You can edit file `vagrant.yml`:
 
-  mv vagrant.yml-dist vagrant.yml
-  $EDITOR vagrant.yml
-  make clean
-  make all
+~~~
+mv vagrant.yml-dist vagrant.yml
+$EDITOR vagrant.yml
+make clean
+make all
+~~~
 
 ## Tips
 
 Find all existing VM created by vagrant on your system:
 
-  vagrant global-status
+~~~
+vagrant global-status
+~~~
