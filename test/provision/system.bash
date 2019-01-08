@@ -22,6 +22,7 @@ PACKAGES=(
     "postgresql${PGVER}"
     "postgresql${PGVER}-server"
     "postgresql${PGVER}-contrib"
+    screen vim
 )
 
 yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"

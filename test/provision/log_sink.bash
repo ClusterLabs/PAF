@@ -6,6 +6,7 @@ set -o pipefail
 
 DOMAIN="$1"
 
+# setup log sink
 cat <<'EOF' > /etc/rsyslog.d/log_sink.conf
 $ModLoad imtcp 
 $InputTCPServerRun 514
@@ -19,3 +20,11 @@ $template RemoteLogs,"/var/log/%HOSTNAME%/%PROGRAMNAME%.log"
 EOF
 
 systemctl restart rsyslog
+
+# install packages
+
+PACKAGES=(
+    screen vim
+)
+
+yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"
