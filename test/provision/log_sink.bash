@@ -28,3 +28,6 @@ PACKAGES=(
 )
 
 yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"
+
+# allow passwordless ssh connections between nodes as root.
+cat ~root/.ssh/id_rsa.pub >> ~root/.ssh/authorized_keys
