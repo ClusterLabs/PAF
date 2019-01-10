@@ -95,6 +95,7 @@ vagrant up --provision-with=cts
 Then, you'll be able to start te exerciser from the log-sink server using eg.:
 
 ~~~
+vagrant ssh -c "sudo pcs cluster stop --all"
 vagrant ssh log-sink
 sudo -i
 cd /usr/share/pacemaker/tests/cts
