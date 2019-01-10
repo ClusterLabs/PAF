@@ -8,7 +8,7 @@ PGVER="$1"
 HAPASS="$2"
 NETWORK="$3"
 MASTER_IP="$4"
-DOMAIN="$5"
+NODENAME="$5"
 
 # install required packages
 P=$(curl -s "https://download.postgresql.org/pub/repos/yum/${PGVER}/redhat/rhel-7-x86_64/"|grep -Eo "pgdg-centos[0-9.]+-${PGVER}-[0-9]+\.noarch.rpm"|head -1)
@@ -58,10 +58,14 @@ queue.type="LinkedList"
 queue.filename="log_sink_fwd"
 action.resumeRetryCount="-1"
 queue.saveonshutdown="on"
-target="log-sink.${DOMAIN}" Port="514" Protocol="tcp")
+target="log-sink" Port="514" Protocol="tcp")
 EOF
 
 systemctl restart rsyslog
+
+# do not resolv node name as localhost. Corosync needs to resolv
+# local host name on its cluster IP.
+sed -ri "/^127.0.0.1\s+${NODENAME}/d" /etc/hosts
 
 # remove management nameserver DNS from resolv.conf
 nmcli conn modify "System eth0" ipv4.dns "" ipv4.ignore-auto-dns yes

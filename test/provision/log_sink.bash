@@ -4,8 +4,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-DOMAIN="$1"
-
 # setup log sink
 cat <<'EOF' > /etc/rsyslog.d/log_sink.conf
 $ModLoad imtcp 

@@ -6,23 +6,17 @@ set -o pipefail
 
 PGVER="$1"
 HAPASS="$2"
-DOMAIN="$3"
-MASTER_IP="$4"
-SSH_LOGIN="$5"
-VM_PREFIX="$6"
-HOST_IP="$7"
-PGDATA="$8"
-shift 8
+MASTER_IP="$3"
+SSH_LOGIN="$4"
+VM_PREFIX="$5"
+HOST_IP="$6"
+PGDATA="$7"
+shift 7
 NODES=( "$@" )
-NODES_DOMAIN=()
 
-for VM in "${NODES[@]}"; do
-    NODES_DOMAIN+=( "${VM}.${DOMAIN}" )
-done
+pcs cluster auth -u hacluster -p "${HAPASS}" "${NODES[@]}"
 
-pcs cluster auth -u hacluster -p "${HAPASS}" "${NODES_DOMAIN[@]}"
-
-pcs cluster setup --name cluster_pgsql --wait --force "${NODES_DOMAIN[@]}"
+pcs cluster setup --name cluster_pgsql --wait --force "${NODES[@]}"
 
 pcs stonith sbd enable
 
@@ -36,14 +30,13 @@ pcs -f cluster1.xml property set stonith-watchdog-timeout=10s
 
 for VM in "${NODES[@]}"; do
     FENCE_ID="fence_vm_${VM}"
-    NODE_DOMAIN="${VM}.${DOMAIN}"
     VM_PORT="${VM_PREFIX}_${VM}"
     pcs -f cluster1.xml stonith create "${FENCE_ID}" fence_virsh    \
-        pcmk_host_check=static-list "pcmk_host_list=${NODE_DOMAIN}" \
+        pcmk_host_check=static-list "pcmk_host_list=${VM}" \
         "port=${VM_PORT}" "ipaddr=${HOST_IP}" "login=${SSH_LOGIN}"  \
         "identity_file=/root/.ssh/id_rsa"
     pcs -f cluster1.xml constraint location "fence_vm_${VM}" \
-        avoids "${NODE_DOMAIN}"=INFINITY
+        avoids "${VM}=INFINITY"
 done
 
 pcs -f cluster1.xml resource create pgsqld "ocf:heartbeat:pgsqlms" \
@@ -63,8 +56,8 @@ pcs -f cluster1.xml resource create pgsql-master-ip           \
     op monitor interval=10s
 
 pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsql-ha INFINITY
-pcs -f cluster1.xml constraint order promote pgsql-ha then start pgsql-master-ip symmetrical=false
-pcs -f cluster1.xml constraint order demote pgsql-ha then stop pgsql-master-ip symmetrical=false
+pcs -f cluster1.xml constraint order promote pgsql-ha "then" start pgsql-master-ip symmetrical=false
+pcs -f cluster1.xml constraint order demote pgsql-ha "then" stop pgsql-master-ip symmetrical=false
 
 pcs cluster cib-push scope=configuration cluster1.xml --wait
 

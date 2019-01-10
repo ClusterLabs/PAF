@@ -8,7 +8,6 @@ PGVER="$1"
 PGDATA="$2"
 MASTER_IP="$3"
 NODENAME="$4"
-DOMAIN="$5"
 
 systemctl stop "postgresql-${PGVER}"
 systemctl disable "postgresql-${PGVER}"
@@ -19,15 +18,15 @@ rm -rf "${PGDATA}"
 
 # pg_hba setup
 cat<<EOC > "${PGDATA}/pg_hba.conf"
-local all         all                             trust
-host  all         all      0.0.0.0/0              trust
+local all         all                      trust
+host  all         all      0.0.0.0/0       trust
 
 # forbid self-replication
-host  replication postgres ${MASTER_IP}/32        reject
-host  replication postgres ${NODENAME}.${DOMAIN}  reject
+host  replication postgres ${MASTER_IP}/32 reject
+host  replication postgres ${NODENAME}     reject
 
 # allow any standby connection
-host  replication postgres 0.0.0.0/0              trust
+host  replication postgres 0.0.0.0/0       trust
 EOC
 
 systemctl start "postgresql-${PGVER}"
@@ -50,7 +49,7 @@ EOS
 # recovery.conf setup
 cat<<EOC > "${PGDATA}/recovery.conf.pcmk"
 standby_mode = on
-primary_conninfo = 'host=${MASTER_IP} application_name=${NODENAME}.${DOMAIN}'
+primary_conninfo = 'host=${MASTER_IP} application_name=${NODENAME}'
 recovery_target_timeline = 'latest'
 EOC
 

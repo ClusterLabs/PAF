@@ -9,7 +9,6 @@ ssh_login = 'root' # ssh login to connect to the host when fencing a VM.
                      # put "./ssh/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
 master_ip = '10.20.30.5' # vIP assigned to master
 nodes     = 'srv1', 'srv2', 'srv3' # servers to create. First one will be master
-domain    = 'priv'   # private network domain name to use
 vm_prefix = 'paf_c7'
 
 if File.file?('vagrant.yml') and ( custom = YAML.load_file('vagrant.yml') )
@@ -18,7 +17,6 @@ if File.file?('vagrant.yml') and ( custom = YAML.load_file('vagrant.yml') )
     ssh_login = custom['ssh_login'] if custom.has_key?('ssh_login')
     master_ip = custom['master_ip'] if custom.has_key?('master_ip')
     nodes     = custom['nodes']     if custom.has_key?('nodes')
-    domain    = custom['domain']    if custom.has_key?('domain')
     vm_prefix = custom['vm_prefix'] if custom.has_key?('vm_prefix')
 end
 
@@ -51,23 +49,20 @@ Vagrant.configure(2) do |config|
     config.vm.define 'log-sink' do |conf|
         conf.vm.hostname = 'log-sink'
         conf.vm.network 'private_network', type: 'dhcp',
-            libvirt__domain_name:     domain,
             libvirt__network_address: network,
             libvirt__dhcp_start:      net_dhcp_start
 
-        conf.vm.provision 'log-sink', type: 'shell', path: 'provision/log_sink.bash',
-            args: [ domain ]
+        conf.vm.provision 'log-sink', type: 'shell', path: 'provision/log_sink.bash'
     end
 
     nodes.each do |node|
         config.vm.define node do |conf|
             conf.vm.hostname = node
             conf.vm.network 'private_network', type: 'dhcp',
-                libvirt__domain_name:     domain,
                 libvirt__network_address: network,
                 libvirt__dhcp_start:      net_dhcp_start
             conf.vm.provision 'system-setup', type: 'shell', path: 'provision/system.bash',
-                args: [ pgver, hapass, network, master_ip, domain ]
+                args: [ pgver, hapass, network, master_ip, node ]
         end
     end
 
@@ -75,14 +70,14 @@ Vagrant.configure(2) do |config|
     config.vm.define first_node, primary:true do |node|
         node.vm.provision 'pgsql-primary', type: 'shell',
             path: 'provision/pgsql-primary.bash',
-            args: [ pgver, pgdata, master_ip, first_node, domain ]
+            args: [ pgver, pgdata, master_ip, first_node ]
     end
 
     # replicas setup. Use "vagrant up --provision-with=pgsql-replicas"
     nodes.select{|e| e != first_node}.each do |node|
         config.vm.define node do |conf|
             conf.vm.provision 'pgsql-replicas', type: 'shell', path: 'provision/pgsql-replicas.bash',
-                args: [ pgver, pgdata, master_ip, node, domain ],
+                args: [ pgver, pgdata, master_ip, node ],
                 run: 'never'
         end
     end
@@ -90,7 +85,7 @@ Vagrant.configure(2) do |config|
     # cluster setup. Use "vagrant up --provision-with=ha"
     config.vm.define first_node do |node|
         node.vm.provision 'pacemaker', type: 'shell', path:'provision/pacemaker.bash',
-            args: [ pgver, hapass, domain, master_ip, ssh_login,
+            args: [ pgver, hapass, master_ip, ssh_login,
                     vm_prefix, host_ip, pgdata ] + nodes,
             run: 'never'
     end
