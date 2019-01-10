@@ -84,6 +84,26 @@ make clean
 make all
 ~~~
 
+## Cluster Test Suite
+
+You can install the Cluster Test Suite from the Pacemaker project using:
+
+~~~
+vagrant up --provision-with=cts
+~~~
+
+Then, you'll be able to start te exerciser from the log-sink server using eg.:
+
+~~~
+vagrant ssh log-sink
+sudo -i
+cd /usr/share/pacemaker/tests/cts
+./CTSlab.py --nodes "srv1 srv2 srv3" --outputfile ~/cts.log $NTESTS
+~~~
+
+Where `NTESTS` is the number of tests to run, picked randomly amongs seeral
+existing ones.
+
 ## Tips
 
 Find all existing VM created by vagrant on your system:
