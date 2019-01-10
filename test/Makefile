@@ -16,5 +16,9 @@ clean:
 	vagrant destroy -f
 
 validate:
-	vagrant validate
+	@vagrant validate
+	@if which shellcheck >/dev/null                                          ;\
+	then shellcheck provision/*                                              ;\
+	else echo "WARNING: shellcheck is not in PATH, not checking bash syntax" ;\
+	fi
 
