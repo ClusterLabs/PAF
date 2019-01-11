@@ -52,6 +52,7 @@ if [ "$HAS_MASTER_IP" -gt 0 ]; then
     ip addr del "${MASTER_IP}/24" dev "${DEV/dev }"
 fi
 
+# send logs to log-sinks
 cat <<EOF >/etc/rsyslog.d/fwd_log_sink.conf
 *.* action(type="omfwd"
 queue.type="LinkedList"
@@ -70,6 +71,3 @@ sed -ri "/^127.0.0.1\s+${NODENAME}/d" /etc/hosts
 # remove management nameserver DNS from resolv.conf
 nmcli conn modify "System eth0" ipv4.dns "" ipv4.ignore-auto-dns yes
 nmcli conn up "System eth0"
-
-# allow passwordless ssh connections between nodes as root.
-cat ~root/.ssh/id_rsa.pub >> ~root/.ssh/authorized_keys

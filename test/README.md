@@ -99,11 +99,24 @@ vagrant ssh -c "sudo pcs cluster stop --all"
 vagrant ssh log-sink
 sudo -i
 cd /usr/share/pacemaker/tests/cts
-./CTSlab.py --nodes "srv1 srv2 srv3" --outputfile ~/cts.log $NTESTS
+./CTSlab.py --nodes "srv1 srv2 srv3" --outputfile ~/cts.log --once
 ~~~
 
-Where `NTESTS` is the number of tests to run, picked randomly amongs seeral
-existing ones.
+You can select the test you want to run with:
+
+~~~
+./CTSlab.py --nodes "srv1 srv2 srv3" --list-tests
+./CTSlab.py --nodes "srv1 srv2 srv3" --outputfile ~/cts.log --choose <$NAME> 1
+~~~
+
+Where `<$NAME>` is the name of the test you want to run.
+
+You can select exercise the cluster randomly and repetitively with:
+
+~~~
+./CTSlab.py --nodes "srv1 srv2 srv3" --list-tests
+./CTSlab.py --nodes "srv1 srv2 srv3" --outputfile ~/cts.log <$NTESTS>
+~~~
 
 ## Tips
 

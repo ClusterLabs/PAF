@@ -9,6 +9,9 @@ pgsql-replicas:
 pacemaker:
 	vagrant up --provision-with=pacemaker
 
+cts:
+	vagrant up --provision-with=cts
+
 prov:
 	vagrant up --provision
 
