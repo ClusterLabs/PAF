@@ -14,5 +14,5 @@ yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"
 
 # make journald logs persistent
 # other log watching methods does not look robust...
-mkdir /var/log/journal
+mkdir -p /var/log/journal
 systemctl restart systemd-journald
