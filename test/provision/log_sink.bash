@@ -14,7 +14,7 @@ $template RemoteLogsMerged,"/var/log/%HOSTNAME%/messages.log"
 
 $template RemoteLogs,"/var/log/%HOSTNAME%/%PROGRAMNAME%.log"
 *.* ?RemoteLogs
-& ~
+#& ~
 EOF
 
 systemctl restart rsyslog

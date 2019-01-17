@@ -12,7 +12,7 @@ pacemaker:
 pgsql-primary:
 	vagrant up --provision-with=pgsql-primary
 
-cts:
+cts: all
 	vagrant up --provision-with=cts
 
 prov:
