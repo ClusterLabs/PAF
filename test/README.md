@@ -2,10 +2,10 @@
 
 This `Vagrantfile` is bootstrapping a fresh cluster with:
 
-* servers srv1, srv2 and srv3 hosting a pgsql cluster with streaming replication
-* pgsql primary is on srv1 and the two standby are on srv2 and srv3
-* server log-sink where all logs from srv1, srv2 and srv3 and collected under `/var/log/<server>`
-* pacemaker stack is setup on srv1, srv2 and srv3
+* servers `srv1`, `srv2` and `srv3` hosting a pgsql cluster with streaming replication
+* pgsql primary is on `srv1` and the two standby are on `srv2` and `srv3`
+* server `log-sink` where all logs from `srv1`, `srv2` and `srv3` are collected under `/var/log/<server>`
+* pacemaker stack is setup on `srv1`, `srv2` and `srv3`
 * fencing using fence_virsh
 * watchdog enabled
 
@@ -78,7 +78,7 @@ vagrant destroy -f
 You can edit file `vagrant.yml`:
 
 ~~~
-mv vagrant.yml-dist vagrant.yml
+cp vagrant.yml-dist vagrant.yml
 $EDITOR vagrant.yml
 make clean
 make all
@@ -92,7 +92,7 @@ You can install the Cluster Test Suite from the Pacemaker project using:
 vagrant up --provision-with=cts
 ~~~
 
-Then, you'll be able to start te exerciser from the log-sink server using eg.:
+Then, you'll be able to start the exerciser from the log-sink server using eg.:
 
 ~~~
 vagrant ssh -c "sudo pcs cluster stop --all"

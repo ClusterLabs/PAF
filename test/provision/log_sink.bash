@@ -18,19 +18,3 @@ $template RemoteLogs,"/var/log/%HOSTNAME%/%PROGRAMNAME%.log"
 EOF
 
 systemctl restart rsyslog
-
-# install packages
-
-PACKAGES=(
-    screen vim
-)
-
-yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"
-
-# remove management nameserver DNS from resolv.conf
-nmcli conn modify "System eth0" ipv4.dns "" ipv4.ignore-auto-dns yes
-nmcli conn up "System eth0"
-
-# allow passwordless ssh connections between nodes as root.
-cat ~root/.ssh/id_rsa.pub >> ~root/.ssh/authorized_keys
-
