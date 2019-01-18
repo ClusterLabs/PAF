@@ -15,7 +15,7 @@ No need to set it up ourselves.
 ## Pre-requisits:
 
 You need `vagrant` and `vagrant-libvirt`. Everything is tested with versions 2.0.2 and
-0.0.45. Please, report your versions if it works with inferior ones.
+0.0.40. Please, report your versions if it works with inferior ones.
 
 ~~~
 apt install vagrant vagrant-libvirt
