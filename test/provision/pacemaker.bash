@@ -61,6 +61,4 @@ pcs -f cluster1.xml constraint order demote pgsql-ha "then" stop pgsql-master-ip
 
 pcs cluster cib-push scope=configuration cluster1.xml --wait
 
-pcs config
-
-crm_mon -nr1
+crm_mon -Dn1

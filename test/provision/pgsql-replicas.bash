@@ -10,8 +10,7 @@ MASTER_IP="$3"
 NODENAME="$4"
 
 # cleanup
-systemctl stop "postgresql-${PGVER}"
-systemctl disable "postgresql-${PGVER}"
+systemctl --quiet --now disable "postgresql-${PGVER}"
 rm -rf "${PGDATA}"
 
 # build standby
@@ -45,4 +44,4 @@ cp "${PGDATA}/recovery.conf.pcmk" "${PGDATA}/recovery.conf"
 chown -R "postgres:postgres" "${PGDATA}/.."
 
 # start
-systemctl start "postgresql-${PGVER}"
+systemctl --quiet start "postgresql-${PGVER}"

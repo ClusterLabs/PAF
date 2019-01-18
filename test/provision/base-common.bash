@@ -25,16 +25,14 @@ PACKAGES=(
 yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"
 
 # firewall setup
-systemctl enable firewalld
-systemctl start  firewalld
+systemctl --quiet --now enable firewalld
 firewall-cmd --quiet --permanent --add-service=high-availability
 firewall-cmd --quiet --permanent --add-service=postgresql
 firewall-cmd --quiet --reload
 
 # cluster stuffs
-systemctl enable pcsd
-systemctl start  pcsd
-echo "${HAPASS}"|passwd --stdin hacluster
+systemctl --quiet --now enable pcsd
+echo "${HAPASS}"|passwd --stdin hacluster > /dev/null 2>&1
 cp /etc/sysconfig/pacemaker /etc/sysconfig/pacemaker.dist
 cat<<'EOF' > /etc/sysconfig/pacemaker
 PCMK_debug=yes
@@ -59,4 +57,4 @@ queue.saveonshutdown="on"
 target="log-sink" Port="514" Protocol="tcp")
 EOF
 
-systemctl restart rsyslog
+systemctl --quiet restart rsyslog

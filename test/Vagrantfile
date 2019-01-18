@@ -61,7 +61,8 @@ Vagrant.configure(2) do |config|
         config.vm.define node do |conf|
             conf.vm.network 'private_network', ip: nodes_ips[node]
             conf.vm.provision 'system-setup', type: 'shell', path: 'provision/system.bash',
-                args: [ node ] + nodes_ips.keys.map {|n| "#{n}=#{nodes_ips[n]}"}
+                args: [ node ] + nodes_ips.keys.map {|n| "#{n}=#{nodes_ips[n]}"},
+                preserve_order: true
         end
     end
 
@@ -73,24 +74,25 @@ Vagrant.configure(2) do |config|
     # common postgresql+pacemaker installation and setup
     pg_nodes.each do |node|
         config.vm.define node do |conf|
-            config.vm.provision 'pgsql-common', type: 'shell', path: 'provision/base-common.bash',
-                args: [ pgver, hapass, master_ip ]
+            conf.vm.provision 'base-common', type: 'shell', path: 'provision/base-common.bash',
+                args: [ pgver, hapass, master_ip ],
+                preserve_order: true
         end
     end
 
     # build primary pgsql instance
-    config.vm.define pg_nodes.first, primary:true do |node|
-        node.vm.provision 'pgsql-primary', type: 'shell',
+    config.vm.define pg_nodes.first, primary:true do |conf|
+        conf.vm.provision 'pgsql-primary', type: 'shell',
             path: 'provision/pgsql-primary.bash',
-            args: [ pgver, pgdata, master_ip, pg_nodes.first ]
+            args: [ pgver, pgdata, master_ip, pg_nodes.first ],
+            preserve_order: true
     end
 
     # replicas setup. Use "vagrant up --provision-with=pgsql-replicas"
     pg_nodes[1..-1].each do |node|
         config.vm.define node do |conf|
             conf.vm.provision 'pgsql-replicas', type: 'shell', path: 'provision/pgsql-replicas.bash',
-                args: [ pgver, pgdata, master_ip, node ],
-                run: 'never'
+                args: [ pgver, pgdata, master_ip, node ], run: 'never'
         end
     end
 

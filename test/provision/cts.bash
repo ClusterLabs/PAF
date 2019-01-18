@@ -18,7 +18,7 @@ $imjournalRatelimitInterval 0
 $imjournalRatelimitBurst 0
 EOF
 
-systemctl restart rsyslog
+systemctl --quiet restart rsyslog
 
 # make journald logs persistent
 mkdir -p /var/log/journal
@@ -30,4 +30,4 @@ RateLimitInterval=0
 RateLimitBurst=0
 EOF
 
-systemctl restart systemd-journald
+systemctl --quiet restart systemd-journald

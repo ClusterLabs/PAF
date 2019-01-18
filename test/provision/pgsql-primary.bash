@@ -9,8 +9,8 @@ PGDATA="$2"
 MASTER_IP="$3"
 NODENAME="$4"
 
-systemctl stop "postgresql-${PGVER}"
-systemctl disable "postgresql-${PGVER}"
+# cleanup
+systemctl --quiet --now disable "postgresql-${PGVER}"
 rm -rf "${PGDATA}"
 
 # init instance
@@ -29,10 +29,10 @@ host  replication postgres ${NODENAME}     reject
 host  replication postgres 0.0.0.0/0       trust
 EOC
 
-systemctl start "postgresql-${PGVER}"
+systemctl --quiet start "postgresql-${PGVER}"
 
 # postgresql.conf setup
-cat <<'EOS' | "/usr/pgsql-${PGVER}/bin/psql" -U postgres
+cat <<'EOS' | "/usr/pgsql-${PGVER}/bin/psql" --quiet --username=postgres
 ALTER SYSTEM SET "listen_addresses" TO '*';
 ALTER SYSTEM SET "wal_level" TO 'replica';
 ALTER SYSTEM SET "max_wal_senders" TO '10';
@@ -63,4 +63,4 @@ DEV=$(ip route show to "${MASTER_IP}/24"|grep -Eo 'dev \w+')
 ip addr add "${MASTER_IP}/24" dev "${DEV/dev }"
 
 # restart master pgsql
-systemctl restart "postgresql-${PGVER}"
+systemctl --quiet restart "postgresql-${PGVER}"

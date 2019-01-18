@@ -17,4 +17,4 @@ $template RemoteLogs,"/var/log/%HOSTNAME%/%PROGRAMNAME%.log"
 #& ~
 EOF
 
-systemctl restart rsyslog
+systemctl --quiet restart rsyslog
