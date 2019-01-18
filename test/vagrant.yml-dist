@@ -1,0 +1,11 @@
+# pgver: "10"             # pg version to use
+# hapass: "hapass"        # password for sys user hacluster 
+# ssh_login: "user"       # ssh login to connect to the host when fencing a VM.
+#                         # put "./ssh/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
+# master_ip: "10.20.30.5" # vIP assigned to master
+# pg_nodes:                  # servers to create.
+#   - "srv1"              # First one will be master
+#   - "srv2"
+#   - "srv3"
+# log_node: "log-sink"
+# vm_prefix: "paf_c7"
