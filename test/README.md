@@ -57,6 +57,7 @@ user$ echo "ssh_login: $USER" >> vagrant.yml
 To create the cluster, run:
 
 ~~~
+cd test
 make all
 ~~~
 
