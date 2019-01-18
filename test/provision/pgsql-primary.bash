@@ -32,7 +32,7 @@ EOC
 systemctl start "postgresql-${PGVER}"
 
 # postgresql.conf setup
-cat <<EOS | "/usr/pgsql-${PGVER}/bin/psql" -U postgres
+cat <<'EOS' | "/usr/pgsql-${PGVER}/bin/psql" -U postgres
 ALTER SYSTEM SET "listen_addresses" TO '*';
 ALTER SYSTEM SET "wal_level" TO 'replica';
 ALTER SYSTEM SET "max_wal_senders" TO '10';

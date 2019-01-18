@@ -39,7 +39,7 @@ systemctl enable pcsd
 systemctl start  pcsd
 echo "${HAPASS}"|passwd --stdin hacluster
 cp /etc/sysconfig/pacemaker /etc/sysconfig/pacemaker.dist
-cat<<EOF > /etc/sysconfig/pacemaker
+cat<<'EOF' > /etc/sysconfig/pacemaker
 PCMK_debug=yes
 PCMK_logpriority=debug
 EOF
@@ -53,7 +53,7 @@ if [ "$HAS_MASTER_IP" -gt 0 ]; then
 fi
 
 # send logs to log-sinks
-cat <<EOF >/etc/rsyslog.d/fwd_log_sink.conf
+cat <<'EOF' >/etc/rsyslog.d/fwd_log_sink.conf
 *.* action(type="omfwd"
 queue.type="LinkedList"
 queue.filename="log_sink_fwd"
