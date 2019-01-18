@@ -18,10 +18,13 @@ You need `vagrant` and `vagrant-libvirt`. Everything is tested with versions 2.0
 0.0.40. Please, report your versions if it works with inferior ones.
 
 ~~~
-apt install vagrant vagrant-libvirt
+apt install vagrant vagrant-libvirt # for Debian-like
+yum install vagrant vagrant-libvirt # for RH-like
+dnf install vagrant vagrant-libvirt # for recent RH-like
 ~~~
 
-You might be able to install vagrant-libvirt only for your current user using:
+Alternatively, you might be able to install vagrant-libvirt only for your current user
+using (depending on the system, this might not work):
 
 ~~~
 vagrant plugin install vagrant-libvirt
