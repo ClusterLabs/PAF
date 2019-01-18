@@ -46,7 +46,7 @@ root$ usermod -a -G libvirt "$USER"
 root$ su - $USER
 user$ mkdir -p "${HOME}/.config/libvirt"
 user$ echo "uri_default='qemu:///system'" > "${HOME}/.config/libvirt/libvirt.conf"
-user$ git clone git@github.com:ioguix/PAF.git
+user$ git clone git@github.com:ClusterLabs/PAF.git
 user$ cd PAF/test
 user$ cat "ssh/id_rsa.pub" >> "${HOME}/.ssh/authorized_keys"
 user$ echo "ssh_login: $USER" >> vagrant.yml
