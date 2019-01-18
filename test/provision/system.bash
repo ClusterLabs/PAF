@@ -22,3 +22,6 @@ PACKAGES=(
 )
 
 yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"
+
+# force proper permissions on .ssh files
+chmod -R 0600 /root/.ssh/
