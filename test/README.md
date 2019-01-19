@@ -18,9 +18,10 @@ You need `vagrant` and `vagrant-libvirt`. Everything is tested with versions 2.0
 0.0.40. Please, report your versions if it works with inferior ones.
 
 ~~~
-apt install vagrant vagrant-libvirt # for Debian-like
-yum install vagrant vagrant-libvirt # for RH-like
-dnf install vagrant vagrant-libvirt # for recent RH-like
+apt install make vagrant vagrant-libvirt libvirt-clients # for Debian-like
+yum install make vagrant vagrant-libvirt libvirt-client # for RH-like
+dnf install make vagrant vagrant-libvirt libvirt-client # for recent RH-like
+systemctl enable --now libvirtd
 ~~~
 
 Alternatively, you might be able to install vagrant-libvirt only for your current user
@@ -42,14 +43,16 @@ to `virsh destroy $other_vm`. Here are the steps:
 Here is a setup example:
 
 ~~~
-root$ usermod -a -G libvirt "$USER"
-root$ su - $USER
-user$ mkdir -p "${HOME}/.config/libvirt"
-user$ echo "uri_default='qemu:///system'" > "${HOME}/.config/libvirt/libvirt.conf"
-user$ git clone git@github.com:ClusterLabs/PAF.git
-user$ cd PAF/test
-user$ cat "ssh/id_rsa.pub" >> "${HOME}/.ssh/authorized_keys"
-user$ echo "ssh_login: $USER" >> vagrant.yml
+####  Replace "myuser" with your usual user  ####
+root$ export MYUSER=myuser
+root$ usermod -a -G libvirt "$MYUSER"
+root$ su - $MYUSER
+myuser$ mkdir -p "${HOME}/.config/libvirt"
+myuser$ echo "uri_default='qemu:///system'" > "${HOME}/.config/libvirt/libvirt.conf"
+myuser$ git clone https://github.com/ClusterLabs/PAF.git
+myuser$ cd PAF/test
+myuser$ cat "ssh/id_rsa.pub" >> "${HOME}/.ssh/authorized_keys"
+myuser$ echo "ssh_login: \"$USER\"" >> vagrant.yml
 ~~~
 
 ## Creating the cluster
@@ -57,7 +60,7 @@ user$ echo "ssh_login: $USER" >> vagrant.yml
 To create the cluster, run:
 
 ~~~
-cd test
+cd PAF/test
 make all
 ~~~
 
