@@ -9,7 +9,8 @@ This is a bugfix release with no new features.
 
 * fix: Fix checking for notify=true, YanChii
 * fix: forbid pg_isready to timeout before the action itself, ioguix
-* misc: Avoid flooding log files with warning about non used nodes, suggested by timdeluxe on github
+* misc: avoid flooding log files when system_user is not postgres, patch by TBP2k18 on github
+* misc: avoid flooding log files with warning about non used nodes, suggested by timdeluxe on github
 * misc: few typos fixes, YanChii
 
 
