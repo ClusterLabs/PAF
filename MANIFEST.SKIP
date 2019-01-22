@@ -74,3 +74,6 @@
 
 # Avoid developers doc
 ^docs\/dev\/.*
+
+# Avoid test folder
+^test\/.*
