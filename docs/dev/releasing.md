@@ -32,8 +32,10 @@ Edit the `CHANGELOG.md` file.
 
 ## Commit the changes
 
+Check tat every issues related to this release has been closed!
+
 ```
-git commit -am 'vX.Y.0 release'
+git commit -m 'vX.Y.0 release'
 ```
 
 For beta or rc release use `vX.Y_betaN` or `vX.Y_rcN`, eg. `v2.2_beta1`.
