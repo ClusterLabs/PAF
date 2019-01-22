@@ -39,11 +39,13 @@ to `virsh destroy $other_vm`. Here are the steps:
 * user might need to be in group `libvirt`
 * user might need to add `uri_default='qemu:///system'` in its
   file `~<user>/.config/libvirt/libvirt.conf`
+* make sure sshd is started on the host
 
 Here is a setup example:
 
 ~~~
 ####  Replace "myuser" with your usual user  ####
+root$ systemctl start sshd
 root$ export MYUSER=myuser
 root$ usermod -a -G libvirt "$MYUSER"
 root$ su - $MYUSER
