@@ -1,3 +1,19 @@
+# PAF v2.2.1
+
+Release date: 2019-0x-yy
+
+__WARNING__: This version is only compatible with at least Pacemaker 1.1.13 using
+a corosync 2.x stack.
+
+This is a bugfix release with no new features.
+
+* fix: Fix checking for notify=true, YanChii
+* fix: forbid pg_isready to timeout before the action itself, ioguix
+* misc: Avoid flooding log files with warning about non used nodes, suggested by timdeluxe on github
+* misc: few typos fixes, YanChii
+
+
+
 # PAF v2.2.0
 
 Release date: 2017-09-12
