@@ -479,7 +479,10 @@ sub _runas {
 # Check if instance is listening on the given host/port.
 #
 sub _pg_isready {
-    my $rc = _runas( $PGISREADY, '-h', $pghost, '-p', $pgport );
+    # Add 60s to the timeout or use a 24h timeout fallback to make sure
+    # Pacemaker will give up before us and take decisions
+    my $timeout = ( _get_action_timeout() || 60*60*24 )  + 60;
+    my $rc = _runas( $PGISREADY, '-h', $pghost, '-p', $pgport, '-t', $timeout );
 
     # Possible error codes:
     #   1: ping rejected (usually when instance is in startup, in crash
