@@ -96,7 +96,7 @@ use OCF_Directories;
 BEGIN {
     use Exporter;
 
-    our $VERSION   = 'v2.2.0';
+    our $VERSION   = 'v2.2.1_rc1';
     our @ISA       = ('Exporter');
     our @EXPORT    = qw(
         $__OCF_ACTION
