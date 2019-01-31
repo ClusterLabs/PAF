@@ -141,7 +141,7 @@ maintenance mode and update PAF, eg.:
 
 ```
 # pcs property set maintenance-mode=true
-# yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
+# yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.1/resource-agents-paf-2.2.1-1.noarch.rpm
 # pcs property set maintenance-mode=false
 ```
 
@@ -188,7 +188,7 @@ for the `pgsql-ha` resource and `enabled=false` appeared for the monitor actions
 Now, update PAF, eg.:
 
 ```
-# yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf-2.2.0-1.noarch.rpm
+# yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.1/resource-agents-paf-2.2.1-1.noarch.rpm
 ```
 
 We can now put the resource in `managed` mode again and enable the monitor actions:

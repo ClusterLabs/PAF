@@ -109,8 +109,8 @@ maintenance mode and update PAF, eg.:
 
 ```
 # crm configure property maintenance-mode=true
-# wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-2_all.deb'
-# dpkg -i resource-agents-paf_2.2.0-2_all.deb
+# wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.1/resource-agents-paf_2.2.1-1_all.deb'
+# dpkg -i resource-agents-paf_2.2.1-1_all.deb
 # crm configure property maintenance-mode=false
 ```
 
@@ -171,8 +171,8 @@ Edit these operations in your favorite editor using:
 Now, update PAF, eg.:
 
 ```
-# wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.0/resource-agents-paf_2.2.0-2_all.deb'
-# dpkg -i resource-agents-paf_2.2.0-2_all.deb
+# wget 'https://github.com/ClusterLabs/PAF/releases/download/v2.2.1/resource-agents-paf_2.2.1-1_all.deb'
+# dpkg -i resource-agents-paf_2.2.1-1_all.deb
 ```
 
 We can now enable the recurrent actions:
