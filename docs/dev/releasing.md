@@ -12,11 +12,11 @@ Edit varable `$VERSION` in the following files:
 In `Build.PL`, search and edit the following line:
 
 ```
-dist_version       => '1.0.0'
+dist_version       => '1.0.0',
+release_status     => 'stable',
 ```
 
-For beta or rc release, set `release_status => 'testing'`, otherwise set it to
-`stable`.
+For beta or rc release, set `release_status => 'testing'`.
 
 In `resource-agents-paf.spec`:
   * update the tag in the `_tag` variable (first line)
@@ -26,7 +26,7 @@ In `resource-agents-paf.spec`:
   * take care of the `Release` field if there is multiple version of the package
     for the same version of PAF
 
-In `debian/`, edit the `changelog` file
+In `debian/`, edit the `changelog` file.
 
 Edit the `CHANGELOG.md` file.
 
