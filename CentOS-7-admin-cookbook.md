@@ -79,6 +79,20 @@ srv1: Stopping Cluster (corosync)...
 This last command is perfectly safe and your cluster will start cleanly when
 desired.
 
+To avoid moving your resources around during cluster shutdown (eg. if one node is shutting
+down slowly), ask the cluster to stop the resource first. Eg.:
+
+```
+pcs resource disable pgsql-ha --wait
+pcs cluster stop --all
+```
+
+On custer startup, you will have to do the opposite action:
+
+```
+pcs cluster start --all --wait
+pcs resource enable pgsql-ha --wait
+```
 
 ## Swapping master and slave roles between nodes
 
