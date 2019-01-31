@@ -12,7 +12,8 @@ This `Vagrantfile` is bootstrapping a fresh cluster with:
 Note that NTP is enabled by default (using chrony) in the vagrant box used (`centos/7`).
 No need to set it up ourselves.
 
-## Pre-requisits:
+## Prerequisites:
+
 
 You need `vagrant` and `vagrant-libvirt`. Everything is tested with versions 2.0.2 and
 0.0.40. Please, report your versions if it works with inferior ones.
