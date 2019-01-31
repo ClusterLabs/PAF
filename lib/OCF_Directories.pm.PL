@@ -7,7 +7,7 @@ use Config;
 use File::Spec;
 use Storable;
 
-my $VERSION = 'v2.2.1_rc1';
+my $VERSION = 'v2.2.1';
 
 my $_ocf_dirs = File::Spec->tmpdir."/ocf_dirs.bin";
 

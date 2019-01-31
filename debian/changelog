@@ -1,8 +1,14 @@
+resource-agents-paf (2.2.1-1) unstable; urgency=low
+
+  * 2.2.1 minor release
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Thu, 31 Jan 2019 14:00:00 +0100
+
 resource-agents-paf (2.2.1~rc1-1) unstable; urgency=low
 
   * 2.2.1_rc1 release candidate
 
- -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Tue, 22 Jan 2019 22:00:00 +0200
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Tue, 22 Jan 2019 22:00:00 +0100
 
 resource-agents-paf (2.2.0-2) unstable; urgency=low
 
