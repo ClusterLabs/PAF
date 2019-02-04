@@ -18,7 +18,7 @@ for N in "${NODES[@]}"; do
 done
 
 PACKAGES=(
-    screen vim
+    screen vim bash-completion
 )
 
 yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"

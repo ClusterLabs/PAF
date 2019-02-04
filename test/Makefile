@@ -9,13 +9,13 @@ all: create_vm pgsql-replicas pacemaker
 create_vm:
 	vagrant up
 
-pgsql-replicas:
+pgsql-replicas: pcmk-stop pgsql-primary
 	vagrant up --provision-with=pgsql-replicas
 
 pacemaker:
 	vagrant up --provision-with=pacemaker
 
-pgsql-primary:
+pgsql-primary: pcmk-stop
 	vagrant up --provision-with=pgsql-primary
 
 prov:
@@ -33,4 +33,7 @@ validate:
 
 cts: all
 	vagrant up --provision-with=cts
+
+pcmk-stop:
+	vagrant ssh -c 'if [ -f "/etc/corosync/corosync.conf" ]; then sudo pcs cluster stop --all --wait; fi'
 

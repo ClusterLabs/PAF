@@ -59,8 +59,11 @@ cp "${PGDATA}/postgresql.conf"    "${PGDATA}/.."
 cp "${PGDATA}/recovery.conf.pcmk" "${PGDATA}/.."
 
 # create master ip
-DEV=$(ip route show to "${MASTER_IP}/24"|grep -Eo 'dev \w+')
-ip addr add "${MASTER_IP}/24" dev "${DEV/dev }"
+ip -o addr show to "${MASTER_IP}" | if ! grep -q "${MASTER_IP}"
+then
+    DEV=$(ip route show to "${MASTER_IP}/24"|grep -Eo 'dev \w+')
+    ip addr add "${MASTER_IP}/24" dev "${DEV/dev }"
+fi
 
 # restart master pgsql
 systemctl --quiet restart "postgresql-${PGVER}"
