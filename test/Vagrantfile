@@ -66,6 +66,9 @@ Vagrant.configure(2) do |config|
         end
     end
 
+    config.vm.provision "file", source: "provision/watcher.py.diff",
+        destination: "${HOME}/watcher.py.diff"
+
     # setup rsyslog to collect logs from other node on log-sink
     config.vm.define log_node do |conf|
         conf.vm.provision 'rsyslog-setup', type: 'shell', path: 'provision/log_sink.bash'
@@ -85,7 +88,7 @@ Vagrant.configure(2) do |config|
         conf.vm.provision 'pgsql-primary', type: 'shell',
             path: 'provision/pgsql-primary.bash',
             args: [ pgver, pgdata, master_ip, pg_nodes.first ],
-            preserve_order: true
+            run: 'never'
     end
 
     # replicas setup. Use "vagrant up --provision-with=pgsql-replicas"
