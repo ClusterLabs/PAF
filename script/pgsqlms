@@ -585,7 +585,8 @@ sub _get_controldata {
     my %controldata;
     my $ans;
 
-    $ans = qx{ $PGCTRLDATA "$datadir" 2>/dev/null };
+    # Implicit language declaring to avoid translation issues
+    $ans = qx{ LANG=en_US $PGCTRLDATA "$datadir" 2>/dev/null };
 
     # Parse the output of pg_controldata.
     # This output is quite stable between pg versions, but we might need to sort
