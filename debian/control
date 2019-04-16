@@ -10,7 +10,7 @@ Homepage: http://clusterlabs.github.io/PAF/
 
 Package: resource-agents-paf
 Architecture: all
-Depends: ${misc:Depends}, resource-agents, perl, pacemaker (>= 1.1.13) | pacemaker-remote (>= 1.1.13), corosync (>= 2.0.0)
+Depends: ${misc:Depends}, resource-agents, perl, pacemaker (>= 1.1.13) | pacemaker-remote (>= 1.1.13), corosync (>= 2.0.0), postgresql (>= 9.6), postgresql-contrib (>= 9.6), postgresql-client (>= 9.6)
 Description: PostgreSQL resource agent for Pacemaker
  PostgreSQL Automatic Failover (aka. PAF) is a new OCF resource Agent
  dedicated to PostgreSQL. Its original wish is to keep a clear limit between
