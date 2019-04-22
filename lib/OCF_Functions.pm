@@ -438,7 +438,7 @@ sub ocf_local_nodename {
             $nodename = qx{ crm_node -n } if $? == 0;
         }
     }
-    else {
+    if (not defined $nodename) {
         # otherwise use uname -n
         $nodename = qx { uname -n };
     }
