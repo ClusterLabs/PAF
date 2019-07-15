@@ -7,7 +7,7 @@ boxname   = 'centos/7'     # vagrant box to use
 pgver     = '11'     # pg version to use
 hapass    = 'hapass' # password for sys user hacluster
 ssh_login = 'root' # ssh login to connect to the host when fencing a VM.
-                     # put "./ssh/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
+                     # put "./provision/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
 master_ip = '10.20.30.5' # vIP assigned to master
 pg_nodes  = 'srv1', 'srv2', 'srv3' # first will be primary
 log_node  = 'log-sink' # name of the node receiving logs
