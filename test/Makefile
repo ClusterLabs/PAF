@@ -24,10 +24,12 @@ prov:
 clean:
 	vagrant destroy -f
 
+check: validate
+
 validate:
 	@vagrant validate
 	@if which shellcheck >/dev/null                                          ;\
-	then shellcheck provision/*                                              ;\
+	then shellcheck provision/*bash                                          ;\
 	else echo "WARNING: shellcheck is not in PATH, not checking bash syntax" ;\
 	fi
 
