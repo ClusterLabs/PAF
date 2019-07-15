@@ -8,11 +8,11 @@ PGVER="$1"
 HAPASS="$2"
 MASTER_IP="$3"
 
-# install required packages
-P=$(curl -s "https://download.postgresql.org/pub/repos/yum/${PGVER}/redhat/rhel-7-x86_64/"|grep -Eo "pgdg-centos[0-9.]+-${PGVER}-[0-9]+\.noarch.rpm"|head -1)
+YUM_INSTALL="yum install --nogpgcheck --quiet -y -e 0"
 
-if ! rpm --quiet -q "${P/.rpm}"; then
-    yum install --nogpgcheck --quiet -y -e 0 "https://download.postgresql.org/pub/repos/yum/${PGVER}/redhat/rhel-7-x86_64/$P"
+# install required packages
+if ! rpm --quiet -q "pgdg-redhat-repo"; then
+    $YUM_INSTALL "https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
 fi
 
 PACKAGES=(
@@ -22,7 +22,7 @@ PACKAGES=(
     "postgresql${PGVER}-contrib"
 )
 
-yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"
+$YUM_INSTALL "${PACKAGES[@]}"
 
 # firewall setup
 systemctl --quiet --now enable firewalld
