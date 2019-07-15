@@ -33,7 +33,7 @@ validate:
 	else echo "WARNING: shellcheck is not in PATH, not checking bash syntax" ;\
 	fi
 
-cts: all
+cts:
 	vagrant up --provision-with=cts
 
 pcmk-stop:
