@@ -16,7 +16,7 @@ if ! rpm --quiet -q "pgdg-redhat-repo"; then
 fi
 
 PACKAGES=(
-    pacemaker pcs resource-agents resource-agents-paf fence-agents-virsh sbd
+    pacemaker pcs resource-agents fence-agents-virsh sbd perl-Module-Build
     "postgresql${PGVER}"
     "postgresql${PGVER}-server"
     "postgresql${PGVER}-contrib"
@@ -58,3 +58,8 @@ target="log-sink" Port="514" Protocol="tcp")
 EOF
 
 systemctl --quiet restart rsyslog
+
+# install PAF
+cd /home/vagrant/PAF/
+perl Build.PL --quiet >/dev/null 2>&1
+perl Build --quiet install
