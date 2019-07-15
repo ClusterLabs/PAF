@@ -75,7 +75,7 @@ Vagrant.configure(2) do |config|
     # common postgresql+pacemaker installation and setup
     pg_nodes.each do |node|
         config.vm.define node do |conf|
-            conf.vm.provision 'base-common', type: 'shell', path: 'provision/base-common.bash',
+            conf.vm.provision 'pgsql-common', type: 'shell', path: 'provision/pgsql-common.bash',
                 args: [ pgver, hapass, master_ip ],
                 preserve_order: true
         end
