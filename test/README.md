@@ -35,7 +35,7 @@ vagrant plugin install vagrant-libvirt
 Pacemaker must be able to ssh to the libvirt host with no password using a user able
 to `virsh destroy $other_vm`. Here are the steps:
 
-* copy `<PAF>/test/ssh/id_rsa.pub` inside `user@host:~/.ssh/authorized_keys`
+* copy `<PAF>/test/provision/id_rsa.pub` inside `user@host:~/.ssh/authorized_keys`
 * edit `ssh_login` in the `vagrant.yml` configuration file
 * user might need to be in group `libvirt`
 * user might need to add `uri_default='qemu:///system'` in its
@@ -54,7 +54,7 @@ myuser$ mkdir -p "${HOME}/.config/libvirt"
 myuser$ echo "uri_default='qemu:///system'" > "${HOME}/.config/libvirt/libvirt.conf"
 myuser$ git clone https://github.com/ClusterLabs/PAF.git
 myuser$ cd PAF/test
-myuser$ cat "ssh/id_rsa.pub" >> "${HOME}/.ssh/authorized_keys"
+myuser$ cat "provision/id_rsa.pub" >> "${HOME}/.ssh/authorized_keys"
 myuser$ echo "ssh_login: \"$USER\"" >> vagrant.yml
 ~~~
 
