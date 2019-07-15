@@ -1,3 +1,4 @@
+# boxname: "centos/7"     # vagrant box to use
 # pgver: "10"             # pg version to use
 # hapass: "hapass"        # password for sys user hacluster 
 # ssh_login: "user"       # ssh login to connect to the host when fencing a VM.
