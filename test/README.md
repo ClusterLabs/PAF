@@ -121,10 +121,9 @@ You can select the test you want to run with:
 
 Where `<$NAME>` is the name of the test you want to run.
 
-You can select exercise the cluster randomly and repetitively with:
+You can exercise the cluster randomly and repetitively with:
 
 ~~~
-./CTSlab.py --nodes "srv1 srv2 srv3" --list-tests
 ./CTSlab.py --nodes "srv1 srv2 srv3" --outputfile ~/cts.log <$NTESTS>
 ~~~
 
