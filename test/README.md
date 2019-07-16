@@ -12,8 +12,8 @@ This `Vagrantfile` is bootstrapping a fresh cluster with:
 Note that NTP is enabled by default (using chrony) in the vagrant box used (`centos/7`).
 No need to set it up ourselves.
 
-## Prerequisites:
 
+## Prerequisites
 
 You need `vagrant` and `vagrant-libvirt`. Everything is tested with versions 2.0.2 and
 0.0.40. Please, report your versions if it works with inferior ones.
@@ -94,6 +94,21 @@ make clean
 make all
 ~~~
 
+
+## OS
+
+This Vagrant environment currently supports CentOS 7 and RHEL 8. Use `boxname` in your
+`vagrant.yml` file (see chapter "Customization") to set the OS you want, eg.: `centos/7`
+or `generic/rhel8`
+
+In regard with RHEL 8, you must provide an active Redhat account with related
+subscriptions using `rhel_user` and `rhel_pass`. Set them in your `vagrant.yml` file
+(see chapter "Customization").
+
+Do not forget this Vagrant environment is building four VM. All will consume one
+subscription if you pick a Redhat box. You will have to remove them by hands (eg. from
+the Redhat website) as soon as you finish with your tests.
+
 ## Cluster Test Suite
 
 You can install the Cluster Test Suite from the Pacemaker project using:
@@ -127,6 +142,7 @@ You can exercise the cluster randomly and repetitively with:
 ./CTSlab.py --nodes "srv1 srv2 srv3" --outputfile ~/cts.log <$NTESTS>
 ~~~
 
+
 ## Tips
 
 Find all existing VM created by vagrant on your system:
@@ -138,7 +154,7 @@ vagrant global-status
 Shutdown all VM:
 
 ~~~
-vagrant ssh -c "sudo pcs resource disable pgsql-ha --wait"
+vagrant ssh -c "sudo pcs resource disable pgsqld-clone --wait"
 vagrant halt
 ~~~
 
@@ -147,5 +163,5 @@ Restart cluster:
 ~~~
 vagrant up
 vagrant ssh -c "sudo pcs cluster start --all"
-vagrant ssh -c "sudo pcs resource enable pgsql-ha --wait"
+vagrant ssh -c "sudo pcs resource enable pgsqld-clone --wait"
 ~~~

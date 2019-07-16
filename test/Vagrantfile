@@ -2,6 +2,8 @@ require 'ipaddr'
 require 'yaml'
 
 #ENV['VAGRANT_NO_PARALLEL'] = 'yes' # uncomment to forbid parallel execution
+ENV["LANG"]           = "C"
+ENV["LC_ALL"]         = "C"
 
 boxname   = 'centos/7'     # vagrant box to use
 pgver     = '11'     # pg version to use
@@ -11,7 +13,9 @@ ssh_login = 'root' # ssh login to connect to the host when fencing a VM.
 master_ip = '10.20.30.5' # vIP assigned to master
 pg_nodes  = 'srv1', 'srv2', 'srv3' # first will be primary
 log_node  = 'log-sink' # name of the node receiving logs
-vm_prefix = 'paf_c7'   # VM prefix in libvrit
+vm_prefix = 'paf_vm'   # VM prefix in libvrit
+rhel_user = ''         # RHEL user account
+rhel_pass = ''         # RHEL user account password
 
 if File.file?('vagrant.yml') and ( custom = YAML.load_file('vagrant.yml') )
     boxname   = custom['boxname']   if custom.has_key?('boxname')
@@ -22,6 +26,8 @@ if File.file?('vagrant.yml') and ( custom = YAML.load_file('vagrant.yml') )
     pg_nodes  = custom['pg_nodes']  if custom.has_key?('pg_nodes')
     log_node  = custom['log_node']  if custom.has_key?('log_node')
     vm_prefix = custom['vm_prefix'] if custom.has_key?('vm_prefix')
+    rhel_user = custom['rhel_user'] if custom.has_key?('rhel_user')
+    rhel_pass = custom['rhel_pass'] if custom.has_key?('rhel_pass')
 end
 
 Vagrant.configure(2) do |config|
@@ -62,7 +68,7 @@ Vagrant.configure(2) do |config|
         config.vm.define node do |conf|
             conf.vm.network 'private_network', ip: nodes_ips[node]
             conf.vm.provision 'system-setup', type: 'shell', path: 'provision/system.bash',
-                args: [ node ] + nodes_ips.keys.map {|n| "#{n}=#{nodes_ips[n]}"},
+                args: [ node, rhel_user, rhel_pass ] + nodes_ips.keys.map {|n| "#{n}=#{nodes_ips[n]}"},
                 preserve_order: true
         end
     end
@@ -75,7 +81,7 @@ Vagrant.configure(2) do |config|
     # common postgresql+pacemaker installation and setup
     pg_nodes.each do |node|
         config.vm.define node do |conf|
-            conf.vm.provision 'pgsql-common', type: 'shell', path: 'provision/pgsql-common.bash',
+            conf.vm.provision 'cluster-common', type: 'shell', path: 'provision/cluster-common.bash',
                 args: [ pgver, hapass, master_ip ],
                 preserve_order: true
         end
@@ -98,11 +104,13 @@ Vagrant.configure(2) do |config|
     end
 
     # cluster setup. Use "vagrant up --provision-with=pacemaker"
-    config.vm.define pg_nodes.first do |node|
-        node.vm.provision 'pacemaker', type: 'shell', path:'provision/pacemaker.bash',
-            args: [ pgver, hapass, master_ip, ssh_login,
-                    vm_prefix, host_ip, pgdata ] + pg_nodes,
-            run: 'never'
+    pg_nodes.each do |node|
+        config.vm.define node do |conf|
+            conf.vm.provision 'pacemaker', type: 'shell', path:'provision/pacemaker.bash',
+                args: [ pgver, hapass, master_ip, ssh_login,
+                        vm_prefix, host_ip, pgdata ] + pg_nodes,
+                run: 'never'
+        end
     end
 
     # cluster test suite setup. Use "vagrant up --provision-with=cts"

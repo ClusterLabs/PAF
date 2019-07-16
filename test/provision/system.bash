@@ -5,6 +5,8 @@ set -o nounset
 set -o pipefail
 
 NODENAME="$1"
+RHEL_USER="$2"
+RHEL_PASS="$3"
 shift
 NODES=( "$@" )
 
@@ -17,9 +19,20 @@ for N in "${NODES[@]}"; do
     fi
 done
 
+# shellcheck disable=SC1091
+source "/etc/os-release"
+OS_ID="$ID"
+
 PACKAGES=(
-    screen vim bash-completion
+    vim bash-completion yum-utils
 )
+
+if [ "$OS_ID" = "rhel" ]; then
+    subscription-manager register --force --username "${RHEL_USER:?}" --password "${RHEL_PASS:?}" --auto-attach
+    PACKAGES+=("tmux")
+else
+    PACKAGES+=("screen")
+fi
 
 yum install --nogpgcheck --quiet -y -e 0 "${PACKAGES[@]}"
 

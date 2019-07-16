@@ -14,9 +14,32 @@ PGDATA="$7"
 shift 7
 NODES=( "$@" )
 
-pcs cluster auth -u hacluster -p "${HAPASS}" "${NODES[@]}"
+PCMK_VER=$(yum info --quiet pacemaker|grep ^Version)
+PCMK_VER="${PCMK_VER#*: }" # extract x.y.z
+PCMK_VER="${PCMK_VER:0:1}" # extract x
 
-pcs cluster setup --name cluster_pgsql --wait --force "${NODES[@]}"
+if [ "$PCMK_VER" -ge 2 ]; then
+    # if pacemaker version is 2.x, we suppose pcs support it (pcs >= 0.10)
+    # from pcs 0.10, pcs host auth must be exec'ed on each node
+    pcs host auth -u hacluster -p "${HAPASS}" "${NODES[@]}"
+else
+    # this could be run on one node, but it doesn't hurt if it runs everywhere,
+    # so we keep this piece of code with the one dedicated to pacemaker 2.x
+    pcs cluster auth -u hacluster -p "${HAPASS}" "${NODES[@]}"
+fi
+
+if [ "$(hostname -s)" != "${NODES[0]}" ]; then
+    exit 0
+fi
+
+# WARNING:
+# Starting from here, everything is executed on first node only!
+
+if [ "$PCMK_VER" -ge 2 ]; then
+    pcs cluster setup cluster_pgsql --force "${NODES[@]}"
+else
+    pcs cluster setup --name cluster_pgsql --wait --force "${NODES[@]}"
+fi
 
 pcs stonith sbd enable
 
@@ -39,25 +62,41 @@ for VM in "${NODES[@]}"; do
         avoids "${VM}=INFINITY"
 done
 
-pcs -f cluster1.xml resource create pgsqld "ocf:heartbeat:pgsqlms" \
-    "bindir=/usr/pgsql-${PGVER}/bin" "pgdata=${PGDATA}"            \
-    op start timeout=60s                                           \
-    op stop timeout=60s                                            \
-    op promote timeout=30s                                         \
-    op demote timeout=120s                                         \
-    op monitor interval=15s timeout=10s role=Master                \
-    op monitor interval=16s timeout=10s role=Slave                 \
-    op notify timeout=60s
+PGSQLD_RSC_OPTS=(
+    "ocf:heartbeat:pgsqlms"
+    "bindir=/usr/pgsql-${PGVER}/bin"
+    "pgdata=${PGDATA}"
+    "op" "start"   "timeout=60s"
+    "op" "stop"    "timeout=60s"
+    "op" "promote" "timeout=30s"
+    "op" "demote"  "timeout=120s"
+    "op" "monitor" "interval=15s" "timeout=10s" "role=Master"
+    "op" "monitor" "interval=16s" "timeout=10s" "role=Slave"
+    "op" "notify"  "timeout=60s"
+)
 
-pcs -f cluster1.xml resource master pgsql-ha pgsqld notify=true
+# NB: pcs 0.10.2 doesn't support to set the id of the clone XML node
+# the id is built from the rsc id to clone using "<rsc-id>-clone"
+# As a matter of cohesion and code simplicity, we use the same
+# convention to create the master resource with pcs 0.9.x for
+# Pacemaker 1.1
+if [ "$PCMK_VER" -ge 2 ]; then
+    PGSQLD_RSC_OPTS+=( "promotable" "notify=true" )
+fi
+
+pcs -f cluster1.xml resource create pgsqld "${PGSQLD_RSC_OPTS[@]}"
+
+if [ "$PCMK_VER" -eq 1 ]; then
+    pcs -f cluster1.xml resource master pgsqld-clone pgsqld notify=true
+fi
 
 pcs -f cluster1.xml resource create pgsql-master-ip           \
     "ocf:heartbeat:IPaddr2" "ip=${MASTER_IP}" cidr_netmask=24 \
     op monitor interval=10s
 
-pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsql-ha INFINITY
-pcs -f cluster1.xml constraint order promote pgsql-ha "then" start pgsql-master-ip symmetrical=false
-pcs -f cluster1.xml constraint order demote pgsql-ha "then" stop pgsql-master-ip symmetrical=false
+pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsqld-clone INFINITY
+pcs -f cluster1.xml constraint order promote pgsqld-clone "then" start pgsql-master-ip symmetrical=false
+pcs -f cluster1.xml constraint order demote pgsqld-clone "then" stop pgsql-master-ip symmetrical=false
 
 pcs cluster cib-push scope=configuration cluster1.xml --wait
 

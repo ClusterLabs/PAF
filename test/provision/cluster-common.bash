@@ -8,11 +8,29 @@ PGVER="$1"
 HAPASS="$2"
 MASTER_IP="$3"
 
+# shellcheck disable=SC1091
+source "/etc/os-release"
+OS_ID="$ID"
+OS_VER="$VERSION_ID"
 YUM_INSTALL="yum install --nogpgcheck --quiet -y -e 0"
 
 # install required packages
+if [ "$OS_ID" = "rhel" ]; then
+    # use yum instead of dnf for compatibility between EL 7 and 8
+    yum-config-manager --enable "*highavailability-rpms"
+fi
+
 if ! rpm --quiet -q "pgdg-redhat-repo"; then
-    $YUM_INSTALL "https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+    if [ "${OS_VER:0:2}" = "8." ]; then
+        $YUM_INSTALL "https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+    else
+        $YUM_INSTALL "https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+    fi
+fi
+
+# disable postgresql upstream module conflicting with pgdg packages in RHEL8
+if [ "${OS_VER:0:2}" = "8." ]; then
+    yum -qy module disable postgresql
 fi
 
 PACKAGES=(
