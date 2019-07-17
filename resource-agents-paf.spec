@@ -17,6 +17,9 @@ Provides: resource-agents-paf = %{version}
 %description
 PostgreSQL resource agent for Pacemaker
 
+# do not build -debuginfo package
+%define debug_package %{nil}
+
 %prep
 %setup -n PAF-%{_tag}
 

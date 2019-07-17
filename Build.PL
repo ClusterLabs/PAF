@@ -89,7 +89,7 @@ for my $dir (
     $lib_ocf_root, '/usr/lib/ocf', '/usr/lib32/ocf', '/usr/lib64/ocf'
 ) {
     if ( -d $dir and -s "$dir/lib/heartbeat/ocf-directories" ) {
-        print STDERR "Found OCF_ROOT: $dir\n";
+        print STDERR "Found OCF_ROOT: $dir\n" if $build->verbose;
         $lib_ocf_root = $dir;
         last;
     }
@@ -137,7 +137,7 @@ for my $dir (
     $ocft_confs, "$ocf_dirs{'prefix'}/share/resource-agents/ocft/configs"
 ) {
     if ( -d $dir ) {
-        print STDERR "Found OCFT_CONFS: $dir\n";
+        print STDERR "Found OCFT_CONFS: $dir\n" if $build->verbose;
         $ocft_confs = $dir;
 
         $build->add_build_element('tests');
