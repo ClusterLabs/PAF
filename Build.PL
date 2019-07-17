@@ -3,8 +3,6 @@
 use strict;
 use warnings;
 
-use File::Spec;
-use Storable;
 use Module::Build;
 use Pod::Man;
 
@@ -148,6 +146,5 @@ for my $dir (
     }
 }
 
+$build->notes('ocf_dirs', \%ocf_dirs);
 $build->create_build_script;
-
-Storable::store( \%ocf_dirs, File::Spec->tmpdir."/ocf_dirs.bin" );
