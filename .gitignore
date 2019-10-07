@@ -19,5 +19,6 @@ nytprof.out
 *.bs
 /_eumm/
 _site
+/devel/.vagrant/
 /test/.vagrant/
 /test/vagrant.yml
