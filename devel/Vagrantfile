@@ -1,0 +1,51 @@
+#ENV['VAGRANT_NO_PARALLEL'] = 'yes' # uncomment to forbid parallel execution
+ENV['LANG']           = 'C'
+ENV['LC_ALL']         = 'C'
+
+Vagrant.configure(2) do |config|
+
+    # enable package local caching to speed up "vagrant up"
+#    if Vagrant.has_plugin?("vagrant-sshfs") 
+        config.cache.synced_folder_opts = {
+            type: :sshfs
+        }
+#    end
+
+    if Vagrant.has_plugin?("vagrant-cachier")
+        config.cache.scope = :box
+    end
+
+    # don't mind about insecure ssh key
+    config.ssh.insert_key = false
+
+    # hardware and host settings
+    config.vm.provider 'libvirt' do |lv|
+        lv.cpus = 1
+        lv.memory = 512
+        lv.default_prefix = 'paf_pkg'
+    end
+
+    config.vm.synced_folder '.', '/vagrant', type: 'rsync', disable: true
+
+    config.vm.define 'deb' do |debvm|
+        debvm.vm.box = 'debian/stretch64'
+        debvm.vm.synced_folder '..', '/vagrant', type: 'rsync'
+        debvm.vm.provision 'DEB builder', type: 'shell', path:'deb-builder.bash'
+        debvm.vm.post_up_message = <<-HEREDOC
+          If no error appeared, you can get the package using the following command:
+
+            vagrant ssh --no-tty deb -c 'sudo ls /root/|grep deb$|xargs sudo tar c -C /root/'| tar xv
+        HEREDOC
+    end
+
+    config.vm.define 'rpm' do |rpmvm|
+        rpmvm.vm.box = 'centos/7'
+        rpmvm.vm.provision 'RPM builder', type: 'shell', path:'rpm-builder.bash'
+        rpmvm.vm.post_up_message = <<-HEREDOC
+          If no error appeared, you can get the package using the following command:
+
+            vagrant ssh --no-tty rpm -c 'sudo tar c -C /root/rpmbuild/RPMS/noarch .'| tar vx
+        HEREDOC
+    end
+end
+
