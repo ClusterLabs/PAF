@@ -72,7 +72,7 @@ my $PGCTL      = "$bindir/pg_ctl";
 my $PGPSQL     = "$bindir/psql";
 my $PGCTRLDATA = "$bindir/pg_controldata";
 my $PGISREADY  = "$bindir/pg_isready";
-my $PGWALDUMP = "$bindir/pg_waldump";
+my $PGWALDUMP  = "$bindir/pg_waldump";
 
 # pacemaker commands path
 my $CRM_MASTER    = "$HA_SBIN_DIR/crm_master --lifetime forever";
@@ -833,6 +833,8 @@ sub _check_switchover {
     my $tl;
     my %cdata;
 
+    $PGWALDUMP = "$bindir/pg_xlogdump" if $PGVERNUM < $PGVER_10;
+
     ocf_log( 'info', 'Switchover in progress from "%s" to "%s".'
         .' Need to check the last record in WAL',
         $OCF_NOTIFY_ENV{'demote'}[0]{'uname'}, $nodename );
@@ -1373,15 +1375,13 @@ sub pgsql_validate_all {
         return $OCF_ERR_INSTALLED;
     }
 
-    $PGWALDUMP = "$bindir/pg_xlogdump" if $PGVERNUM < $PGVER_10;
-
     # check binaries
     unless ( -x $PGCTL and -x $PGPSQL and -x $PGCTRLDATA and -x $PGISREADY
-         and -x $PGWALDUMP
+         and ( -x $PGWALDUMP or -x "$bindir/pg_xlogdump")
      ) {
         ocf_exit_reason(
-            "Missing one or more binary. Check following path: %s, %s, %s, %s, %s",
-            $PGCTL, $PGPSQL, $PGCTRLDATA, $PGISREADY, $PGWALDUMP );
+            "Missing one or more binary. Check following path: %s, %s, %s, %s, %s or %s",
+            $PGCTL, $PGPSQL, $PGCTRLDATA, $PGISREADY, $PGWALDUMP, "$bindir/pg_xlogdump" );
         return $OCF_ERR_ARGS;
     }
 
