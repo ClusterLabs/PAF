@@ -85,7 +85,8 @@ my $nodename;
 my $exit_code = 0;
 # numeric pgsql versions
 my $PGVERNUM;
-my $PGVER_10  = 100000;
+my $PGVER_93 = 90300;
+my $PGVER_10 = 100000;
 
 # Run a query using psql.
 #
@@ -1374,7 +1375,7 @@ sub pgsql_validate_all {
     # postgresql >= 10 do not include the 2nd num in the major release
     $PGVERNUM += $2 * 100 if $1 < 10;
 
-    if ( $PGVERNUM < 90300 ) {
+    if ( $PGVERNUM < $PGVER_93 ) {
         ocf_exit_reason( "PostgreSQL %s not supported. Require 9.3 and more",
             $PGVERSION );
         exit $OCF_ERR_INSTALLED;
