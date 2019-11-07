@@ -580,6 +580,7 @@ sub _create_recovery_conf {
 #
 # WARNING: the status is NOT updated in case of crash.
 #
+# This sub exit the script with an error on failure
 sub _get_controldata {
     my %controldata;
     my $ans;
@@ -856,14 +857,7 @@ sub _check_switchover {
     $last_lsn = _get_last_received_lsn();
 
     unless ( defined $last_lsn ) {
-        ocf_exit_reason(
-            'Could not read last checkpoint and timeline from controldata file!'
-        );
-
-        ocf_log( 'debug',
-            '_check_switchover: %s parameters: datadir:"%s", last_chk: "%s", tl: "%s", mast_lsn: "%s"',
-            $PGWALDUMP, $datadir, $last_redo, $tl, $last_lsn
-        );
+        ocf_exit_reason( 'Could not fetch last received LSN!' );
 
         return 2;
     }
