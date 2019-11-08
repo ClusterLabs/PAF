@@ -294,10 +294,10 @@ sub ha_debug {
 }
 
 #
-# ocf_log: log messages from the resource agent
-# This function is slightly different from its equivalent in ocf-shellfuncs.in
-# as it behaves like printf.
-# Arguments:
+# ocf_log: log messages from the resource agent
+# This function is slightly different from its equivalent in ocf-shellfuncs.in
+# as it behaves like printf.
+# Arguments:
 #   * __OCF_PRIO: log level
 #   * __OCF_MSG:  printf-like format string
 #   * all other arguments are values for the printf-like format string
@@ -516,7 +516,7 @@ sub ocf_notify_env {
             $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
     }
 
-    # notify_nactive_uname doesn't exists. See:
+    # notify_nactive_uname doesn't exists. See:
     # http://lists.clusterlabs.org/pipermail/developers/2017-January/000406.html
     if ( defined $ENV{"OCF_RESKEY_CRM_meta_notify_inactive_resource"} ) {
         $i = 0;
@@ -543,9 +543,9 @@ sub ocf_notify_env {
             $ENV{"OCF_RESKEY_CRM_meta_notify_${action}_uname"};
     }
 
-    # Fix active and inactive fields for Pacemaker version < 1.1.16
-    # ie. crm_feature_set < 3.0.11
-    # See http://lists.clusterlabs.org/pipermail/developers/2016-August/000265.html
+    # Fix active and inactive fields for Pacemaker version < 1.1.16
+    # ie. crm_feature_set < 3.0.11
+    # See http://lists.clusterlabs.org/pipermail/developers/2016-August/000265.html
     # and git commit a6713c5d40327eff8549e7f596501ab1785b8765
     if (
         ocf_version_cmp( $ENV{"OCF_RESKEY_crm_feature_set"}, '3.0.11' ) == 0
