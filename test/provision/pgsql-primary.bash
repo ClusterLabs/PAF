@@ -9,6 +9,8 @@ PGDATA="$2"
 MASTER_IP="$3"
 NODENAME="$4"
 
+CUSTOMDIR="${PGDATA}/conf.d"
+
 # cleanup
 systemctl --quiet --now disable "postgresql-${PGVER}"
 rm -rf "${PGDATA}"
@@ -29,34 +31,46 @@ host  replication postgres ${NODENAME}     reject
 host  replication postgres 0.0.0.0/0       trust
 EOC
 
-systemctl --quiet start "postgresql-${PGVER}"
-
 # postgresql.conf setup
-cat <<'EOS' | "/usr/pgsql-${PGVER}/bin/psql" --quiet --username=postgres
-ALTER SYSTEM SET "listen_addresses" TO '*';
-ALTER SYSTEM SET "wal_level" TO 'replica';
-ALTER SYSTEM SET "max_wal_senders" TO '10';
-ALTER SYSTEM SET "hot_standby" TO 'on';
-ALTER SYSTEM SET "hot_standby_feedback" TO 'on';
-ALTER SYSTEM SET "wal_keep_segments" TO '256';
-ALTER SYSTEM SET "log_destination" TO 'syslog,stderr';
-ALTER SYSTEM SET "log_checkpoints" TO 'on';
-ALTER SYSTEM SET "log_min_duration_statement" TO '0';
-ALTER SYSTEM SET "log_autovacuum_min_duration" TO '0';
-ALTER SYSTEM SET "log_replication_commands" TO 'on';
-EOS
+mkdir -p "$CUSTOMDIR"
+echo "include_dir = 'conf.d'" >> "${PGDATA}/postgresql.conf"
 
-# recovery.conf setup
-cat<<EOC > "${PGDATA}/recovery.conf.pcmk"
-standby_mode = on
-primary_conninfo = 'host=${MASTER_IP} application_name=${NODENAME}'
-recovery_target_timeline = 'latest'
+cat <<'EOC' > "${CUSTOMDIR}/custom.conf"
+listen_addresses = '*'
+wal_level = replica
+max_wal_senders = 10
+hot_standby = on
+hot_standby_feedback = on
+wal_keep_segments = 256
+log_destination = 'syslog,stderr'
+log_checkpoints = on
+log_min_duration_statement = 0
+log_autovacuum_min_duration = 0
+log_replication_commands = on
 EOC
+
+if [ "${PGVER%%.*}" -lt 12 ]; then
+    # recovery.conf setup
+    cat<<-EOC > "${CUSTOMDIR}/recovery.conf.pcmk"
+	standby_mode = on
+	primary_conninfo = 'host=${MASTER_IP} application_name=${NODENAME}'
+	recovery_target_timeline = 'latest'
+	EOC
+else
+    cat <<-EOC > "${CUSTOMDIR}/repli.conf"
+	primary_conninfo = 'host=${MASTER_IP} application_name=${NODENAME}'
+	EOC
+
+    # standby_mode disappear in v12
+    # no need to add recovery_target_timeline as its default is 'latest' since v12
+fi
 
 # backing up files
 cp "${PGDATA}/pg_hba.conf"        "${PGDATA}/.."
 cp "${PGDATA}/postgresql.conf"    "${PGDATA}/.."
-cp "${PGDATA}/recovery.conf.pcmk" "${PGDATA}/.."
+cp "${CUSTOMDIR}"/*               "${PGDATA}/.."
+
+chown -R postgres:postgres "$PGDATA"
 
 # create master ip
 ip -o addr show to "${MASTER_IP}" | if ! grep -q "${MASTER_IP}"
@@ -66,4 +80,4 @@ then
 fi
 
 # restart master pgsql
-systemctl --quiet restart "postgresql-${PGVER}"
+systemctl --quiet start "postgresql-${PGVER}"

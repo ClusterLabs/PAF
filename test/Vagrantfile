@@ -59,11 +59,10 @@ Vagrant.configure(2) do |config|
     # disable default share
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
-    config.vm.provision "file", source: '..',
-        destination: "${HOME}/PAF",
-        preserve_order: true
+    config.vm.synced_folder "..", "/vagrant", type: "rsync",
+        rsync__exclude: [ ".git/" ]
 
-    # system setup for all ndoes
+    # system setup for all nodes
     (pg_nodes + [log_node]).each do |node|
         config.vm.define node do |conf|
             conf.vm.network 'private_network', ip: nodes_ips[node]

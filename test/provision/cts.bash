@@ -32,7 +32,13 @@ EOF
 
 systemctl --quiet restart systemd-journald
 
-# fix bug in the log watcher.
+
+# shellcheck disable=SC1091
+source "/etc/os-release"
+OS_VER="$VERSION_ID"
+if [ "${OS_VER:0:2}" != "7." ]; then exit; fi
+
+# fix bug in the log watcher for EL7
 cat <<'EOF' | patch /usr/lib64/python2.7/site-packages/cts/watcher.py
 *** /tmp/watcher.py.orig	2019-02-07 16:25:32.836265277 +0100
 --- /tmp/watcher.py	2019-02-07 16:27:03.296926885 +0100

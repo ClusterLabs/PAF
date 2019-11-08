@@ -76,7 +76,13 @@ vagrant ssh log-sink
 
 ## Destroying the cluster
 
-To destroy your cluster, run:
+To destroy your cluster, either run:
+
+~~~
+make clean
+~~~
+
+or
 
 ~~~
 vagrant destroy -f
@@ -111,10 +117,11 @@ the Redhat website) as soon as you finish with your tests.
 
 ## Cluster Test Suite
 
-You can install the Cluster Test Suite from the Pacemaker project using:
+Once your cluster is up and running, you can install the Cluster Test Suite from the
+Pacemaker project using:
 
 ~~~
-vagrant up --provision-with=cts
+make cts
 ~~~
 
 Then, you'll be able to start the exerciser from the log-sink server using eg.:

@@ -14,6 +14,8 @@ PGDATA="$7"
 shift 7
 NODES=( "$@" )
 
+CUSTOMDIR="${PGDATA}/conf.d"
+
 PCMK_VER=$(yum info --quiet pacemaker|grep ^Version)
 PCMK_VER="${PCMK_VER#*: }" # extract x.y.z
 PCMK_VER="${PCMK_VER:0:1}" # extract x
@@ -66,6 +68,7 @@ PGSQLD_RSC_OPTS=(
     "ocf:heartbeat:pgsqlms"
     "bindir=/usr/pgsql-${PGVER}/bin"
     "pgdata=${PGDATA}"
+    "recovery_template=${CUSTOMDIR}/recovery.conf.pcmk"
     "op" "start"   "timeout=60s"
     "op" "stop"    "timeout=60s"
     "op" "promote" "timeout=30s"
