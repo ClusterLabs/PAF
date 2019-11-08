@@ -23,9 +23,7 @@ done
 source "/etc/os-release"
 OS_ID="$ID"
 
-PACKAGES=(
-    vim bash-completion yum-utils
-)
+PACKAGES=( vim bash-completion yum-utils )
 
 if [ "$OS_ID" = "rhel" ]; then
     subscription-manager register --force --username "${RHEL_USER:?}" --password "${RHEL_PASS:?}" --auto-attach
@@ -42,8 +40,8 @@ Host *
   StrictHostKeyChecking no
 EOF
 
-cp "/home/vagrant/PAF/test/provision/id_rsa" "/home/vagrant/.ssh"
-cp "/home/vagrant/PAF/test/provision/id_rsa.pub" "/home/vagrant/.ssh"
+cp "/vagrant/test/provision/id_rsa" "/home/vagrant/.ssh"
+cp "/vagrant/test/provision/id_rsa.pub" "/home/vagrant/.ssh"
 
 chown -R "vagrant:" "/home/vagrant/.ssh"
 chmod 0700 "/home/vagrant/.ssh"

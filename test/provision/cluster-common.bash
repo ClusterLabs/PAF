@@ -77,7 +77,16 @@ EOF
 
 systemctl --quiet restart rsyslog
 
+# cleanup pre-existing IP address
+ip -o addr show to "${MASTER_IP}" | if grep -q "${MASTER_IP}"
+then
+    DEV=$(ip route show to "${MASTER_IP}/24"|grep -Eo 'dev \w+')
+    ip addr del "${MASTER_IP}/24" dev "${DEV/dev }"
+fi
+
 # install PAF
-cd /home/vagrant/PAF/
-perl Build.PL --quiet >/dev/null 2>&1
+cd /vagrant
+[ -f Build ] && perl Build distclean
+sudo -u vagrant perl Build.PL --quiet >/dev/null 2>&1
+sudo -u vagrant perl Build --quiet
 perl Build --quiet install
