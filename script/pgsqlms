@@ -52,7 +52,7 @@ my $pgdata_default      = "/var/lib/pgsql/data";
 my $pghost_default      = "/tmp";
 my $pgport_default      = 5432;
 my $start_opts_default  = "";
-my $maxlag_default    = "0";
+my $maxlag_default      = "0";
 
 # Set default values if not found in environment
 my $system_user  = $ENV{'OCF_RESKEY_system_user'} || $system_user_default;
@@ -84,7 +84,7 @@ my $ATTRD_PRIV    = "$HA_SBIN_DIR/attrd_updater --private --lifetime reboot";
 # Global vars
 my $nodename;
 my $exit_code = 0;
-# numeric pgsql versions
+# numeric pgsql versions
 my $PGVERNUM;
 my $PGVER_93 = 90300;
 my $PGVER_10 = 100000;
@@ -230,8 +230,8 @@ sub _get_lag_scores {
     # The row_number applies on the result set ordered on write_location ASC so
     # the highest row_number should be given to the closest node from the
     # master, then the lowest node name (alphanumeric sort) in case of equality.
-    # The result set itself is order by priority DESC to process best known
-    # candidate first.
+    # The result set itself is order by priority DESC to process best known
+    # candidate first.
     $query = qq{
       SELECT application_name, priority, location, state, current_lag
       FROM (
@@ -309,7 +309,7 @@ sub _get_priv_attr {
 
 # Set the given private attribute name to the given value
 # As setting an attribute is asynchronous, this will return as soon as the
-# attribute is really set by attrd and available.
+# attribute is really set by attrd and available.
 sub _set_priv_attr {
     my ( $name, $val ) = @_;
     my $name_instance  = "$name-$OCF_RESOURCE_INSTANCE";
@@ -318,8 +318,8 @@ sub _set_priv_attr {
 
     qx{ $ATTRD_PRIV --name "$name_instance" --update "$val" };
 
-    # give attr name without the resource instance name as _get_priv_attr adds
-    # it as well
+    # give attr name without the resource instance name as _get_priv_attr adds
+    # it as well
     while ( _get_priv_attr( $name ) ne $val ) {
         ocf_log( 'debug', '_set_priv_attr: waiting attrd ack for "%s"...', $name_instance );
         select( undef, undef, undef, 0.1 );
@@ -330,7 +330,7 @@ sub _set_priv_attr {
 
 # Delete the given private attribute.
 # As setting an attribute is asynchronous, this will return as soon as the
-# attribute is really deleted by attrd.
+# attribute is really deleted by attrd.
 sub _delete_priv_attr {
     my ( $name ) = @_;
     my $name_instance  = "$name-$OCF_RESOURCE_INSTANCE";
@@ -339,8 +339,8 @@ sub _delete_priv_attr {
 
     qx{ $ATTRD_PRIV --name "$name_instance" --delete };
 
-    # give attr name without the resource instance name as _get_priv_attr adds
-    # it as well
+    # give attr name without the resource instance name as _get_priv_attr adds
+    # it as well
     while ( _get_priv_attr( $name ) ne '' ) {
         ocf_log( 'debug', '_delete_priv_attr: waiting attrd ack for "%s"...',
             $name_instance );
@@ -352,7 +352,7 @@ sub _delete_priv_attr {
 
 # Get, parse and return the resource master score on given node.
 # Returns an empty string if not found.
-# Returns undef on crm_master call on error
+# Returns undef on crm_master call on error
 sub _get_master_score {
     my ( $node ) = @_;
     my $node_arg = '';
@@ -391,11 +391,11 @@ sub _set_master_score {
     return;
 }
 
-# _master_score_exists
-# This subroutine checks if a master score is set for one of the relative clones
+# _master_score_exists
+# This subroutine checks if a master score is set for one of the relative clones
 # in the cluster and the score is greater or equal of 0.
 # Returns 1 if at least one master score >= 0 is found.
-# Returns 0 otherwise
+# Returns 0 otherwise
 sub _master_score_exists {
     my @partition_nodes = split /\s+/ => qx{ $CRM_NODE --partition };
 
@@ -480,8 +480,8 @@ sub _runas {
 # Check if instance is listening on the given host/port.
 #
 sub _pg_isready {
-    # Add 60s to the timeout or use a 24h timeout fallback to make sure
-    # Pacemaker will give up before us and take decisions
+    # Add 60s to the timeout or use a 24h timeout fallback to make sure
+    # Pacemaker will give up before us and take decisions
     my $timeout = ( _get_action_timeout() || 60*60*24 )  + 60;
     my $rc = _runas( $PGISREADY, '-h', $pghost, '-p', $pgport, '-d', 'postgres', '-t', $timeout );
 
@@ -510,8 +510,8 @@ sub _pg_ctl_status {
 # Start the local instance using pg_ctl
 #
 sub _pg_ctl_start {
-    # Add 60s to the timeout or use a 24h timeout fallback to make sure
-    # Pacemaker will give up before us and take decisions
+    # Add 60s to the timeout or use a 24h timeout fallback to make sure
+    # Pacemaker will give up before us and take decisions
     my $timeout = ( _get_action_timeout() || 60*60*24 ) + 60;
 
     my @cmd = ( $PGCTL, '--pgdata', $pgdata, '-w', '--timeout', $timeout, 'start' );
@@ -589,14 +589,14 @@ sub _get_controldata {
 
     $ans = qx{ $PGCTRLDATA "$datadir" 2>/dev/null };
 
-    # Parse the output of pg_controldata.
+    # Parse the output of pg_controldata.
     # This output is quite stable between pg versions, but we might need to sort
     # it at some point if things are moving in there...
     $ans =~ m{
         # get the current state
         ^\QDatabase cluster state\E:\s+(.*?)\s*$
         .*
-        # Get the latest known REDO location
+        # Get the latest known REDO location
         ^\QLatest checkpoint's REDO location\E:\s+([/0-9A-F]+)\s*$
         .*
         # Get the latest known TL
@@ -741,8 +741,8 @@ sub _check_locations {
         if $row_num == 0;
 
     # For each standby connected, set their master score based on the following
-    # rule: the first known node/application, with the highest priority and
-    # with an acceptable state.
+    # rule: the first known node/application, with the highest priority and
+    # with an acceptable state.
     while ( $row = shift @rs ) {
 
         if ( $partition_nodes !~ /$row->[0]/ ) {
@@ -759,7 +759,7 @@ sub _check_locations {
         $node_score = _get_master_score( $row->[0] );
 
         if ( $row->[3] =~ /^\s*(?:startup|backup)\s*$/ ) {
-            # We exclude any standby being in state backup (pg_basebackup) or
+            # We exclude any standby being in state backup (pg_basebackup) or
             # startup (new standby or failing standby)
             ocf_log( 'info', 'Forbidding promotion on "%s" in state "%s"',
                 $row->[0], $row->[3] );
@@ -810,7 +810,7 @@ sub _check_locations {
         _set_master_score( '-1000', $node );
     }
 
-    # Finally set the master score if not already done
+    # Finally set the master score if not already done
     $node_score = _get_master_score();
     _set_master_score( '1001' ) unless $node_score eq '1001';
 
@@ -819,14 +819,14 @@ sub _check_locations {
 
 # _check_switchover
 # check if the pgsql switchover to the localnode is safe.
-# This is supposed to be called **after** the master has been stopped or demoted.
-# This sub checks if the local standby received the shutdown checkpoint from the
+# This is supposed to be called **after** the master has been stopped or demoted.
+# This sub checks if the local standby received the shutdown checkpoint from the
 # old master to make sure it can take over the master role and the old master
-# will be able to catchup as a standby after.
+# will be able to catchup as a standby after.
 #
-# Returns 0 if switchover is safe
-# Returns 1 if swithcover is not safe
-# Returns 2 for internal error
+# Returns 0 if switchover is safe
+# Returns 1 if swithcover is not safe
+# Returns 2 for internal error
 sub _check_switchover {
     my $has_sht_chk = 0;
     my $last_redo;
@@ -848,14 +848,14 @@ sub _check_switchover {
     # master to check in the WAL between these adresses if we have a
     # "checkpoint shutdown" using pg_xlogdump/pg_waldump.
     #
-    # Force a checkpoint to make sure the controldata shows the very last TL
-    # and the master's shutdown checkpoint
+    # Force a checkpoint to make sure the controldata shows the very last TL
+    # and the master's shutdown checkpoint
     _query( q{ CHECKPOINT }, {} );
     %cdata     = _get_controldata();
     $tl        = $cdata{'tl'};
     $last_redo = $cdata{'redo'};
 
-    # Get the last received LSN from master
+    # Get the last received LSN from master
     $last_lsn = _get_last_received_lsn();
 
     unless ( defined $last_lsn ) {
@@ -1422,7 +1422,7 @@ sub pgsql_validate_all {
         return $OCF_ERR_ARGS;
     }
 
-    # require wal_level >= hot_standby
+    # require wal_level >= hot_standby
     %cdata = _get_controldata();
     unless ( $cdata{'wal_level'} =~ m{hot_standby|logical|replica} ) {
         ocf_exit_reason(
@@ -1477,15 +1477,15 @@ sub pgsql_start {
             ocf_log( 'info', 'Instance "%s" started', $OCF_RESOURCE_INSTANCE );
 
             # Check if a master score exists in the cluster.
-            # During the very first start of the cluster, no master score will
-            # exists on any of the existing slaves, unless an admin designated
-            # one of them using crm_master. If no master exists the cluster will
+            # During the very first start of the cluster, no master score will
+            # exists on any of the existing slaves, unless an admin designated
+            # one of them using crm_master. If no master exists the cluster will
             # not promote a master among the slaves.
             # To solve this situation, we check if there is at least one master
-            # score existing on one node in the cluster. Do nothing if at least
+            # score existing on one node in the cluster. Do nothing if at least
             # one master score is found among the clones of the resource. If no
-            # master score exists, set a score of 1 only if the resource was a
-            # shut downed master before the start.
+            # master score exists, set a score of 1 only if the resource was a
+            # shut downed master before the start.
             if ( $prev_state eq "shut down" and not _master_score_exists() ) {
                 ocf_log( 'info', 'No master score around. Set mine to 1' );
 
@@ -1514,8 +1514,8 @@ sub pgsql_stop {
     my $rc;
     my $state;
     my $pidfile = "$datadir/postmaster.pid";
-    # Add 60s to the timeout or use a 24h timeout fallback to make sure
-    # Pacemaker will give up before us and take decisions
+    # Add 60s to the timeout or use a 24h timeout fallback to make sure
+    # Pacemaker will give up before us and take decisions
     my $timeout = ( _get_action_timeout() || 60*60*24 ) + 60;
 
     # Instance must be running as secondary or primary or being stopped.
@@ -1728,8 +1728,8 @@ sub pgsql_demote {
     # See discussion "CRM trying to demote a stopped resource" on
     # developers@clusterlabs.org
     unless ( $rc == $OCF_NOT_RUNNING ) {
-        # Add 60s to the timeout or use a 24h timeout fallback to make sure
-        # Pacemaker will give up before us and take decisions
+        # Add 60s to the timeout or use a 24h timeout fallback to make sure
+        # Pacemaker will give up before us and take decisions
         my $timeout = ( _get_action_timeout() || 60*60*24 )  + 60;
 
         # WARNING the instance **MUST** be stopped gracefully.
@@ -1823,7 +1823,7 @@ sub pgsql_promote {
     #
 
     # Cancel the switchover if it has been considered not safe during the
-    # pre-promote action
+    # pre-promote action
     $cancel_switchover = _get_priv_attr('cancel_switchover');
     if ( $cancel_switchover ) { # if not empty or not 0
         ocf_exit_reason(
@@ -1833,12 +1833,12 @@ sub pgsql_promote {
 
         return $OCF_ERR_GENERIC if $cancel_switchover eq '1';
         return $OCF_ERR_ARGS; # ban the resource from the node if we have an
-                              # internal error during _check_switchover
+                              # internal error during _check_switchover
     }
 
     # Do not check for a better candidate if we try to recover the master
     # Recover of a master is detected during the pre-promote action. It sets the
-    # private attribute 'recover_master' to '1' if this is a master recover.
+    # private attribute 'recover_master' to '1' if this is a master recover.
     if ( _get_priv_attr( 'recover_master' ) eq '1' ) {
         ocf_log( 'info', 'Recovering old master, no election needed');
     }
@@ -1969,9 +1969,9 @@ sub pgsql_promote {
 
 # This action is called **before** the actual promotion when a failing master is
 # considered unreclaimable, recoverable or a new master must be promoted
-# (switchover or first start).
+# (switchover or first start).
 # As every "notify" action, it is executed almost simultaneously on all
-# available nodes.
+# available nodes.
 sub pgsql_notify_pre_promote {
     my $rc;
     my $node_tl;
@@ -2000,7 +2000,7 @@ sub pgsql_notify_pre_promote {
     _delete_priv_attr( 'cancel_switchover' );
 
     # check for the last received entry of WAL from the master if we are
-    # the designated slave to promote
+    # the designated slave to promote
     if ( _is_switchover( $nodename ) and scalar
          grep { $_->{'uname'} eq $nodename } @{ $OCF_NOTIFY_ENV{'promote'} }
     ) {
@@ -2015,8 +2015,8 @@ sub pgsql_notify_pre_promote {
 
         # If the sub keeps going, that means the switchover is safe.
         # Keep going with the election process in case the switchover was
-        # instruct to the wrong node.
-        # FIXME: should we allow a switchover to a lagging slave?
+        # instruct to the wrong node.
+        # FIXME: should we allow a switchover to a lagging slave?
     }
 
     # We need to trigger an election between existing slaves to promote the best
@@ -2031,7 +2031,7 @@ sub pgsql_notify_pre_promote {
     # As we can not break the transition from a notification action, we check
     # during the promotion if each node TL and LSN are valid.
 
-    # Force a checpoint to make sure the controldata shows the very last TL
+    # Force a checpoint to make sure the controldata shows the very last TL
     _query( q{ CHECKPOINT }, {} );
     %cdata    = _get_controldata();
     $node_lsn = _get_last_received_lsn( 'in decimal' );
@@ -2054,12 +2054,12 @@ sub pgsql_notify_pre_promote {
         if $? != 0 ;
 
     # If this node is the future master, keep track of the slaves that
-    # received the same notification to compare our LSN with them during
-    # promotion
+    # received the same notification to compare our LSN with them during
+    # promotion
     if ( $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} eq $nodename ) {
         # Build the list of active nodes:
-        #   master + slave + start - stop
-        # FIXME: Deal with rsc started during the same transaction but **after**
+        #   master + slave + start - stop
+        # FIXME: Deal with rsc started during the same transaction but **after**
         #        the promotion ?
         $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'active'} },
                                                  @{ $OCF_NOTIFY_ENV{'start'} };
@@ -2103,7 +2103,7 @@ sub pgsql_notify_pre_demote {
                            and $rc == $OCF_FAILED_MASTER;
 
     # in case of master crash, we need to detect if the CRM tries to recover
-    # the master clone. The usual transition is to do:
+    # the master clone. The usual transition is to do:
     #   demote->stop->start->promote
     #
     # There are multiple flaws with this transition:
@@ -2147,11 +2147,11 @@ sub pgsql_notify_pre_stop {
                            and $rc == $OCF_RUNNING_SLAVE;
 
     # in case of slave crash, we need to detect if the CRM tries to recover
-    # the slaveclone. The usual transition is to do: stop->start
+    # the slaveclone. The usual transition is to do: stop->start
     #
     # This transition can no twork because the instance is in
     # OCF_ERR_GENERIC step. So the stop action will fail, leading most
-    # probably to fencing action.
+    # probably to fencing action.
     #
     # To avoid this, we try to start the instance in recovery from here.
     # If it success, at least it will be stopped correctly with a normal
