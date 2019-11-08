@@ -73,7 +73,10 @@
 \bPAF-[\d\.\_]+
 
 # Avoid developers doc
-^docs\/dev\/.*
+^devel\/.*
 
 # Avoid test folder
 ^test\/.*
+
+# avoid manual page generated during the build process
+ocf_heartbeat_pgsqlms.7
