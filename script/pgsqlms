@@ -41,9 +41,8 @@ our $PROGRAM = 'pgsqlms';
 
 # OCF environment
 my $OCF_RESOURCE_INSTANCE = $ENV{'OCF_RESOURCE_INSTANCE'};
-my $OCF_ACTION            = $ARGV[0];
 my $OCF_RUNNING_SLAVE     = $OCF_SUCCESS;
-my %OCF_NOTIFY_ENV        = ocf_notify_env() if $OCF_ACTION eq 'notify';
+my %OCF_NOTIFY_ENV        = ocf_notify_env() if $__OCF_ACTION eq 'notify';
 
 # Default parameters values
 my $system_user_default = "postgres";
@@ -909,7 +908,7 @@ sub _confirm_role {
             # The instance is a primary.
             ocf_log( 'debug', "_confirm_role: instance $OCF_RESOURCE_INSTANCE is a primary");
             # Check lsn diff with current slaves if any
-            _check_locations() if $OCF_ACTION eq 'monitor';
+            _check_locations() if $__OCF_ACTION eq 'monitor';
             return $OCF_RUNNING_MASTER;
         }
 
@@ -2210,8 +2209,8 @@ sub pgsql_reload {
 ############################################################
 #### MAIN
 
-exit ocf_meta_data() if $OCF_ACTION eq 'meta-data';
-exit ocf_methods()   if $OCF_ACTION eq 'methods';
+exit ocf_meta_data() if $__OCF_ACTION eq 'meta-data';
+exit ocf_methods()   if $__OCF_ACTION eq 'methods';
 
 # Avoid "could not change directory" when executing commands as "system-user".
 chdir File::Spec->tmpdir();
@@ -2237,10 +2236,10 @@ $nodename = ocf_local_nodename();
 
 $exit_code = pgsql_validate_all();
 
-exit $exit_code if $exit_code != $OCF_SUCCESS or $OCF_ACTION eq 'validate-all';
+exit $exit_code if $exit_code != $OCF_SUCCESS or $__OCF_ACTION eq 'validate-all';
 
 # Run action
-for ( $OCF_ACTION ) {
+for ( $__OCF_ACTION ) {
     if    ( /^start$/     ) { $exit_code = pgsql_start()   }
     elsif ( /^stop$/      ) { $exit_code = pgsql_stop()    }
     elsif ( /^monitor$/   ) { $exit_code = pgsql_monitor() }
