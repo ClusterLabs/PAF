@@ -1894,16 +1894,20 @@ sub pgsql_promote {
 
             # Get the "lsn_location" attribute value for the node, as set during
             # the "pre-promote" action.
-            $ans = _get_priv_attr( 'lsn_location', $node );
-
-            if ( $ans eq '' ) {
-                # This should not happen as the "lsn_location" attribute should
-                # have been updated during the "pre-promote" action.
-                ocf_exit_reason( 'Can not get LSN location for "%s"', $node );
-                return $OCF_ERR_GENERIC;
+            # This is implemented as a loop as private attributes are asynchronously
+            # available from other nodes.
+            # see: https://github.com/ClusterLabs/PAF/issues/131
+            # NOTE: if a node did not set its lsn_location for some reason, this will end
+            # with a timeout and the whole promotion will start again.
+            WAIT_FOR_LSN: {
+                $ans = _get_priv_attr( 'lsn_location', $node );
+                if ( $ans eq '' ) {
+                    ocf_log( 'info', 'pgsql_promote: waiting for LSN from %s', $node );
+                    select( undef, undef, undef, 0.1 );
+                    redo WAIT_FOR_LSN;
+                }
             }
 
-            # convert location to decimal
             chomp $ans;
             ( $node_tl, $node_lsn ) = split /#/, $ans;
 
