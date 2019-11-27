@@ -1,0 +1,13 @@
+diff --git a/script/pgsqlms b/script/pgsqlms
+index 0f49b1c..56583d9 100755
+--- a/script/pgsqlms
++++ b/script/pgsqlms
+@@ -48,7 +48,7 @@ my %OCF_NOTIFY_ENV        = ocf_notify_env() if $__OCF_ACTION eq 'notify';
+ my $system_user_default = "postgres";
+ my $bindir_default      = "/usr/bin";
+ my $pgdata_default      = "/var/lib/pgsql/data";
+-my $pghost_default      = "/tmp";
++my $pghost_default      = "/var/run/postgresql";
+ my $pgport_default      = 5432;
+ my $start_opts_default  = "";
+ my $maxlag_default      = "0";
