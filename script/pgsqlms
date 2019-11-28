@@ -1047,12 +1047,13 @@ The system owner of your instance's process
 
 =item B<recovery_template>
 
-B<ONLY> for PostgreSQL 11 and bellow. This parameter is IGNORED for
-PostgreSQL 12 and higher. The cluster will refuse to start if a template
-file is found.
+B<ONLY> for PostgreSQL 11 and bellow.
 
 The local template that will be copied as the C<PGDATA/recovery.conf> file.
 This template file must exists on all node.
+
+With PostgreSQL 12 and higher, the cluster will refuse to start if this
+parameter is set or a template file is found.
 
 (optional, string, default "$PGDATA/recovery.conf.pcmk")
 
