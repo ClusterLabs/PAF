@@ -1,3 +1,21 @@
+# PAF v2.3 rc1
+
+Release date: 2019-11-28
+
+__WARNING__: This version is only compatible with at least
+Pacemaker 1.1.13 using a corosync 2.x stack.
+
+Changelog since 2.2:
+
+* new: support PostgreSQL 12
+* fix: wrong log message during switchover failure
+* fix: race condition during election process, gh #131 reported by dud225
+* change: with PostgreSQL 12, setting `recovery_template` is forbidden
+* misc: debian package use `/var/run/postgres` as `pghost` default value
+* misc: various small code cleanup
+
+
+
 # PAF v2.2.1
 
 Release date: 2019-01-31
