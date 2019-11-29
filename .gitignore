@@ -17,8 +17,8 @@ nytprof.out
 /pm_to_blib
 *.o
 *.bs
+*.tmp
 /_eumm/
 _site
-/devel/.vagrant/
-/test/.vagrant/
-/test/vagrant.yml
+.vagrant/
+vagrant.yml
