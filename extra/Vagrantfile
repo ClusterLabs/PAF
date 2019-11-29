@@ -60,7 +60,7 @@ Vagrant.configure(2) do |config|
     # disable default share
     config.vm.synced_folder ".", "/vagrant", disabled: true
 
-    config.vm.synced_folder "..", "/vagrant", type: "rsync",
+    config.vm.synced_folder "../../..", "/vagrant", type: "rsync",
         rsync__exclude: [ ".git/" ]
 
     # system setup for all nodes

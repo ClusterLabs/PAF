@@ -40,8 +40,8 @@ Host *
   StrictHostKeyChecking no
 EOF
 
-cp "/vagrant/test/provision/id_rsa" "/home/vagrant/.ssh"
-cp "/vagrant/test/provision/id_rsa.pub" "/home/vagrant/.ssh"
+cp "/vagrant/extra/vagrant/3nodes-vip/provision/id_rsa" "/home/vagrant/.ssh"
+cp "/vagrant/extra/vagrant/3nodes-vip/provision/id_rsa.pub" "/home/vagrant/.ssh"
 
 chown -R "vagrant:" "/home/vagrant/.ssh"
 chmod 0700 "/home/vagrant/.ssh"
