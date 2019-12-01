@@ -1,0 +1,14 @@
+# boxname: "centos/7"     # vagrant box to use
+# pgver: "10"             # pg version to use
+# hapass: "hapass"        # password for sys user hacluster
+# ssh_login: "user"       # ssh login to connect to the host when fencing a VM.
+#                         # put "./provision/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
+# base_ip: "10.20.30.5"   # Base IP address to compute other ones
+# pg_nodes:                  # servers to create.
+#   - "srv1"              # First one will be master
+#   - "srv2"
+#   - "srv3"
+# log_node: "log-sink"
+# vm_prefix: "paf_vm"
+# rhel_user: ""           # RHEL user account
+# rhel_pass: ""           # RHEL user account password

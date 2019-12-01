@@ -12,6 +12,8 @@ This `Vagrantfile` is bootstrapping a fresh cluster with:
 Note that NTP is enabled by default (using chrony) in the vagrant box used (`centos/7`).
 No need to set it up ourselves.
 
+This README takes `3nodes-vip` as example. Replace with the cluster name you
+want.
 
 ## Prerequisites
 
@@ -35,7 +37,7 @@ vagrant plugin install vagrant-libvirt
 Pacemaker must be able to ssh to the libvirt host with no password using a user able
 to `virsh destroy $other_vm`. Here are the steps:
 
-* copy `<PAF>/test/provision/id_rsa.pub` inside `user@host:~/.ssh/authorized_keys`
+* copy `<PAF>/extra/vagrant/3nodes-vip/provision/id_rsa.pub` inside `user@host:~/.ssh/authorized_keys`
 * edit `ssh_login` in the `vagrant.yml` configuration file
 * user might need to be in group `libvirt`
 * user might need to add `uri_default='qemu:///system'` in its
@@ -53,7 +55,7 @@ root$ su - $MYUSER
 myuser$ mkdir -p "${HOME}/.config/libvirt"
 myuser$ echo "uri_default='qemu:///system'" > "${HOME}/.config/libvirt/libvirt.conf"
 myuser$ git clone https://github.com/ClusterLabs/PAF.git
-myuser$ cd PAF/test
+myuser$ cd PAF/extra/vagrant/3nodes-vip
 myuser$ cat "provision/id_rsa.pub" >> "${HOME}/.ssh/authorized_keys"
 myuser$ echo "ssh_login: \"$USER\"" >> vagrant.yml
 ~~~
@@ -63,7 +65,7 @@ myuser$ echo "ssh_login: \"$USER\"" >> vagrant.yml
 To create the cluster, run:
 
 ~~~
-cd PAF/test
+cd PAF/extra/vagrant/3nodes-vip
 make all
 ~~~
 
