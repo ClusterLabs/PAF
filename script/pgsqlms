@@ -1346,7 +1346,7 @@ sub pgsql_validate_all {
 
         $guc = qx{ $POSTGRES -C primary_conninfo -D "$pgdata" $start_opts};
         unless ($guc =~ /['\s]application_name=$nodename['\s]/) {
-            ocf_exit_reason( 'warning',
+            ocf_exit_reason(
                 q{Parameter "primary_conninfo" MUST contain 'application_name=%s'. }.
                 q{It is currently set to '%s'}, $nodename, $guc );
             return $OCF_ERR_ARGS;
@@ -1826,8 +1826,7 @@ sub pgsql_promote {
     # pre-promote action
     $cancel_switchover = _get_priv_attr('cancel_switchover');
     if ( $cancel_switchover ) { # if not empty or not 0
-        ocf_exit_reason(
-            'Switchover has been canceled from pre-promote action' );
+        ocf_exit_reason( 'Switchover has been canceled from pre-promote action' );
 
         _delete_priv_attr( 'cancel_switchover' );
 
