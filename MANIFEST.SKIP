@@ -75,8 +75,8 @@
 # Avoid developers doc
 ^devel\/.*
 
-# Avoid test folder
-^test\/.*
+# Avoid extra folder
+^extra\/.*
 
 # avoid manual page generated during the build process
 ocf_heartbeat_pgsqlms.7
