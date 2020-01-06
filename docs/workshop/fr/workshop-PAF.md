@@ -1370,24 +1370,6 @@ Afficher les valeurs des paramètres abordés :
 
 -----
 
-## Cas d'un cluster multi-site
-
-* ticket de site, autorisant le démarrage de ressources
-* "dead man dependency", fencing automatique à la révocation du ticket
-
-FIXME : a développer? Expliquer pourquoi c'est complexe et risqué?
-
-::: notes
-
-[Documentation associée](http://clusterlabs.org/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/ch15.html)
-
-Attention, la configuration "multi-sites" (ou "split site", ou "stretch cluster") a des contraintes particulières (
-[voir aussi la documentation Red Hat à ce propos](https://access.redhat.com/articles/27136#Support_Reqs) ).
-
-:::
-
------
-
 # Fonctionnement du cluster
 
 Mécanique interne
