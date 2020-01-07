@@ -274,36 +274,39 @@ l'utilise pas pour interagir avec le système lui même.
 
 -----
 
-## Pacemaker et RHEL 7
+## Pacemaker et RHEL
 
-* RHEL 7 : HA par défaut :
-  * utilisation de Corosync 2.x
-  * Pacemaker 1.1.x
+* RHEL 8 : HA par défaut :
+  * utilisation de Corosync 3.x
+  * Pacemaker 2.x
   * client d'administration `pcs`
 
 ::: notes
 
-L'installation recommandée (et supportée) sous les distributions RHEL 7 et dérivés est la suivante:
+L'installation recommandée (et supportée) suivant les distributions de RHEL et dérivés :
 
-* Corosync 2.x
-* Pacemaker 1.1.x
-* daemon d'administration `pcsd`
-* client d'administration `pcs`
+| RHEL version | Corosync | Pacemaker | Administration |
+|  7 | 2.x | 1.1.x | pcsd & pcs |
+|  8 | 3.x | 2.x | pcs & pcs |
 
 :::
 
+
 -----
 
-## Pacemaker et Debian 8/9
+## Pacemaker et Debian
 
-* Debian 8 :
-  * packagé dans les backports depuis Debian 9
-* Debian 9
-  * corosync 2.x
-  * Pacemaker 1.1.x
-  * client d'administration `crmsh` 2.x ou le couple `pcsd`et `pcs`
+* Debian 10
+  * corosync 3.x
+  * Pacemaker 2.x
+  * client d'administration `crmsh` 4.x ou le couple `pcsd`et `pcs`
 
 ::: notes
+
+| Debian version | Corosync | Pacemaker | Administration |
+| 8 | 1.4 | 1.1.x | crmsh |
+| 9 | 2.4 | 1.1.x | pcsd & pcs 0.9 ou crmsh 2.3|
+| 10 | 3.0 | 2.0 | pcs & pcs 0.10 ou crmsh 4.0 |
 
 L'équipe de maintenance des paquets Pacemaker n'a pu intégrer les dernières versions des composants à temps pour la
 version 8 de Debian. Il a été décidé d'utiliser officiellement le dépôt backport de Debian pour distribuer ces paquets
@@ -1078,7 +1081,10 @@ Détails sur Corosync
 
 ::: notes
 
-FIXME
+Corosync est un système de communication de groupe (GCS). Il fournit l'infrastucture nécessaire au
+fonctionnement du cluster en mettant à disposition des API permettant la communication et d'adhésion
+des membres au seindu cluster. Corosync fournit notamment des notifications de gain ou de perte du
+quorum qui sont utilisé pour mettre en place la haute disponibilité.
 
 * conf générée par pcs dans notre cas
 * possibilié de la personnaliser
