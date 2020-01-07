@@ -288,7 +288,7 @@ L'installation recommandée (et supportée) suivant les distributions de RHEL et
 | RHEL version | Corosync | Pacemaker | Administration              |
 |:------------:|:--------:|:---------:|-----------------------------|
 | 7            | 2.x      | 1.1.x     | pcsd & pcs                  |
-| 8            | 3.x      | 2.x       | pcs & pcs                   |
+| 8            | 3.x      | 2.x       | pcsd & pcs                  |
 
 :::
 
@@ -304,11 +304,11 @@ L'installation recommandée (et supportée) suivant les distributions de RHEL et
 
 ::: notes
 
-| Debian version | Corosync | Pacemaker | Administration              |
-|:--------------:|:--------:|:---------:|-----------------------------|
-| 8              | 1.4      | 1.1.x     | crmsh                       |
-| 9              | 2.4      | 1.1.x     | pcsd & pcs 0.9 ou crmsh 2.3 |
-| 10             | 3.0      | 2.0       | pcs & pcs 0.10 ou crmsh 4.0 |
+| Debian version | Corosync | Pacemaker | Administration               |
+|:--------------:|:--------:|:---------:|------------------------------|
+| 8              | 1.4      | 1.1.x     | crmsh                        |
+| 9              | 2.4      | 1.1.x     | pcsd & pcs 0.9 ou crmsh 2.3  |
+| 10             | 3.0      | 2.0       | pcsd & pcs 0.10 ou crmsh 4.0 |
 
 L'équipe de maintenance des paquets Pacemaker n'a pu intégrer les dernières versions des composants à temps pour la
 version 8 de Debian. Il a été décidé d'utiliser officiellement le dépôt backport de Debian pour distribuer ces paquets
