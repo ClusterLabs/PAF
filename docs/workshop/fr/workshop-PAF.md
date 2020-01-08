@@ -118,6 +118,32 @@ fortes chances qu'une bascule n'ait jamais lieu pour un cluster dépourvu de fen
 
 -----
 
+## Quorum
+
+* Quelle partie du cluster doit continuer à fonctionner en cas de partition ?
+* Comment savoir ?
+  * donner un vote à chaque élément du cluster
+  * permettre au cluster de fonctionner que s'il a la majorité des votes
+
+::: notes
+
+Le `quorum` est le nombre minimum de vote qu'une transaction distribuée doit obtenir pour
+être autorisée à effectuer une opération dans ce système. Son objectif est d'assurer
+la consistance du système distribué.
+
+Pour se faire, chaque noeud du système se voit assigné un nombre de vote.
+Il faut au moins que `(N / 2) + 1` votes soient présents pour que le
+`quorum` soit atteint. Le cluster ne fonctionne que si la majorité des noeuds
+sont présents.
+
+Le `quorum` permet donc au cluster de savoir où il doit initier une récupération
+des services et où il doit fencer. Il est donc indispensable au fonctionnement
+du cluster en permettant d'éviter un `split brain`.
+
+:::
+
+-----
+
 ## KISS
 
 * une architecture complexe pose des problèmes
@@ -1076,75 +1102,111 @@ Détails sur Corosync
 ## Présentation
 
 * couche de communication bas niveau du cluster
-* solution favorisée par les versions récentes de Pacemaker
-* depuis 2004
-  * dérivé de OpenAIS
-  * avec des morceaux de CMAN dedans ensuite (à vérifier)
+* créé en 2004
+* dérivé de OpenAIS
+* avec des morceaux de CMAN dedans ensuite (à vérifier)
 
 ::: notes
 
-Corosync est un système de communication de groupe (GCS). Il fournit l'infrastucture nécessaire au
-fonctionnement du cluster en mettant à disposition des API permettant la communication et d'adhésion
-des membres au seindu cluster. Corosync fournit notamment des notifications de gain ou de perte du
-quorum qui sont utilisé pour mettre en place la haute disponibilité.
+Corosync est un système de communication de groupe (GCS). Il fournit l'infrastructure nécessaire au
+fonctionnement du cluster en mettant à disposition des APIs permettant la communication et d'adhésion
+des membres au sein du cluster. Corosync fournit notamment des notifications de gain ou de perte du
+quorum qui sont utilisés pour mettre en place la haute disponibilité.
 
-* conf générée par pcs dans notre cas
-* possibilié de la personnaliser
-* attention à toujours conserver une conf identique partout
+Lorsque l'on utilise `pcs` pour créer le cluster, la configuration est créée par l'outil dans
+`/etc/corosync/corosync.conf`. Ce fichier peut être personnalisé. En cas de modification
+manuelle, il faut veiller à conserver une configuration identique. Cela peut être fait
+manuellement ou avec la commande `pcs cluster sync`.
+
+La configuration de corosync est décrite dans le man `corosync.conf`. Les fonctionnalités
+liées à `votequorum` sont décrites dans le page man de `votequorum`.
 
 :::
 
 -----
 
-## Fonctionnement
+## Architecture
 
-* architecture sous forme de modules ("service engines")
-* Totem Single Ring Ordering and Membership
-* supporte deux protocoles réseaux:
-  * en multicast
-  * ou en unicast
+* Corosync : une architecture sous forme de services, dont :
+  * `cgp` : API de gestion de group de processus ;
+  * `cmap` : API de gestion de configuration ;
+  * `votequorum` : API de gestion du quorum.
 
 ::: notes
 
-Les modules sont des services proposé par corosync à la couche supérieure, eg:
+Corosync s'appuie sur une ensemble de services internes pour proposer plusieurs APIs aux applications
+qui l'utilisent.
 
-* quorum
-* ...
+Corosync expose notamment l'api `cpg` dont l'objet est de permettre la création d'applications
+distribuées qui continuent à fonctionner pendant des partitions, fusions ou pannes du cluster.
+Cette api permet de gérer :
 
-Totem Single Ring Ordering and Membership : met à disposition le modèle de communication "Extended Virtual Synchrony"
-pour la gestion des messages et des groupes.
+* les join/leave des noeuds dans un ou plusieurs groupes ;
+* la propagation des messages à l'ensemble des membres des groupes ;
+* la propagation des changements de configuration ;
+* l'ordre de délivrance des messages.
+
+Corosync utilise `cmap` pour gérer et stocker sa configuration sous forme de stockage
+clé-valeur. Cette API est également mise à disposition des applications qui utilisent corosync.
+Pacemaker s'en sert notamment pour récupérer certaines informations sur le cluster et
+ses membres.
+
+Le service `votequorum` permet à corosync de fournir des notifications sur la gain ou la
+perte du quorum dans le cluster.
 
 :::
 
 -----
 
-## Diffusion de messages entre les membres
+## Fonctionnalités de corosync 3
 
-* circulation de token entre les membres d'un groupe (Closed Process Group, ou CPG)
-* assure la diffusion à tous les membres
-* accuse la reception du message à tout le groupe
-* assure l'ordre de délivrance des messages
-* propage les join/leave à tous les membres présents du groupe
+* Nouvelle librairie `kronosnet` (`knet)
+  * chiffrement
+  * redondance des cannaux de communications
+  * compression
 
 ::: notes
 
-FIXME
+Corosync3 utilise la librairie kronosnet (knet). Cette libraire :
+* remplace les modes de transport multicast et unicast ;
+* remplace le protocole RRP (Redundant Ring Protocole).
 
-:::
+Corosync implémente le protocole _Totem Single Ring Ordering and Membership_ pour la gestion
+des messages et des groupes. Il est possible de redonder les cannaux de communications ou liens
+en créant plusieurs interfaces (option `totem` > `interface` > `linknumber`) qui seront
+utilisés comme support des rings (option `nodelist` > `node` > `ringX_addr`). `knet` permet
+de créer jusqu'à 8 liens avec des protocoles et des priorités différentes.
+
+Le chiffrement peut être configuré soit avec l'option `totem` > `secauth` soit avec les
+paramètres `totem` > `crypto_model`, `totem` > `crypto_cipher` et `totem` > `crypto_hash`.
+
+Il est également possible d'utiliser la compression.
 
 -----
 
-## Fonctionnalités
+## Clusters à deux noeuds
 
-* gestion du quorum
-  * nombre de votes total et par nœud
-  * re-configuration automatique
-* peut utiliser le chiffrement (option `secauth`)
-* prise en compte de multiples interfaces réseau (Redundant Ring Protocol, ou RRP)
+* Cas d'un cluster à deux noeuds : `two_node : 1`
+  * option héritée de CMAN
+  * requiers `expected-votes : 2`
+  * implique `wait_for_all : 1`
+  * requiers un fencing hardware configuré sur la même interface que le heartbeat
 
 ::: notes
 
-FIXME
+Si l'on considère un cluster à deux noeuds avec un vote par noeud. Le nombre de vote attendu
+est 2 (`expected-votes`). Avec ce setup, il n'est pas possible d'avoir une majorité en cas de
+partition du cluster. La configuration `two_node` permet de fixer artificiellement le
+quorum à 1 et de résoudre ce problème.
+
+Ce paramétrage, implique `wait_for_all : 1` qui empêche le cluster d'établir
+une majorité tant que l'ensemble des noeuds n'est pas présent. Cela évite une
+partition au démarrage du cluster.
+
+En cas de problème réseau, les deux noeuds font la course pour se tuer.
+
+Même si elle fonctionne, ce genre de configuration n'est pas optimale. Comme en témoigne
+[cet article du blog de clusterlabs](http://blog.clusterlabs.org/blog/2018/two-node-problems).
 
 :::
 
@@ -1159,7 +1221,30 @@ FIXME
 
 ::: notes
 
-FIXME
+`corosync-cfgtool` permet de :
+
+* arrêter corosync sur le serveur ;
+* récupérer l'ip d'un noeud ;
+* tuer un noeud ;
+* récupérer des informations sur les rings et réinitialiser leur statut ;
+* demander à l'ensemble des noeuds de recharger leur configuration.
+
+`corosync-cpgtool` permet d'afficher les groupes cpg et leurs membres.
+
+`corosync-cmapctl` permet de manipuler et consulter la base d'objet de corosync,
+les actions possibles sont :
+
+* lister les valeurs associées aux clés : directement (ex: totem.secauth), par
+préfix(ex: totem.) ou sans filtre ;
+* définir ou supprimer des valeurs ;
+* changer la configuration depuis un fichier externe ;
+* suivre les modification des clés stockées dans `cmap` en temps réel en filtrant
+sur un préfix ou directement sur un clé.
+
+`corosync-quorumtool` permet de afficher les informations sur le quorum et les noeuds ;
+* modifier la configuration des votes (nombre, nombre attendu) ;
+* suivre les modifications de quorum ;
+* lister les noeuds avec leurs nom, id  et ips .
 
 :::
 
@@ -1277,21 +1362,17 @@ Configuration globales
   * `no-quorum-policy=ignore` : désactiver la gestion du quorum (déconseillé !)
   * `stonith-enabled=false` : désactiver la gestion du fencing (déconseillé !)
 
-* Cas d'un cluster a deux noeuds : `two_node : 1`
-  * option héritée de CMAN
-  * requiers `expected-votes : 2`
-  * implique `wait_for_all : 1`. Ce parametre empeche le cluster d'établir une majorité tant que 
-    l'ensemble des noeuds n'est pas présent. Cela evite une partition au démarrage du cluster. (C'est la
-    valeur par défaut avec `two_nodes : 1`
-  * requiers un fencing hardware configuré sur la meme interface que le heartbeat
+:::notes
 
-::: notes
+Il est technniquement possible de désactiver le [quorum] ou [stonith][fencing].
 
-FIXME Expliquer :
+Comme dit précédemment c'est à proscrire hors d'un environnement de test. Sans
+ces features, le comportement du cluster est imprévisible en cas de panne et sa
+cohérence en péril.
 
-* pourquoi conserver le quorum sur un cluster à deux noeuds:
-  Si on ne peut pas mettre en place de fencing? En cas de coupure réseau entre les deux noeuds les deux s'arrêtent?
-  ie.: hors paramètres resources
+Dans le cas d'un cluster qui gère une base de donnée cela signifie que l'on encourt le
+risque d'avoir plusieurs ressources PostgreSQL disponibles en écriture sur plusieurs
+noeuds (conséquence d'un `split brain`).
 
 :::
 
@@ -1300,15 +1381,27 @@ FIXME Expliquer :
 ## Cluster symétrique et asymétrique
 
 * attribut `symmetric-cluster`
-  * change l'effet des scores de préférence pour un noeud
-* Asymétrique "Opt-In"
-  * les ressources ne peuvent pas être démarrées à moins d'avoir déclaré un score >= 0
-* Symétrique "Opt-Out"
-  * les ressources peuvent être démarrées sur tous les noeuds à moins d'avoir déclaré un score < 0
+  * change l'effet des scores de préférence des ressources
+* Deux types de clusters :
+  * Asymétrique "Opt-In" : les ressources ne peuvent pas être démarrées à moins
+  d'avoir déclaré un score >= 0
+  * Symétrique "Opt-Out" : les ressources peuvent être démarrées sur tous les
+  noeuds à moins d'avoir déclaré un score < 0
 
 ::: notes
 
-FIXME
+Le paramètre `symetric-cluster` permet de changer la façon dont pacemaker choisit
+où démarrer les ressources :
+
+* configuré à `true` (defaut), le cluster est dit symétrique. Les ressources peuvent être
+démarrées partout. Le choix du noeud se fait par ordre décroissant des valeurs des
+contraintes de localisation. Une contrainte de localisation négative empêchera la
+ressource de démarrer sur un noeud.
+* configuré à `false`, le cluster est dit asymétrique. Les ressources ne peuvent
+démarrer nulle part. La définition de contraintes de localisation va permettre de
+définir sur quels noeuds les ressources peuvent être démarrées.
+
+La notion de contraintes de localisation est définie dans le chapitre [Contraintes de localisation][]
 
 :::
 
@@ -1561,7 +1654,26 @@ identity_file="/root/.ssh/id_rsa" login_timeout=15
 
 ::: notes
 
-FIXME
+Les contraintes de localisation ont pour fonction d'aider pacemaker à savoir où
+démarrer les ressources.
+
+Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le même
+score alors pacemaker choisi aléatoirement parmis les noeuds candidats.
+
+Si un noeud est sorti momentanément du cluster, ses ressources peuvent être déplacées
+vers d'autres noeuds. Lors de sa réintroduction, les contraintes de localisation
+définies peuvent provoquer une nouvelle bascule des ressources.
+
+La plus part du temps, il est préférable d'éviter de déplacer des ressources qui
+fonctionnent correctement. C'est particulièrement vrai pour les base de données
+dont le temps de bascule peut prendre plusieurs secondes.
+
+Le paramètre `stickiness` permet de dire à pacemaker à quel point une ressource
+en bonne santée préfère rester attachée à un noeud. Pour cela la valeur du paramètre
+`stickiness` est additionnée au score de la ressource sur le noeud courant et
+comparé aux scores sur les autres noeuds pour déterminer le noeud "idéal".
+
+Ce paramètre peut être défini globalement ou par ressource.
 
 :::
 
