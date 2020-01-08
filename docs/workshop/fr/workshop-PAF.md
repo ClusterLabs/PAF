@@ -3438,29 +3438,14 @@ check_crm OK - Cluster OK
 ~~~
 
 L'argument `-c` de la sonde permet de lever une alerte si une
-contrainte existe sur une resource suite à un déplacement forcé
-(eg. `crm_resource --ban`). Malheureusement, cette commande dépend de `crmsh`.
-Si nécessaire, le patch suivant permet de se séparer de cette dépendance:
+contrainte existe sur une ressource suite à un déplacement forcé
+(eg. `crm_resource --ban`). Malheureusement, cette commande dépend de `crmsh`
+et ne fonctionne donc pas avec `pcs`.
 
-~~~diff
-***************
-*** 57 ****
-! my $crm_configure_show = '/usr/sbin/crm configure show';
---- 57 ----
-! my $crm_configure_show = q{/usr/sbin/cibadmin -Q --xpath "//rsc_location[starts-with(@id, 'cli-prefer-') or starts-with(@id, 'cli-ban-') or starts-with(@id, 'cli-standby-')]/@id" -e};
-***************
-*** 191 ****
-!         if ( $line =~ m/location cli-(prefer|standby)-\S+\s+(\S+)/ ) {
---- 191 ----
-!         if ( $line =~ m/id='(cli-[^']+)'/ ) {
-***************
-*** 193 ****
-!                 ": $2 blocking location constraint detected" );
---- 193 ----
-!                 ": $1 blocking location constraint detected" );
-~~~
 
-L'outil '**check\_corosync\_rings** permet de détecter les incidents réseau
+**check\_corosync\_rings**
+
+L'outil **check\_corosync\_rings** permet de détecter les incidents réseau
 au niveau Corosync. Par exemple, voici le cas d'un anneau défaillant :
 
 ~~~console
