@@ -30,7 +30,10 @@ hide_author_in_slide: true
 ## Prérequis minimum
 
 * fiabilité des ressources (matériel, réseau, etc.)
-* chaque élément d'architecture doit être redondé
+* redondance de chaque élément d'architecture
+* synchronisation des horloges des serveurs
+* supervision de l'ensemble
+
 
 ::: notes
 
@@ -56,6 +59,20 @@ réellement tout redonder:
 
 S'il reste un seul `Single Point of Failure` dans l'architecture, ce point
 subira un jour où l'autre une défaillance.
+
+Concernant le synchronisme des horloges des serveurs entre eux, celui-ci est
+important pour les besoins applicatifs et la qualité des données. Suite à une
+bascule, les dates pourraient être incohérentes entre celles écrites par la
+précédente instance primaire et la nouvelle.
+
+Ensuite, ce synchronisme est important pour assurer une cohérence dans
+l'horodatage des journaux applicatifs entre les serveurs. La compréhension
+rapide et efficace d'un incident dépend directement de ce point. Ànoter qu'il
+est aussi possible de centraliser les log sur une architecture dédiée à part
+(attention aux SPoF ici aussi).
+
+Le synchronisme des horloges est d'autant plus important dans les
+environnements virtualisés où les horloges ont facilement tendance à dévier.
 
 :::
 
@@ -3326,70 +3343,133 @@ Suivre le déroulement des actions :
 
 # Supervision
 
-FIXME
-
------
-
-## Bonnes pratiques
-
-* Les serveurs doivent être à la même heure (facilite la lecture des logs)
-* Utiliser un démon NTPd sur chaque noeud
-* Le superviser
-
-::: notes
-
-FIXME
-
-:::
+Ce chapitre aborde les différents axes de supervision d'un cluster Pacemaker.
 
 -----
 
 ## Sondes
 
-* Superviser l'état du cluster (on pourrait ne pas remarquer les bascules!)
-  * [Check CRM](https://exchange.nagios.org/directory/Plugins/Clustering-and-High-2DAvailability/Check-CRM/details)
-* Superviser l'état des `rings` corosync
+* supervision basique avec `crm_mon`
+* état du cluster avec `check_crm` (on pourrait ne pas remarquer les bascules!)
+  * [check_crm](https://exchange.nagios.org/directory/Plugins/Clustering-and-High-2DAvailability/Check-CRM/details)
+* état des __rings__ corosync avec `check_corosync_rings`
   * [check_corosync_rings](https://exchange.nagios.org/directory/Plugins/Clustering-and-High-2DAvailability/Check-Corosync-Rings/details)
 
 ::: notes
 
-**check\_crm**
+Il existe peu de projet permettant d'intégrer la supervision d'un cluster
+Pacemaker au sein d'un système centralisé, eg. Nagios ou dérivés. Nous pouvons
+citer `crm_mon`, `check_crm` ou `check_corosync_rings`.
 
-Cas d'une ressource stoppée :
+**crm\_mon**
+
+L'outil `crm_mon` est capable de produire une sortie adaptée à Nagios grâce
+à l'argument `--simple-status`. Néanmoins, la remontée d'erreur est limitée
+à la seule disponibilité des nœuds, mais pas des ressources.
+
+Voici un exemple avec e cluster dans son état normal:
 
 ~~~console
-# pcs resource ban pgsqld node2
-./check_crm.pl
-check_crm CRITICAL - :  node2  Stopped
+# crm_mon --simple-status
+CLUSTER OK: 3 nodes online, 7 resources configured
 ~~~
 
-Warning si failcount>0 (seuil paramétrable. Par exemple si PAF a relancé une instance :
+L'outil ne rapporte pas d'erreur en cas d'incident sur une ressource:
+
+~~~console
+[root@srv1 ~]# killall postgres
+
+[root@srv1 ~]# pcs resource show
+ Master/Slave Set: pgsqld-clone [pgsqld]
+     pgsqld	(ocf::heartbeat:pgsqlms):	FAILED srv1
+     Masters: [ srv2 ]
+     Slaves: [ srv3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started srv2
+
+[root@srv1 ~]# crm_mon --simple-status
+CLUSTER OK: 3 nodes online, 7 resources configured
+~~~
+
+Mais remonte une erreur en cas de perte d'un nœud:
+
+~~~console
+[root@srv1 ~]# pcs stonith fence srv3
+Node: srv3 fenced
+
+[root@srv1 ~]# crm_mon --simple-status
+CLUSTER WARN: offline node: srv3
+~~~
+
+Cette sonde est donc peu utile, car souvent en doublon avec une sonde
+pré-existante confirmant que le serveur est bien démarré. Elle peut
+éventuellement servir à confirmer que les services Pacemaker/Corosync sont
+bien démarrés sur chaque nœud du cluster.
+
+
+**check\_crm**
+
+Malheureusement, l'outil n'a pas été mis à jour depuis 2013. Il dépend du
+paquet `libmonitoring-plugin-perl` sous Debian et dérivés et de `epel-release` et
+`perl-Monitoring-Plugin.noarch` sous les RedHat et dérivés.
+
+Le module perl ayant changé de nom depuis, il est nécessaire de modifier deux
+lignes dans le code source:
+
+~~~console
+sed -i 's/Nagios::Plugin/Monitoring::Plugin/' check_crm.pl
+~~~
+
+Ci dessous, le cas d'une ressource ayant subit au moins une erreur. L'option -f
+permet d'indiquer le nombre minimal d'erreur avant que la sonde ne lève une
+alerte:
 
 ~~~console
 # ./check_crm.pl
 check_crm WARNING - : pgsqld failure detected, fail-count=1
-# pcs resource failcount show pgsqld
-Failcounts for pgsqld
- node2: 1
+
+# ./check_crm.pl -f 3
+check_crm OK - Cluster OK
+
 # pcs resource failcount reset pgsqld
-# pcs resource failcount show pgsqld
-No failcounts for pgsqld
+[...]
+
 # ./check_crm.pl
 check_crm OK - Cluster OK
 ~~~
 
-Attention : la sonde est prévue pour utiliser le binaire `crm` donc la commande `crm configure show`. A tester/adapter
-sur debian pour pcs.
+L'argument `-c` de la sonde permet de lever une alerte si une
+contrainte existe sur une resource suite à un déplacement forcé
+(eg. `crm_resource --ban`). Malheureusement, cette commande dépend de `crmsh`.
+Si nécessaire, le patch suivant permet de se séparer de cette dépendance:
 
-**check\_corosync\_rings** :
+~~~diff
+***************
+*** 57 ****
+! my $crm_configure_show = '/usr/sbin/crm configure show';
+--- 57 ----
+! my $crm_configure_show = q{/usr/sbin/cibadmin -Q --xpath "//rsc_location[starts-with(@id, 'cli-prefer-') or starts-with(@id, 'cli-ban-') or starts-with(@id, 'cli-standby-')]/@id" -e};
+***************
+*** 191 ****
+!         if ( $line =~ m/location cli-(prefer|standby)-\S+\s+(\S+)/ ) {
+--- 191 ----
+!         if ( $line =~ m/id='(cli-[^']+)'/ ) {
+***************
+*** 193 ****
+!                 ": $2 blocking location constraint detected" );
+--- 193 ----
+!                 ": $1 blocking location constraint detected" );
+~~~
 
-Cas d'un anneau défaillant :
+L'outil '**check\_corosync\_rings** permet de détecter les incidents réseau
+au niveau Corosync. Par exemple, voici le cas d'un anneau défaillant :
 
 ~~~console
 # ifdown eth1
 Device 'eth1' successfully disconnected.
+
 # ./check_corosync_ring.pl
 check_cororings CRITICAL - Running corosync-cfgtool failed
+
 # corosync-cfgtool -s
 Printing ring status.
 Local node ID 1
@@ -3398,9 +3478,11 @@ RING ID 0
   status  = ring 0 active with no faults
 RING ID 1
   id  = 192.168.100.2
-  status  = Marking ringid 1 interface 192.168.100.2 FAULTY
+  status  = Marking ringid 1 interface 192.168.100.2 FAULTY*
+
 # ifup eth1
 Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/3)
+
 # corosync-cfgtool -s
 Printing ring status.
 Local node ID 1
@@ -3410,6 +3492,7 @@ RING ID 0
 RING ID 1
   id  = 192.168.100.2
   status  = ring 1 active with no faults
+
 # ./check_corosync_ring.pl 
 check_cororings OK - ring 0 OK ring 1 OK
 ~~~
@@ -3420,7 +3503,7 @@ check_cororings OK - ring 0 OK ring 1 OK
 
 ## Pacemaker alerts
 
-* Déclencher une action en cas d'évènement (noeud défaillant, ressource qui démarre ou s'arrête...)
+* Déclencher une action en cas d'évènement (nœud défaillant, ressource qui démarre ou s'arrête...)
 * Possibilité d'exécuter un script
 * Exemples fournis : écriture dans un fichier de log, envoi de mail, envoi trap snmp
 * Disponible depuis pacemaker 1.1.15
@@ -3428,17 +3511,19 @@ check_cororings OK - ring 0 OK ring 1 OK
 ::: notes
 
 Depuis la version 1.1.15, Pacemaker offre la possibilité de lancer des
-[alertes](https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/ch07.html) en fonction de
-certains évènements.
+[alertes](https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/ch07.html)
+en fonction de certains évènements.
 
-Le principe est assez simple, Pacemaker lance un script et lui transmet des variables d'environnement. Cela laisse une
-grande liberté dans l'écriture de script.
+Le principe est assez simple, Pacemaker lance un script et lui transmet des
+variables d'environnement. Cela laisse une grande liberté dans l'écriture de
+script.
 
-Pacemaker propose plusieurs script en exemple stockés dans /usr/share/pacemaker/alerts :
+Pacemaker propose plusieurs scripts en exemple stockés dans
+`/usr/share/pacemaker/alerts` :
 
-  * *alert_file.sh.sample* : Ecriture de l'évènement dans un fichier texte
-  * *alert_smtp.sh.sample* : Envoi d'un mail
-  * *alert_snmp.sh.sample* : Envoi d'une "trap" snmp
+  * `alert_file.sh.sample` : écriture de l'évènement dans un fichier texte
+  * `alert_smtp.sh.sample` : envoi d'un mail
+  * `alert_snmp.sh.sample` : envoi d'une "trap" snmp
 
 Voici un exemple de configuration avec *alert_file.sh.sample* :
 
@@ -3456,11 +3541,11 @@ Voici un exemple de configuration avec *alert_file.sh.sample* :
 </configuration>
 ~~~
 
-Dans cet exemple, Pacemaker exécutera le script `/usr/share/pacemaker/alerts/alert_file.sh` et lui transmet plusieurs
-variables :
+Dans cet exemple, Pacemaker exécutera le script
+`/usr/share/pacemaker/alerts/alert_file.sh` et lui transmet plusieurs variables :
 
-  * *timestamp-format* : Format du timestamp
-  * *logfile_destination* : Emplacement du fichier de destination
+  * `timestamp-format` : format du timestamp
+  * `logfile_destination` : emplacement du fichier de destination
 
 ~~~
 cp /usr/share/pacemaker/alerts/alert_file.sh.sample /usr/share/pacemaker/alerts/alert_file.sh
@@ -3499,10 +3584,7 @@ Provoquer un changement dans le cluster :
 pcs resource ban pgsql-ha
 ~~~
 
-Consulter le fichier alerts.log :
-
-
-Sur hanode2:
+Consulter le fichier `alerts.log`. Sur hanode2:
 
 ~~~
 11:47:24.397811: Resource operation 'notify' for 'pgsqld' on 'hanode2': ok
@@ -3528,6 +3610,8 @@ Sur hanode1:
 11:47:35.993734: Resource operation 'monitor (10000)' for 'pgsql-master-ip' on 'hanode1': ok
 ~~~
 
-A noter qu'il est possible de filtrer sur certains évènements depuis la version 1.1.18.
+Il pourrait être intéressant d'adapter ce script pour utiliser l'outil
+`logger` au lieu d'écrire directement dans un fichier. Ces modifications sont
+laissés à l'exercice du lecteur.
 
 :::
