@@ -1060,7 +1060,7 @@ FIXME diagram
   soit le type de _RA_ utilisé
 * est responsable d'exécuter les actions récurrentes en toute autonomie et de
   prévenir le _controller_ en cas d'écart avec le résultat attendu
-* anciennement appelé ̀̀ LRMd` (_Local Resource Manager_)
+* anciennement appelé `LRMd` (_Local Resource Manager_)
 
 ::: notes
 
@@ -2505,14 +2505,15 @@ Sur chaque nœud :
 
 ## Pré-requis de PAF
 
-FIXME
-
 * supporte PostgreSQL à partir de la version 9.3 et supérieure
 * "hot standby" actif: doit pouvoir se connecter aux secondaires
-* modèle de fichier de configuration "recovery.conf.pcmk"
-  * réplication streaming active entre les nœuds
-  * `application_name` égal au nom du nœud
-  * `recovery_target_timeline = 'latest'`
+* réplication streaming active entre les nœuds :
+  * configurée avec :
+    * `application_name` égal au nom du nœud
+    * `recovery_target_timeline = 'latest'`
+  * configurée dans :
+    * pg11 et avant : modèle de fichier de configuration `recovery.conf.pcmk`
+    * pg12 et après : fichier de configuration de PostgreSQL
 * le cluster PostgreSQL doit être prêt avant le premier démarrage
 * PostgreSQL doit être désactivé au démarrage du serveur
 
@@ -2525,27 +2526,50 @@ Astuce:
 
 L'agent PAF a peu de pré-requis.
 
-Il supporte toutes les version de PostgreSQL supérieure ou égale à la version 9.3.
+Il supporte toutes les version de PostgreSQL supérieure ou égale à la version
+9.3.
 
-Le contrôleur du cluster a besoin de connaître le statut de chaque instance: primaire ou secondaire. Ainsi, l'action
-`monitor` est exécutée à intervalle régulier autant sur le primaire que sur les secondaires. Il est donc essentiel
-que le paramètre `hot standby` soit activé sur toutes les instances, même sur un primaire qui démarre toujours en
-secondaire d'abord ou qui peut être repositionné en secondaire par un demote sur décision du cluster ou sur commande.
+Le `recovery.conf` a disparut avec la version 12 de PostgreSQL, les paramètres
+qu'il contenait sont désormais renseignés dans le fichier de configuration de
+l'instance.
 
-Au tout premier démarrage du cluster PAF recherche parmi les instances configurée quel est l'instance principale. Il
-est donc essentiel d'avoir créé sont cluster PostgreSQL avant la création de la ressource dans Pacemaker et que ce
-dernier soit fonctionnel dès son démarrage.
+Le contrôleur du cluster à besoin de connaître le statut de chaque instance:
+primaire ou secondaire. Ainsi, l'action `monitor` est exécutée à intervalle
+régulier autant sur le primaire que sur les secondaires. Il est donc essentiel
+que le paramètre `hot standby` soit activé sur toutes les instances, même sur
+un primaire qui démarre toujours en secondaire d'abord ou qui peut être
+repositionné en secondaire par un demote sur décision du cluster ou sur
+commande.
 
-Lors de la création de la ressource, Pacemaker s'attend à la trouver éteinte. Il n'est pas vital que les instance
-soit éteintes, mais cela reste préférable afin d'éviter une légère perte de temps et des erreurs inutiles dans
-les log et les événements du cluster.
+Au tout premier démarrage du cluster, PAF recherche parmi les instances
+configurées quel est l'instance principale. Il est donc essentiel d'avoir créé
+sont cluster PostgreSQL avant la création de la ressource dans Pacemaker et
+que ce dernier soit fonctionnel dès son démarrage.
 
-Étant donné que Pacemaker contrôle entièrement le cluster PostgreSQL, ce dernier doit être désactivé au
-démarrage du serveur.
+Afin de permettre à PAF de faire le lien entre des connexions de réplication
+et le noms des nœuds du cluster, il faut donner le nom du nœud ou se trouve
+l'instance dans la chaine de connexion (`primary_conninfo`) en utilisant le
+paramètre`application_name`.
 
-Il est recommandé d'empêcher activement chaque instance à pouvoir se connecter en réplication avec elle même. La
-bascule étant automatique, un ancien primaire rétrogradé en secondaire pourrait se connecter à lui même si la
-mécanique d'aiguillage des connexions vers le nouveau primaire n'a pas encore convergé.
+Lors de la création de la ressource, Pacemaker s'attend à la trouver éteinte.
+Il n'est pas vital que les instances soient éteintes, mais cela reste
+préférable afin d'éviter une légère perte de temps et des erreurs inutiles
+dans les log et les événements du cluster.
+
+Étant donné que Pacemaker contrôle entièrement le cluster PostgreSQL, ce
+dernier doit être désactivé au démarrage du serveur.
+
+Il est recommandé d'empêcher activement chaque instance de pouvoir se
+connecter en réplication avec elle même. La bascule étant automatique, un
+ancien primaire rétrogradé en secondaire pourrait se connecter à lui même si
+la mécanique d'aiguillage des connexions vers le nouveau primaire n'a pas
+encore convergé.
+
+La _timeline_ à l'intérieur des journaux de transaction est mise à jour par le
+serveur primaire suite à une promotion de l'instance. Pour que les instances
+secondaires se raccrochent à la primaire, il faut leurs dire d'utiliser la
+dernière _timeline_ des journaux de transactions. C'est le rôle du
+paramètre `recovery_target_timeline` que l'on doit valoriser à `latest`.
 
 :::
 
