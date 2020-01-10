@@ -1121,7 +1121,7 @@ Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
 
 ## TP
 
-* installer les //resource agents//
+* installer les _resource agents_
 * lister les RA installés à l'aide de `pcs`
 * afficher les information relatives à l'agent `dummy`
 * afficher les information relatives à l'agent `pgsql`
@@ -1513,7 +1513,7 @@ La notion de contraintes de localisation est définie dans le chapitre
 
 -----
 
-## Mode maintenance - 1
+## Maintenance - 1
 
 * ressource "unmanaged"
   * désactive les actions "monitor" sur cette ressource
@@ -1987,7 +1987,7 @@ Détails de l'agent Dummy
 
 Créer une ressource `dummy1` utilisant le _RA_ Dummy:
 
-* customiser le paramètre `state`
+* modifier le paramètre `state` avec la valeur `/tmp/sub/dummy1.state`
 * vérifier son état toutes les 10 secondes
 * positionner son attribut `migration-threshold` (surcharge la valeur par défaut du cluster)
 * positionner son attribut `failure-timeout` à 4h
@@ -2027,7 +2027,7 @@ Consulter les logs du DC.
 # pcs config show
 ~~~
 
-Observer les changements opérés par le scheduler.
+Observer les changements opérés par le _scheduler_.
 
 :::
 
@@ -2047,13 +2047,13 @@ Les contraintes de colocation servent à indiquer à Pacemaker où une ressource
 au même endroit ou à des endroits différents (exclusion).
 
 L'ordre des déclarations est important car cela implique que la ressource _A_ sera
-assignée à un noeud après la ressource _B_. Cela implique donc que la contraintes de
-localistion placée sur la ressource _B_ décide du placement de la ressource _A_.
+assignée à un nœud après la ressource _B_. Cela implique que la contrainte de
+localisation placée sur la ressource _B_ décide du placement de la ressource _A_.
 
 Ces contraintes n'ont pas d'impact sur l'[ordre de démarrage][Contraintes d'ordre].
 
 Dans le cas de PAF, il faut utiliser une contrainte de colocation pour que la VIP
-soit montée sur le même noeud que le master.
+soit montée sur le même nœud que le master.
 
 [Explication](http://clusterlabs.org/doc/Colocation_Explained.pdf)
 
@@ -2061,20 +2061,20 @@ soit montée sur le même noeud que le master.
 
 -----
 
-## TP: création des RA (dummy2) dans le cluster
+## TP: création des _RA_ (dummy2) dans le cluster
 
-dummy2
+Ajout d'un second service Dummy et de contraintes de localisation.
 
 ::: notes
 
-ajouter une ressource dummy2:
+Ajouter une ressource dummy2:
 
-* ne doit jamais démarrer sur le même nœud que dummy1 (contrainte de localisation)
-* customiser le paramètre `state`
+* ne doit jamais démarrer sur le même nœud que `dummy1` (contrainte de localisation)
+* modifier le paramètre `state` avec la valeur `/tmp/sub/dummy2.state`
 * vérifier son état toutes les 10 secondes
 * positionner son attribut `migration-threshold`
 * positionner son attribut `failure-timeout` à 4h
-* lui positionner un stickiness élevé (100 par exemple)
+* lui positionner un `stickiness` élevé (100 par exemple)
 * préférence faible pour le nœud 2 (10 par exemple)
 
 Note : il est important d'utiliser un fichier xml pour appliquer les contraintes de localisation avant de démarrer la
