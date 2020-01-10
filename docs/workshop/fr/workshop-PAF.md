@@ -1847,9 +1847,22 @@ Consulter les logs du DC. (observer les changements opérés par le pengine).
 * définit un lien entre plusieurs ressources
 * peut être un lien de colocalisation ou d'exclusion
   * Par exemple une VIP là où la ressource doit être démarrée
-* attention à l'ordre de déclaration ! FIXME : expliquer pourquoi?
+* attention à l'ordre de déclaration !
 
 ::: notes
+
+Les contraintes de colocation servent à indiquer à Pacemaker où une ressource _A_ doit
+être placée par rapport à une ressource _B_. Elles permettent de localiser deux ressources
+au même endroit ou à des endroits différents (exclusion).
+
+L'ordre des déclarations est important car cela implique que la ressource _A_ sera
+assignée à un noeud après la ressource _B_. Cela implique donc que la contraintes de
+localistion placée sur la ressource _B_ décide du placement de la ressource _A_.
+
+Ces contraintes n'ont pas d'impact sur l'[ordre de démarrage][Contraintes d'ordre].
+
+Dans le cas de PAF, il faut utiliser une contrainte de colocation pour que la VIP
+soit montée sur le même noeud que le master.
 
 [Explication](http://clusterlabs.org/doc/Colocation_Explained.pdf)
 
@@ -1933,7 +1946,17 @@ déplacement d'une IP virtuelle une fois que le service a été déplacé sur un
 
 ::: notes
 
-FIXME
+La notion de groupe est un raccourcis syntaxique qui permet de simplifier les
+déclarations en regroupant les contraintes d'un ensemble de ressources.
+
+Les attributs d'un groupe permettent notamment de définir la priorité et le
+rôle du group ou encore de mettre l'ensemble du groupe en maintenance.
+
+La `stickiness` d'un groupe correspond à la somme des `stickiness` des ressources
+présentes dans ce groupe.
+
+Dans le cas de PAF, on utilise un groupe pour rassembler la ressource PostgreSQL
+master et la VIP.
 
 :::
 
@@ -1973,7 +1996,26 @@ CIB updated
 
 ::: notes
 
-FIXME
+Les règles permettent de définir :
+* les contraintes de localisation ,
+* les options et attributs d'instance d'une ressource ,
+* les options du cluster ,
+en fonction :
+* des attributs d'un noeud ,
+* de l'heure, de la date ou de la périodicité  (à la manière d'une crontab) ,
+* d'une durée.
+
+Pacemaker recalcule l'état du cluster sur la base d'évènements. Il est possible
+qu'aucun évènement ne se produise pendant une période, ce qui empêcherait le
+déclenchement d'une modification de configuration lié à une règle temporelle.
+Il faut donc configurer le paramètre `cluster-recheck-interval` a une valeur adaptée
+pour s'assurer que les règles basées sur le temps soient exécutées.
+
+Les règles peuvent être utilisées pour favoriser l'utilisation d'un noeud plus
+puissant en fonction de la périodes de la journée ou du nombre de CPU.
+
+Il faut cependant garder à l'esprit que la bascule d'une ressource PostgreSQL n'est
+pas transparente et que la [simplicité][KISS] doit rester de mise.
 
 :::
 
@@ -2113,7 +2155,14 @@ modification de la configuration d'une ressource
 
 ::: notes
 
-FIXME
+La configuration des ressources peut être faite avec l'outil `crm_resource` et
+l'option `-s / --set-parameter` ou `-d / --delete-parameter`.
+
+On distingue les paramètres de :
+* configuration de la ressource (modifiable avec l'option --meta)
+* configuration du ressource agent.
+
+Les outils pcs et crmsh peuvent également être utilisés.
 
 :::
 
@@ -2265,6 +2314,8 @@ Sur chaque noeud :
 
 ## Pré-requis de PAF
 
+FIXME
+
 * supporte PostgreSQL à partir de la version 9.3 et supérieure
 * "hot standby" actif: doit pouvoir se connecter aux secondaires
 * modèle de fichier de configuration "recovery.conf.pcmk"
@@ -2275,6 +2326,7 @@ Sur chaque noeud :
 * PostgreSQL doit être désactivé au démarrage du serveur
 
 Astuce:
+
 * empêcher le wal receiver de se connecter sur sa propre instance
   * eg. ajout d'une règle `reject` dans `pg_hba.conf`
 
@@ -2421,11 +2473,36 @@ par la suite :
 -----
 ## Configuration de PAF
 
-FIXME
+* Obligatoire: PGDATA
+* Paramétrage dépendant de la version : recovery_template (pre PG12)
+* Rappel : PAF ne touche pas à la configurtion de PostgreSQL
 
 ::: notes
 
-FIXME
+La configuration de la ressource PostgreSQL est faite avec les paramètres :
+
+* bindir : localisation des binaires de PostgreSQL (defaut: /usr/bin)
+* pgdata : localisation du PGDATA de l'instance (defaut: /var/lib/pgsql/data)
+* datadir : chemin du répertoire data_directory si il est différent de PGDATA
+
+* pghost : le répertoire de socket ou l'adresse IP pour se connecter à l'instance
+  locale (defaut: /tmp ou /var/run/postgresql pour DEBIAN)
+* pgport : le port de l'instance locale (default: 5432)
+
+* recovery_template : un template local pour le fichier PGDATA/recovery.conf
+(defaut: $PGDATA/recovery.conf.pcmk)
+  * avant PG12 : Ce fichier doit exister sur tous les noeuds ;
+  * à partir de PG12 : Ce fichier ne doit exister sur aucun noeud.
+
+* start_opts : Argument supplémentaire à donner au processus PostgreSQL au démarrage
+  de PostgreSQL. (defaut : '') C'est utile notamment si le fichier de configuration
+  de PostgreSQL n'est pas placé dans PGDATA.
+* system_user : l'utilisateur système du propriétaire d l'instance (defaut: postgres)
+
+* maxlag : lag maximal autorisé pour une standby avant d'y placer un score négatif.
+  La différence est calculée entre la position actuelle dans le journal de transaction
+  sur le master et la postion écrite sur la standby (defaut : 0, désactive la
+  fonction)
 
 :::
 
