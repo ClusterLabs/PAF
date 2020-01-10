@@ -39,7 +39,7 @@ PAF supports PostgreSQL 9.3 and higher. It has been extensively tested under
 CentOS 6 and 7 in various scenario.
 
 The `recovery.conf` file has been removed with PostgreSQL 12. The configuration
-which used to be set inside it must be set inside the instance configuration
+that used to be set inside it must be set inside the instance configuration
 file.
 
 PAF has been written to give to the administrator the maximum control
