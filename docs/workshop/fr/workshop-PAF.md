@@ -1644,8 +1644,8 @@ paramétrage général
 
 Afficher et modifier la valeur du paramétrage par défaut des ressources suivantes :
 
-* migration-threshold : 3
-* resource-stickiness : 1
+* `migration-threshold: 3`
+* `resource-stickiness: 1`
 
 ~~~console
 # pcs resource defaults
@@ -1925,13 +1925,46 @@ d'exécution ( `timeout` ), avoir une éventuelle récurrence d'exécution (
 
 ## Timeout des actions d'une ressource
 
-* valeur du timeout déclaré au niveau de la ressource à sa création
-* peut être configuré action par action
-* n'est normalement __pas__ gérée dans le code de l'agent
+* timeout par défaut des actions de 20 secondes
+* cette valeur par défaut peut être modifiée
+* peut être surchargé action par action à la création de la ressource
+* les valeurs par défaut exposées par les _resource agents_ sont des valeurs
+  recommandées, elles ne sont pas appliquées automatiquement
+* le _local executor_ s'assure du respect des timeout. Ils ne doivent
+  __pas__ être gérés par le _RA_ 
 
 ::: notes
 
-FIXME
+Chaque action (opérations `start`, `stop`, `monitor`, etc) demandée par le
+_controller_ et exécutée par le _local executor_ possède un timeout imposé. Par
+défaut, ce dernier est de 20 secondes.
+
+Cette valeur par défaut peut être modifiée dans la section `op_defaults` de
+la CIB, avec l'une ou l'autre de ces commandes:
+
+~~~
+crm_attribute --type op_defaults --name timeout --update 20s
+pcs resource op defaults timeout=20s
+~~~
+
+Il est possible de préciser le timeout pour chaque action définie pour chaque
+ressource de votre cluster, ce dernier surcharge alors la valeur par défaut.
+Préciser les timeouts de chaque action lors de la définition d'une ressource
+est recommandé même s'ils sont identiques à la valeur par défaut. Cette
+pratique aide à la compréhension rapide de la configuration d'un cluster.
+
+La création d'une ressource et de son paramétrage est abordé en TP.
+
+Les _resource agent_ n'ont pas à se préoccuper des timeout de leurs actions.
+Tout au plus, ces agents peuvent indiquer des timeout par défaut à titre de
+recommandation seulement. Il reste à la charge de l'administrateur de définir
+les différents timeout en tenant compte de cette recommandation.
+
+Enfin, si une action ne se termine dans le temps imparti par son timeout,
+
+Le démon `execd`, qui exécute l'action, se charge d'interrompre une action
+dès que son timeout est atteint. Habituellement, le cluster planifie des
+actions palliatives à cette erreur (eg. _recovery_ ou _failover_).
 
 :::
 
@@ -1939,28 +1972,32 @@ FIXME
 
 ## TP: création des RA (dummy1) dans le cluster
 
-création d'une première ressource en HA
+Création d'une première ressource "Dummy" en HA.
+
+Ce _resource agent_ existe seulement à titre de démonstration et
+d'expérimentation.
 
 ::: notes
-* détails de l'agent Dummy
+
+Détails de l'agent Dummy
 
 ~~~console
 # pcs resource describe ocf:pacemaker:Dummy
 ~~~
 
-créer une ressource dummy1 utilisant le RA Dummy:
+Créer une ressource `dummy1` utilisant le _RA_ Dummy:
 
 * customiser le paramètre `state`
 * vérifier son état toutes les 10 secondes
 * positionner son attribut `migration-threshold` (surcharge la valeur par défaut du cluster)
 * positionner son attribut `failure-timeout` à 4h
-* lui positionner un stickiness faible (1 par exemple, surcharge la valeur par défaut du cluster)
+* lui positionner un `stickiness` faible (1 par exemple, surcharge la valeur par défaut du cluster)
 * forte préférence pour le nœud 1 (100 par exemple)
 
-Note : il est important d'utiliser un fichier xml pour appliquer les contraintes de localisation avant de démarrer la
-ressource
+Note: il est important d'utiliser un fichier xml pour appliquer les contraintes
+de localisation avant de démarrer la ressource
 
-Créer le sous-répertoire /tmp/sub sur les 3 nœuds.
+Créer le sous-répertoire `/tmp/sub` sur les 3 nœuds.
 
 ~~~console
 # pcs cluster cib dummy1.xml
@@ -1973,7 +2010,7 @@ meta migration-threshold=3 failure-timeout=4h resource-stickiness=1
 # pcs -f dummy1.xml constraint location dummy1 prefers hanode1=100
 ~~~
 
-controller le contenu du fichier dummy1.xml avant de pousser la configuration
+Contrôler le contenu du fichier `dummy1.xml` avant de pousser la configuration:
 
 ~~~ console
 # pcs cluster verify -V dummy1.xml  # controle la syntaxe
@@ -1982,13 +2019,15 @@ controller le contenu du fichier dummy1.xml avant de pousser la configuration
 # pcs cluster cib-push dummy1.xml
 ~~~
 
-Consulter les logs du DC. (observer les changements opérés par le pengine).
+Consulter les logs du DC.
 
 ~~~console
 # pcs status
 
 # pcs config show
 ~~~
+
+Observer les changements opérés par le scheduler.
 
 :::
 
