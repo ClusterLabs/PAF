@@ -38,24 +38,20 @@ For information about how to install this agent, see `INSTALL.md`.
 PAF supports PostgreSQL 9.3 and higher. It has been extensively tested under
 CentOS 6 and 7 in various scenario.
 
-The `recovery.conf` file has been removed with PostgreSQL 12. The configuration
-that used to be set inside it must be set inside the instance configuration
-file.
-
 PAF has been written to give to the administrator the maximum control
 over their PostgreSQL configuration and architecture. Thus, you are 100%
 responsible for the master/slave creations and their setup. The agent
 will NOT edit your setup. It only requires you to follow these pre-requisites:
 
   * slave __must__ be in hot_standby (accept read-only connections) ;
-  * you __must__ provide a template file on each node for all versions of
-    PostgreSQL before 12. It will be copied as the local `recovery.conf` when
-    needed by the agent ;
   * the following parameters __must__ be configured in the appropriate place :
-    * `standby_mode = on`
+    * `standby_mode = on` (for PostgreSQL 11 and before)
     * `recovery_target_timeline = 'latest'`
     * `primary_conninfo` wih `application_name` set to the node name as seen
       in Pacemaker.
+  * these last parameters has been merged inside the instance configuration
+    file with PostgreSQL 12. For PostgreSQL 11 and before, you __must__
+    provide a `recovery.conf` template file.
 
 When setting up the resource in Pacemaker, here are the available parameters you
 can set:
@@ -70,11 +66,10 @@ can set:
   * `pghost`: the socket directory or IP address to use to connect to the
     local instance (default: `/tmp` or `/var/run/postgresql` for DEBIAN)
   * `pgport`:  the port to connect to the local instance (default: `5432`)
-  * `recovery_template`: the local template that will be copied as the
-    `PGDATA/recovery.conf` file. (default: `$PGDATA/recovery.conf.pcmk`)
-    This template file :
-    * must exists on all node for PostgreSQL 11 and before ;
-    * must not exist on any node for PostgreSQL 12 and after.
+  * `recovery_template`: __only__ for PostgreSQL 11 and before. The local 
+    template that will be copied as the `PGDATA/recovery.conf` file. This
+    file must not exist on any node for PostgreSQL 12 and after.
+    (default: `$PGDATA/recovery.conf.pcmk`)
   * `start_opts`: Additional arguments given to the postgres process on startup.
     See "postgres --help" for available options. Useful when the postgresql.conf
     file is not in the data directory (PGDATA), eg.:
