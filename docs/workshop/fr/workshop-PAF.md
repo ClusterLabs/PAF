@@ -2475,11 +2475,18 @@ pengine:     info: LogActions: Leave   dummy2  (Started hanode3)
 
 ## Suppression des ressources
 
-FIXME
+* `pcs resource delete <resource_name> supprimer la ressource ou le groupe
+* deux étapes :
+  * stopper le ressource
+  * supprimer la ressource
 
 ::: notes
 
-FIXME
+La supression de ressource peut être réalisée par `pcs resource delete
+<resource_name>`.
+
+La supression d'un groupe supprime non seulement ce groupe mais aussi les
+ressources qu'il contient.
 
 :::
 
@@ -2487,15 +2494,19 @@ FIXME
 
 ### TP: supprimer les dummy
 
-FIXME
-
 ::: notes
+
+Lister les ressources du cluster :
 
 ~~~console
 # pcs resource show
  dummy1 (ocf::pacemaker:Dummy): Started hanode1
  dummy2 (ocf::pacemaker:Dummy): Started hanode3
+~~~
 
+Utiliser `pcs resource delete <node_name>` pour supprimer les ressources :
+
+~~~console
 # pcs resource delete dummy1
 Attempting to stop: dummy1... Stopped
 
@@ -3008,14 +3019,37 @@ FIXME
 ## Détail d'un failover
 
 1. fencing du nœud hébergeant l'instance primaire en échec si nécessaire
-2. tentative de promotion du secondaire ayant le LSN le plus élevé au dernier monitor
+2. tentative de promotion du secondaire ayant le LSN le plus élevé au dernier
+   monitor
   1. comparaison des LSN actuels entre les secondaires
   2. poursuite de la promotion si le secondaire élu est toujours le plus avancé
-  3. annulation de la promotion ("soft error") sinon pour déclencher une nouvelle transition
+  3. annulation de la promotion ("soft error") sinon pour déclencher une
+     nouvelle transition
 
 ::: notes
 
-FIXME
+Dans le contexte de PostgreSQL, un failover désigne la promotion non planifiée
+d'une instance secondaire suite à un incident.
+
+Pour pacemaker, cette promotion correspond au déplacement du rôle `master` vers
+un autre nœud. Du fait de la présence d'une containte de colocation entre le
+role `master` et la VIP, cette dernière bascule aussi.
+
+Le failover n'aura lieu que si :
+* l'incident concerne le nœud ou se trouve la ressource PostgreSQL avec le rôle
+  master ;
+* la ressource master ne peut pas redémarrer sur le nœud dans le temps qui lui
+  est donné (timeout de l'action start).
+
+Le failover s'accompagne du fencing du nœud en erreur. Ce comportement est
+dicté par le fait que la propriété `on-fail` de l'action start est `fence`
+(valeur par défaut).
+
+Le choix de l'instance qui va devenir primaire se fait en fonction du LSN des
+instances secondaires.  L'instance ayant le LSN le plus élevé est choisie.
+Pendant la promotion, les LSN sont à nouveau comparés. Si le secondaire choisi
+n'est plus le plus récent alors la transition est annulée et une nouvelle
+élection est réalisée.
 
 :::
 
@@ -3051,20 +3085,25 @@ Suppression du fichier `/var/lib/pgsql/10/data/global/pg_control`
 
 ## Démarrer/arrêter le cluster
 
-FIXME
+* Faire attention à ce qu'aucune ressource ne soit démarrée sur le nœud avant
+  de l'arrêter.
+  * désactiver les ressources
+  * mettre le noeud en standby
 
 ::: notes
 
-Précision à propos du démarrage et de l'arrêt d'un cluster avec une ressource stateful active
-cf. ce mail et la discussion autour: <http://lists.clusterlabs.org/pipermail/users/2017-December/006963.html>
+Précision à propos du démarrage et de l'arrêt d'un cluster avec une ressource
+stateful active cf. ce mail et la discussion autour:
+<http://lists.clusterlabs.org/pipermail/users/2017-December/006963.html>
 
-Pas de bonne solution à part éteindre la ressource stateful avant d'éteindre le cluster
+Pas de bonne solution à part éteindre la ressource stateful avant d'éteindre le
+cluster
 
 ~~~console
-# pcs cluster standby hanode3
+# pcs node standby hanode3
 # reboot
 # pcs cluster start
-# pcs cluster unstandby hanode3
+# pcs node unstandby hanode3
 ~~~
 
 ou
@@ -3075,6 +3114,9 @@ ou
 # pcs cluster start --all
 # pcs resource enable pgsql-ha
 ~~~
+
+NOTE: `pcs node standby <node_name>` à remplacé `pcs cluster standby` dans la
+version  0.10.1 de pcs.
 
 :::
 
@@ -3656,7 +3698,11 @@ crm_shadow --force --commit pgsql-ha_on_hanode1
 
 ## TP: provoquer une bascule manuelle
 
-FIXME
+* pour faire partir une ressource d'un nœud, il faut la bannir de ce nœud.
+* `pcs resource ban <resource_name>`
+* penser à retirer la contrainte de localisation placée par le `ban`.
+* la stickiness permet d'éviter que la ressource ne revienne sur le nœud où
+  elle était.
 
 ::: notes
 
