@@ -176,7 +176,11 @@ be out-of-date.
 
 -----
 
-## Historique de Pacemaker
+## Histoire
+
+-----
+
+### Historique de Pacemaker
 
 * plusieurs plate-formes historiques distinctes
   * projet Linux-HA mené par SUSE
@@ -203,7 +207,7 @@ communication utilisée : OpenAIS (Red Hat) ou Heartbeat (SUSE).
 
 -----
 
-## Historique de Pacemaker - suite
+### Historique de Pacemaker - suite
 
 * 2009 : Corosync apparaît
   * issu de OpenAIS
@@ -221,7 +225,7 @@ distribution tend vers cette plate-forme commune.
 
 -----
 
-## Historique de Pacemaker - futur
+### Historique de Pacemaker - futur
 
 * 2017: les principales distributions ont convergé
   * Corosync 2.x et Pacemaker 1.1.x
@@ -267,6 +271,7 @@ Pour plus de détails, voir: [Kronosnet:The new face of Corosync communications]
 * `pcs`
   * introduit par Red Hat
   * supporte également Corosync
+  * utilisé dans ce workshop
 
 ::: notes
 
@@ -301,51 +306,43 @@ l'utilise pas pour interagir avec le système lui même.
 
 -----
 
-## Pacemaker et RHEL
+## Versions disponibles
 
-* RHEL 8 : HA par défaut :
-  * utilisation de Corosync 3.x
-  * Pacemaker 2.x
-  * client d'administration `pcs`
+* RHEL 7 et Debian 9:
+  * Corosync 2.x
+  * Pacemaker 1.1.x
+
+* RHEL 8 et Debian 10:
+  * Corosync 3.x
+  * Pacemaker 2.0.x
+
 
 ::: notes
 
 L'installation recommandée (et supportée) suivant les distributions de RHEL et dérivés :
 
-| RHEL version | Corosync | Pacemaker | Administration              |
-|:------------:|:--------:|:---------:|-----------------------------|
-| 7            | 2.x      | 1.1.x     | pcsd & pcs                  |
-| 8            | 3.x      | 2.x       | pcsd & pcs                  |
+| OS        | Corosync | Pacemaker | Administration               |
+|:---------:|:--------:|:---------:|------------------------------|
+| EL 7      | 2.x      | 1.1.x     | pcsd 0.9                     |
+| EL 8      | 3.x      | 2.0.x     | pcsd 0.10                    |
+| Debian 8  | 1.4      | 1.1.x     | crmsh                        |
+| Debian 9  | 2.4      | 1.1.x     | pcs 0.9 ou crmsh 2.3         |
+| Debian 10 | 3.0      | 2.0.x     | pcs 0.10 ou crmsh 4.0        |
 
-:::
+L'équipe de maintenance des paquets Pacemaker n'a pu intégrer les dernières
+versions des composants à temps pour la version 8 de Debian. Il a été décidé
+d'utiliser officiellement le dépôt backport de Debian pour distribuer ces
+paquets dans Debian 8. Les versions 8 et 9 de Debian partagent donc les mêmes
+versions des paquets concernant Pacemaker.
 
+L'initialisation du cluster avec `crmsh` 2.x n'est toujours pas fonctionnelle
+et ne devrait pas être corrigée, la branche 3.x étant désormais la branche
+principale du projet. La version 3.0 de `crmsh` supporte l'initialisation d'un
+cluster sous Debian mais avec un peu d'aide manuelle et quelques erreurs
+d'intégration.
 
------
-
-## Pacemaker et Debian
-
-* Debian 10
-  * corosync 3.x
-  * Pacemaker 2.x
-  * client d'administration `crmsh` 4.x ou le couple `pcsd`et `pcs`
-
-::: notes
-
-| Debian version | Corosync | Pacemaker | Administration               |
-|:--------------:|:--------:|:---------:|------------------------------|
-| 8              | 1.4      | 1.1.x     | crmsh                        |
-| 9              | 2.4      | 1.1.x     | pcsd & pcs 0.9 ou crmsh 2.3  |
-| 10             | 3.0      | 2.0       | pcsd & pcs 0.10 ou crmsh 4.0 |
-
-L'équipe de maintenance des paquets Pacemaker n'a pu intégrer les dernières versions des composants à temps pour la
-version 8 de Debian. Il a été décidé d'utiliser officiellement le dépôt backport de Debian pour distribuer ces paquets
-dans Debian 8. Les versions 8 et 9 de Debian partagent donc les mêmes versions des paquets concernant Pacemaker.
-
-L'initialisation du cluster avec `crmsh` 2.x n'est toujours pas fonctionnelle et ne devrait pas être corrigée, la
-branche 3.x étant désormais la branche principale du projet. La version 3.0 de `crmsh` supporte l'initialisation d'un
-cluster sous Debian mais avec un peu d'aide manuelle et quelques erreurs d'intégration.
-
-L'utilisation de `pcsd` et `pcs` est désormais pleinement fonctionne sous Debian. Voir à ce propos:
+L'utilisation de `pcsd` et `pcs` est désormais pleinement fonctionne sous
+Debian. Voir à ce propos:
 <https://clusterlabs.github.io/PAF/Quick_Start-Debian-9-pcs.html>
 
 :::
@@ -354,7 +351,9 @@ L'utilisation de `pcsd` et `pcs` est désormais pleinement fonctionne sous Debia
 
 # Premiers pas avec Pacemaker
 
-Ce chapitre aborde l'installation et démarrage de Pacemaker.
+Ce chapitre aborde l'installation et démarrage de Pacemaker. L'objectif est de
+créer rapidement un cluster vide que nous pourrons étudier plus en détail
+dans la suite du workshop.
 
 -----
 
@@ -368,32 +367,19 @@ Paquets essentiels:
 
 ::: notes
 
-L'installation de Pacemaker se fait très simplement depuis les dépôts officiels de CentOS 7 avec la commande suivante:
+L'installation de Pacemaker se fait très simplement depuis les dépôts
+officiels de CentOS 7 en utilisant les paquets `pacemaker`. notez que
+les paquets `corosync` et `resource-agents` sont installés aussi par dépendance.
 
-~~~console
-yum install -y pacemaker           \
-               resource-agents     \
-               pcs                 \
-               fence-agents-all
-~~~
-
-Le paquet `corosync` est installé par dépendance de Pacemaker.
-
-Voici le détail de chaque paquet :
+Voici le détail de ces paquets :
 
 * `corosync` : gère la communication entre les nœuds, la gestion du groupe, du quorum
-* `pacemaker` : orchestration du cluster, prise de décision suite aux événements détectés au sein du cluster
-* `pcs` : administration du cluster au travers de l'outil CLI du même nom ou du daemon HTTP. Gère la propagation des
-  commandes de contrôle du cluster entre les nœuds
-* `resource-agents`: collection de "_resource agents_" pour divers services
-* `fence-agents-all`: collection de "_fencing agents_" pour les différentes méthode de fencing supportées
+* `pacemaker` : orchestration du cluster, réaction aux événements, prise de
+  décision et actions
+* `resource-agents`: collection de _resource agents_ (_RA_) pour divers services
 
-Même si l'administration du cluster peut se faire entièrement sans l'utilisation du couple `pcs`/`pcsd`, ces outils
-sont très pratiques au quotidien et facilitent grandement la gestion du cluster. De plus, ils intègrent toutes les
-bonnes pratiques relatives aux commandes supportées.
-
-Le paquet `corosync` installe un certain nombre d'outils commun à toutes les distributions et que nous aborderons plus
-loin:
+Le paquet `corosync` installe un certain nombre d'outils commun à toutes les
+distributions et que nous aborderons plus loin:
 
 * `corosync-cfgtool`
 * `corosync-cmapctl`
@@ -401,8 +387,9 @@ loin:
 * `corosync-keygen`
 * `corosync-quorumtool`
 
-Pacemaker aussi installe un certain nombre de binaires commun à toutes les distributions, dont les suivants que vous
-pourriez rencontrer dans ce workshop ou dans certaines discussions :
+Pacemaker aussi installe un certain nombre de binaires commun à toutes les
+distributions, dont les suivants que vous pourriez rencontrer dans ce workshop
+ou dans certaines discussions :
 
 * `crm_attribute`
 * `crm_node`
@@ -416,11 +403,56 @@ pourriez rencontrer dans ce workshop ou dans certaines discussions :
 * `crm_verify`
 * `stonith_admin`
 
-Beaucoup d'autres outils sont installés sur toutes les distributions, mais sont destinés à des utilisations très
-pointues, de debug ou aux agents eux-même.
+Beaucoup d'autres outils sont installés sur toutes les distributions, mais sont
+destinés à des utilisations très pointues, de debug ou aux agents eux-même.
 
-Les outils d'administration `pcs` et `crm` reposent fortement sur l'ensemble de ces binaires et permettent d'utiliser
-une interface unifiée et commune à ceux-ci.
+Les outils d'administration `pcs` et `crm` reposent fortement sur l'ensemble de
+ces binaires et permettent d'utiliser une interface unifiée et commune à
+ceux-ci.
+
+:::
+
+-----
+
+### TP: Installation de Pacemaker
+
+::: notes
+
+Installer les paquets nécessaires et suffisants et vérifiez les dépendances
+installées (eg. `corosync`, `resource-agents`):
+
+~~~console
+# yum install -y pacemaker
+~~~
+
+Tous les outils nécessaires et suffisants à l'administration d'un cluster
+Pacemaker sont désormais présents. 
+
+:::
+
+-----
+
+### TP: Installation de `pcs`
+
+::: notes
+
+Pour les besoins de ce workshop, nous installons aussi le paquet `pcs`.
+Même si l'administration du cluster peut se faire entièrement sans
+l'utilisation du couple `pcs`/`pcsd`, ces outils sont très pratiques au
+quotidien et facilitent grandement la gestion du cluster. De plus, ils
+intègrent toutes les bonnes pratiques relatives aux commandes supportées.
+
+~~~console
+# yum install -y pcs
+~~~
+
+Le daemon `pcsd` s'occupe seulement de propager les configurations et commandes
+sur tous les nœuds. Ce dernier peut être démarré et lancé automatiquement
+au démarrage :
+
+~~~console
+# systemctl enable --now pcsd
+~~~
 
 :::
 
@@ -434,126 +466,25 @@ une interface unifiée et commune à ceux-ci.
 
 ::: notes
 
-La création du cluster se résume à la configuration de Corosync, puis au démarrage de Pacemaker qui s'appuie
-directement dessus.
+La création du cluster se résume à créer le fichier de configuration de
+Corosync, puis à démarrer de Pacemaker.
 
-L'utilisation de `pcs` nous permet de ne pas avoir à éditer la configuration de Corosync manuellement. Néanmoins, un
-pré-requis à l'utilisation de `pcs` est que tous les daemons soient authentifiés les uns auprès des autres pour
-s'échanger des commandes au travers de leur API HTTP.
+L'utilisation de `pcs` nous permet de ne pas avoir à éditer la configuration de
+Corosync manuellement. Néanmoins, un pré-requis à l'utilisation de `pcs` est
+que tous les daemons soient authentifiés les uns auprès des autres pour
+s'échanger des commandes au travers de leur API HTTP. Cela se fait grâce à la
+commande `pcs cluster auth [...]`.
 
-Une fois `pcsd` démarré sur tous les nœuds, l'authentification des membres
-et création du cluster se fait grâce à la commande suivante (FIXME: change
-avec pcmk 2):
-
-~~~console
-# passwd hacluster
-# pcs cluster auth hanode1 hanode2 hanode3 -u hacluster
-~~~
-
-La commande vous demandera le mot de passe précédemment positionné pour l'utilisateur `hacluster`. Il est recommandé
-d'utiliser le même mot de passe pour cet utilisateur sur tous les serveurs afin d'en simplifier la configuration.
-
-Les daemons étant prêts à travailler entre eux, nous pouvons créer le cluster lui même:
-
-~~~console
-# pcs cluster setup --name cluster_demo hanode1 hanode2 hanode3
-~~~
-
-Cette commande permet de créer un cluster nommé "cluster_demo", composé des trois nœuds `hanode1`, `hanode2` et
-`hanode3`. Le fichier de configuration de Corosync
-`/etc/corosync/corosync.conf` est créé et propagé automatiquement sur tous
-ces nœuds par `pcsd`.
+Il est ensuite aisé de créer le cluster grâce à la commande `pcs cluster
+setup [...]`.
 
 :::
 
 -----
 
-## Démarrage du cluster
-
-* cluster créé mais pas démarré
-* ne pas activer Pacemaker au démarrage des serveurs
-* utilisation de `pcs` pour démarrer le cluster
+### TP: Authentification de pcs
 
 ::: notes
-
-Une fois le cluster créé, ce dernier n'est pas démarré automatiquement. Il
-est déconseillé de démarrer Pacemaker automatiquement au démarrage des
-serveurs. En cas d'incident et de fencing, un nœud toujours défaillant
-pourrait déstabiliser le cluster et provoquer des interruptions de services
-suite à un retour automatique prématuré. En forçant l'administrateur à
-devoir démarrer Pacemaker manuellement, celui-ci a alors tout le
-loisir d'intervenir, d'analyser l'origine du problème et éventuellement
-d'effectuer des actions correctives avant de réintégrer le nœud, sain,
-dans le cluster.
-
-La commande suivante permet de démarrer les services Pacemaker et Corosync sur
-tous les nœuds du cluster :
-
-~~~console
-# pcs cluster start --all
-~~~
-
-Cette commande propage l'ordre de démarrage à tous les daemons `pcsd` qui s'occupent alors de démarrer les services
-localement. Sans l'argument `--all`, seuls les services locaux sont démarrés.
-
-L'équivalent de cette commande indépendamment de `pcs` serait de démarrer manuellement les services Corosync puis
-Pacemaker sur chaque nœud du cluster. À noter que démarrer Pacemaker suffit
-souvent sur de nombreuses distributions Linux, Corosync étant démarré
-automatiquement comme dépendance.
-
-Bien entendu, la même commande existe pour interrompre tout le cluster et fonctionne de la même manière :
-
-~~~console
-# pcs cluster stop --all
-~~~
-
-Nous reviendrons sur quelques bonnes pratiques à ce propos dans le chapitre consacré à PAF.
-
-Les commandes utiles pour vérifier l'état du cluster sont les suivantes :
-
-~~~console
-# pcs status
-~~~
-
-ou, sur toute distribution :
-
-~~~console
-# crm_mon -1
-~~~
-
-:::
-
------
-
-## TP
-
-* Installation de Pacemaker
-* Création du cluster avec pcs
-* Démarrage du cluster
-
-::: notes
-
-### Installation de Pacemaker
-
-~~~console
-# yum install -y corosync pacemaker pcs
-~~~
-
-Il est ensuite recommandé de désactiver Pacemaker et Corosync au démarrage du serveur. Cela permet à l'administrateur
-de s'assurer de l'état du nœud avant de le réintégrer au cluster suite à un incident.
-
-~~~console
-# systemctl disable corosync
-# systemctl disable pacemaker
-~~~
-
-Le daemon `pcsd` s'occupe seulement de propager les configurations et commandes sur tous les nœuds. Ce dernier peut
-être lancé automatiquement au démarrage :
-
-~~~console
-# systemctl enable pcsd
-# systemctl start pcsd
-~~~
 
 L'outil `pcs` se sert de l'utilisateur système `hacluster` pour s'authentifier
 auprès de `pcsd`. Puisque les commandes de gestion du cluster peuvent être
@@ -571,10 +502,16 @@ Nous pouvons désormais authentifier les membres du cluster (FIXME: pcmk 2):
 # pcs cluster auth hanode1 hanode2 hanode3 -u hacluster
 ~~~
 
-Remarque : les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+Remarque : les commandes `pcs` peuvent être exécutées depuis n'importe quel
+nœud.
 
+:::
 
-### Création du cluster avec pcs
+-----
+
+### TP: Création du cluster avec pcs
+
+::: notes
 
 Ci-après la commande permettant de créer le cluster sur tous les nœuds. Elle
 ne doit être exécutée que sur un seul d'entre eux.
@@ -583,56 +520,81 @@ ne doit être exécutée que sur un seul d'entre eux.
 # pcs cluster setup --name cluster_tp hanode1 hanode2 hanode3
 ~~~
 
-Le fichier `/etc/corosync/corosync.conf` est créé et propagé automatiquement sur tous les nœuds grâce aux daemons
-`pcsd`.
+Cette commande permet de créer un cluster nommé "cluster_tp", composé des
+trois nœuds `hanode1`, `hanode2` et `hanode3`. Le fichier de configuration de
+Corosync `/etc/corosync/corosync.conf` est créé et propagé automatiquement sur
+tous ces nœuds par `pcsd`.
 
-Afin de pouvoir mieux appréhender certains concepts, activons le mode debug de certains modules de Pacemaker sur chaque
-serveur.
-
-Pour ce faire, éditer la variable `PCMK_debug` dans le fichier de configuration `/etc/sysconfig/pacemaker` :
+Afin de pouvoir mieux étudier Pacemaker, nous activons le mode debug de
+certains daemons sur chaque serveur. Pour ce faire, éditer la variable
+`PCMK_debug` dans le fichier d'environnement '`/etc/sysconfig/pacemaker`:
 
 ~~~console
 PCMK_debug=crmd,pengine,lrmd
 ~~~
 
-Ce paramétrage permet d'obtenir les messages de debug des sous processus `crmd`, `pengine` et `lrmd` que nous
-aborderons dans la suite de ce workshop.
+Ce paramètre permet d'obtenir les messages de debug des sous processus `crmd`,
+`pengine` et `lrmd` que nous aborderons dans la suite de ce workshop.
 
-Pour obtenir l'ensemble des messages de debug de tous les processus, positionner ce paramètre à `yes`.
+Pour obtenir l'ensemble des messages de debug de tous les processus,
+positionner ce paramètre à `yes`.
 
-### Démarrage du cluster
+:::
 
-Vérifier l'état de Pacemaker et Corosync :
+-----
+
+## Démarrage du cluster
+
+* cluster créé mais pas démarré
+* ne pas activer Pacemaker au démarrage des serveurs
+* utilisation de `pcs` pour démarrer le cluster
+
+::: notes
+
+Une fois le cluster créé, ce dernier n'est pas démarré automatiquement. Il est
+déconseillé de démarrer Pacemaker automatiquement au démarrage des serveurs. En
+cas d'incident et de fencing, un nœud toujours défaillant pourrait déstabiliser
+le cluster et provoquer des interruptions de services suite à un retour
+automatique prématuré. En forçant l'administrateur à devoir démarrer Pacemaker
+manuellement, celui-ci a alors tout le loisir d'intervenir, d'analyser
+l'origine du problème et éventuellement d'effectuer des actions correctives
+avant de réintégrer le nœud, sain, dans le cluster.
+
+Le démarrage du cluster nécessite la présence des deux services Corosync et
+Pacemaker sur tous les nœuds. Démarrer d'abord les services Corosync puis
+Pacemaker. À noter que démarrer Pacemaker suffit souvent sur de nombreuses
+distributions Linux, Corosync étant démarré automatiquement comme dépendance.
+
+Plutôt que de lancer manuellement Pacemaker sur chaque nœud, il est possible
+de sous traiter cette tâche aux daemons `pcsd` avec une unique commande `pcs`.
+
+:::
+
+-----
+
+### TP: Démarrage du cluster
+
+::: notes
+
+Désactiver Pacemaker et Corosync au démarrage du serveur et vérifier l'état des
+services :
 
 ~~~console
-# systemctl status pacemaker.service
-# systemctl status corosync.service
+# systemctl disable corosync pacemaker
+# systemctl status pacemaker corosync
 ~~~
 
-Démarrer le cluster sur tous les nœuds :
+Démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`:
 
 ~~~console
 # pcs cluster start --all
 ~~~
 
-Vérifier à nouveau l'état de Pacemaker et Corosync :
+Cette commande propage l'ordre de démarrage à tous les daemons `pcsd` qui
+s'occupent alors de démarrer les services localement. Sans l'argument `--all`,
+seuls les services locaux sont démarrés.
 
-~~~console
-# systemctl status pacemaker.service
-# systemctl status corosync.service
-~~~
-
-Vérifier l'état du cluster :
-
-~~~console
-# pcs status
-~~~
-
-ou
-
-~~~console
-# crm_mon -n1D
-~~~
+Vérifier à nouveau l'état de Pacemaker et Corosync.
 
 :::
 
@@ -687,490 +649,15 @@ d'utilisation:
 
 -----
 
-# Pacemaker, fonctionnement interne
-
-![Diagramme complet](medias/pcmk_diag1.png)
+### TP: Visualiser l'état du cluster
 
 ::: notes
 
-Dans ce chapitre, nous abordons rapidement le fonctionnement interne de Pacemaker. Le but est de comprendre le rôle de
-chaque brique et ainsi mieux diagnostiquer l'état du cluster, son paramétrage et savoir interpréter les messages de log
-correctement.
-
-Le diagramme présente les différents éléments de Pacemaker au sein d'un cluster à trois nœuds. Une vue plus détaillée
-mais centrée sur un seul nœud est présenté dans la documentation de Pacemaker. Voir:
-[Schémas de l'architecture interne de Pacemaker](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_pacemaker_architecture.html#_internal_components)
-
-Cette architecture et le paramétrage de Pacemaker permet de supporter différents types de scénario de cluster dont
-certains (vieux) exemples sont présentés dans le wiki de Pacemaker:
-
-[Schémas des différentes configuration de nœuds possibles avec Pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
+Expérimenter avec les commandes vues précédemment et leurs arguments.
 
 :::
 
 -----
-
-## Cluster Information Base (CIB)
-
-* détient la configuration du cluster
-* l'état des différentes ressources
-* un historique des actions exécutées
-* géré par le processus `pacemaker-based` (`cib` en 1.1)
-* stockage fichier au format XML
-* synchronisé automatiquement entre les nœuds
-* historisé
-
-::: notes
-
-La CIB est la représentation interne de la configuration et de l'état des composantes du cluster. C'est un fichier XML,
-créée par Pacemaker à l'initialisation du cluster et qui évolue ensuite au fil des configurations et évènements du
-cluster.
-
-En fonction de cet ensemble d'états et du paramétrage fourni, le cluster détermine l'état idéal de chaque ressource
-qu'il gère (démarré/arrêté/promu et sur quel serveur) et calcule les transitions permettant d'atteindre cet état.
-
-Le processus `pacemaker-based` est chargé d'appliquer les modifications dans la CIB, de conserver les information transitoires en
-mémoire (statuts, certains scores, etc) et de notifier les autres processus de ces modifications si nécessaire.
-
-Le contenu de la CIB est historisé puis systématiquement synchronisé entre les nœuds à chaque modification. Ces
-fichiers sont stockés dans `/var/lib/pacemaker/cib` :
-
-~~~
-ls /var/lib/pacemaker/cib/ -alh
-total 68K
-drwxr-x--- 2 hacluster haclient 4.0K Feb  7 16:46 .
-drwxr-x--- 6 hacluster haclient 4.0K Feb  7 12:16 ..
--rw------- 1 hacluster haclient  258 Feb  7 16:43 cib-1.raw
--rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-1.raw.sig
--rw------- 1 hacluster haclient  442 Feb  7 16:43 cib-2.raw
--rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-2.raw.sig
--rw------- 1 hacluster haclient  639 Feb  7 16:43 cib-3.raw
--rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-3.raw.sig
--rw------- 1 hacluster haclient  959 Feb  7 16:43 cib-4.raw
--rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-4.raw.sig
--rw------- 1 hacluster haclient  959 Feb  7 16:43 cib-5.raw
--rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-5.raw.sig
--rw------- 1 hacluster haclient  959 Feb  7 16:46 cib-6.raw
--rw------- 1 hacluster haclient   32 Feb  7 16:46 cib-6.raw.sig
--rw-r----- 1 hacluster haclient    1 Feb  7 16:46 cib.last
--rw------- 1 hacluster haclient  959 Feb  7 16:46 cib.xml
--rw------- 1 hacluster haclient   32 Feb  7 16:46 cib.xml.sig
-~~~
-
-`cib.xml` correspond à la version courante de la CIB, les autres fichiers `cib-*.raw`, aux versions précédentes.
-
-Par défaut, Pacemaker conserve toutes les versions de la CIB depuis la création du cluster. Il est recommandé de
-limiter ce nombre de fichier grâce aux paramètres ''pe-error-series-max'', ''pe-warn-series-max'' et
-''pe-input-series-max''.
-
-Il n'est pas recommandé d'éditer la CIB directement en XML. Préférez toujours utiliser les commandes de haut niveau
-proposées par `pcs` ou `crm`. En dernier recours, utilisez l'outil `cibadmin`.
-
-:::
-
------
-
-## TP
-
-découverte de la CIB
-
-::: notes
-
-La CIB est synchronisée et versionnée entre tous les nœuds du cluster.
-
-Les fichiers sont stockés dans `/var/lib/pacemaker/cib`.
-
-* consulter le contenu de ce répertoire
-* identifier la dernière version de la CIB
-* comparer avec `cibadmin --query` et `pcs cluster cib`
-
-Vous devriez observer une section "\<status\>" supplémentaire dans le document
-XML présenté par `cibadmin`. Cette section contient l'état du cluster et est
-uniquement conservée en mémoire.
-
-:::
-
------
-
-## Designated Controler (DC) - Diagramme global
-
-FIXME diagram
-
-![Diagramme DC](medias/pcmk_diag1-dc.png)
-
------
-
-## Designated Controler (DC)
-
-* démon `controller` désigné pilote principal sur un nœud uniquement
-* lit et écrit dans la CIB
-* invoque PEngine pour générer les éventuelles transitions
-* contrôle le déroulement des transitions
-* envoie les actions à réaliser aux démons `controller` des autres nœuds
-* possède les journaux applicatifs les plus complets
-
-::: notes
-
-Le *Designated Controler* est élu au sein du cluster une fois le groupe de communication établi au niveau de Corosync.
-Il pilote l'ensemble du cluster.
-
-Il est responsable de:
-
-* lire l'état courant dans la CIB
-* invoquer le `scheduler` en cas d'écart avec l'état stable (changement d'état d'un service, changement de configuration,
-  évolution des scores ou des attributs, etc)
-* mettre à jour la CIB (mises à jour propagée aux autres nœuds)
-* transmettre aux `controller` distants une à une les actions à réaliser sur leur nœud
-
-C'est le DC qui maintient l'état primaire de la CIB ("master copy").
-
-:::
-
------
-
-## Scheduler - Diagramme global
-
-FIXME diagram
-
-![Diagramme Scheduler](medias/pcmk_diag1-pengine.png)
-
------
-
-## Scheduler
-
-* reçoit en entrée les informations d'état des ressources et le paramétrage
-* décide de l'état idéal du cluster
-* génère un graphe de transition pour atteindre cet état
-* anciennement appelé `PEngine`
-
-![Diagramme Scheduler - calcul graphe de transition](medias/pcmk_pengine.png)
-
-::: notes
-
-Le `scheduler` est la brique de Pacemaker qui calcule les transitions nécessaires pour passer d'un état à l'autre.
-
-Il reçoit en entrée des informations d'état et de paramétrage au format XML (extrait de la CIB), détermine si un nouvel
-état est disponible pour les ressources du cluster, et calcule toutes les actions à mettre en œuvre pour l'atteindre.
-
-Toutes ces actions sont regroupées au sein d'un graph de transition que le
-`Designated Controller`, qui pilote le cluster, devra ensuite mettre en œuvre.
-
-Voici un exemple de transition complexe présentant une bascule maître-esclave DRBD:
-![Diagramme exemple de transition complexe](medias/Policy-Engine-big.png)
-
-Ce diagramme vient de la documentation de Pacemaker. L'original est disponible à cette adresse:
-<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/images/Policy-Engine-big.png>
-
-Les explications sur les codes couleurs sont disponibles à cette adresse:
-<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/_visualizing_the_action_sequence.html>
-
-Dans cet exemple chaque flèche impose une dépendance et un ordre entre les actions. Pour qu'une action soit déclenchée,
-toutes les actions précédentes doivent être exécutées et réussies. Les textes en jaune sont des "actions virtuelles",
-simples points de passage permettant de synchroniser les actions entre elles avant de poursuivre les suivantes. Les
-textes en noir représentent des actions à exécuter sur l'un des nœuds du cluster.
-
-Le format des textes est le suivant: `<resource>_<action>_<interval>`
-
-Une action avec un intervalle à 0 est une action ponctuelle ("start", "stop", etc). Une action avec un intervalle
-supérieur à 0 est une action récurrente, tel que `monitor`.
-
-Dans cet exemple:
-
-* les actions 1 à 4 concernent l'exécution des actions `notify` "pre-demote" sur les nœuds "frigg" et "odin" du cluster
-* l'action 1 déclenche en parallèle les deux actions 2 et 3
-* l'action 4 est réalisée une fois que les actions 1, 2 et 3 sont validées
-* l'action 5 est exécutée n'importe quand
-* l'action 5 interrompt l'exécution récurrente de l'action `monitor` sur la ressource "drbd0:0" du serveur "frigg"
-* l'action 7 est exécutée après que 5 et 6 soient validées
-* l'action 7 effectue un `demote` de la ressource "drbd0:0" sur "frigg" (qui n'est donc plus supervisée)
-* la pseudo action 8 est réalisée une fois que l'action `demote` est terminée
-* la pseudo action 9 initialise le déclenchement des actions `notify` "post-demote" et dépend de la réalisation
-  précédente de la notification "pre-demote" et de l'action `demote` elle même
-* les actions 9 à 12 représentent l'exécution des notifications "post-demote" dans tout le cluster
-* les actions 13 à 24 représentent les actions de `notify` "pre-promote", `promote` de drbd sur "odin" et `notify`
-  "post-promote" au sein du cluster
-* les actions 25 et 27 peuvent alors être exécutées et redémarrent les actions de monitoring récurrentes de drbd sur
-  "odin" et "frigg"
-* les actions 26, 28 à 30 démarrent un groupe de ressource dépendant de la ressource drbd
-
-:::
-
------
-
-## TP
-
-Étude du `scheduler`.
-
-::: notes
-
-* sur quels nœuds est lancé le processus `schedulerd` ?
-* où se trouvent les logs ?
-* quelles différences observer entre les différents nœuds (identifier le DC) ?
-
-:::
-
-
------
-
-## Cluster Resource Manager (CRM) - Diagramme global
-
-FIXME diagram
-
-![Diagramme CRM](medias/pcmk_diag1-crmd.png)
-
------
-
-
-## Controller
-
-* démon `controld` local à chaque nœud
-* chargé du pilotage des événements
-* reçoit des instructions du _scheduler_ s'il est DC ou du _controller_ DC distant
-* transmet les actions à réaliser au sein des transitions
-  * au démon `execd` local
-  * au démon `fenced` local
-* récupère les codes retours des actions
-* transmets les codes retours de chaque action au _controller_ DC
-* anciennement appelé `CRMd`
-
-::: notes
-
-Le  démon `controld` est local à chaque nœud qui pilote les événements. Il peut soit être actif (DC), et donc être chargé
-de l'ensemble du pilotage du cluster, soit passif, et attendre que le _controller_ DC lui fournisse des instructions.
-
-Lorsque des instructions lui sont transmises, il les communique aux démons `execd` et/ou `fenced` locaux pour qu'ils
-exécutent les actions appropriées auprès des _ressources agents_ et _fencing agents_.
-
-Une fois l'action réalisée, le _controller_ récupère le statut de l'action (via
-son code retour) et le transmet au _controller_ DC qui en valide la cohérence
-avec ce qui est attendu au sein de la transition.
-
-En cas de code retour différent de celui attendu, le _controller_ DC décide d'annuler la transition en cours. Il
-demande alors une nouvelle transition au _scheduler_.
-
-:::
-
------
-
-## TP
-
-Étude du démon `controld`.
-
-::: notes
-
-* comment sont désignés les messages du _controller_ dans les log ?
-* qui est le DC dans votre cluster ?
-
-Solutions possibles:
-
-* `crm_mon`
-* `pcs status`
-* log : "Set DC to "
-
-:::
-
------
-
-## _Fencer_ et _Fencing Agent_ - Diagramme global
-
-FIXME diagram
-
-![Diagramme Fencing](medias/pcmk_diag1-fencing.png)
-
------
-
-## Fencer
-
-* démon `fenced`
-* gestionnaire des agents de fencing (_FA_)
-* utilise l'API des fencing agent pour exécuter les actions demandées
-* reçoit des commandes du _controller_ et les passe aux _FA_
-* renvoie le code de retour de l'action au _controller_
-* capable de gérer plusieurs niveau de fencing avec ordre de priorité
-* anciennement appelé `STONITHd`
-
-::: notes
-
-Le _fencer_ joue sensiblement un rôle identique au _local executor_ vis-à-vis des
-agents de fencing (_FA_).
-
-:::
-
------
-
-## _Fencing Agent_ (_FA_)
-
-* script permettant de traduire les instructions du _fencer_ vers l'outil de fencing
-* doit assurer que le nœud cible est bien complètement isolé du cluster
-* doit renvoyer des codes retours définis dans l'API des _FA_ en fonction des résultats
-
-::: notes
-
-Attention aux _FA_ qui dépendent du nœud cible !
-
-Exemple classique : la carte IPMI. Si le serveur a une coupure électrique le
-_FA_ (la carte IPMI donc) n'est plus joignable. Pacemaker ne reçoit donc
-aucune réponse et ne peut pas savoir si le fencing a fonctionné, ce qui
-empêche toute bascule.
-
-Il est conseillé de chaîner plusieurs _FA_ si la méthode de fencing présente
-un _SPoF_: IPMI, rack d'alimentation, switch réseau ou SAN, ...
-
-:::
-
------
-
-## TP
-
-Découverte et installation du fencing
-
-::: notes
-
-Au cours de workshop, nous utilisons l'agent de fencing `fence_virsh`. Il ne
-fait pas parti des agents de fencing distribués par défaut et s'installe via le
-paquet `fence-agents-virsh`. Cet agent de fencing est basé sur SSH et la
-commande `virsh`.
-
-Installer les _FA_ : `yum install -y fence-agents fence-agents-virsh`
-
-Lister les FA à l'aide de la commande `pcs resource agents stonith` ou
-`stonith_admin -V -I`.
-
-Nous abordons la création d'une ressource de fencing plus loin dans le workshop.
-
-:::
-
------
-
-## _Local Executor_ et _Resources Agent_ - Diagramme global
-
-FIXME diagram
-
-![Diagramme LRM et ressources](medias/pcmk_diag1-resource.png)
-
------
-
-## _Local Executor_
-
-* démon `execd`
-* interface entre le _controller_ et les _resource agents_ (_RA_)
-* capable d'exécuter les différents types de _RA_ supportés (OCF, systemd, LSF, etc) et d'en comprendre la réponse
-* reçoit des commandes du _controller_ et les passe aux _RA_
-* renvoie le résultat de l'action au _controller_ de façon homogène, quelque
-  soit le type de _RA_ utilisé
-* est responsable d'exécuter les actions récurrentes en toute autonomie et de
-  prévenir le _controller_ en cas d'écart avec le résultat attendu
-* anciennement appelé `LRMd` (_Local Resource Manager_)
-
-::: notes
-
-Lorsqu'une instruction doit être transmise à un agent, le _controller_ passe
-cette information au _local executor_, qui se charge de faire exécuter l'action
-appropriée par le _RA_.
-
-Le démon `execd` reçoit un code de retour de l'agent, qu'il transmet au
-_controller_, lequel mettra à jour la CIB pour que cette information soit
-partagée au niveau du cluster.
-
-Pour les action dont le paramètre `interval` est supérieur à 0, le
-_local executor_ est responsable d'exécuter les actions de façon récurrente
-à la période indiquée dans la configuration. Le _local executor_ ne
-reviendra vers le CRMd que si le code retour de l'action varie.
-
-:::
-
------
-
-## _Ressource Agent_ (_RA_)
-
-* exécutable permettant de traduire les instructions du _local executor_ vers la ressource
-* doit renvoyer des codes retours bien définis en fonction du statut de sa
-  ressource
-* plusieurs types de _ressource agent_ supportés
-* la spécification "OCF" est l'API la plus poussée et complète pour écrire
-  un _RA_
-* l'API OCF permet de présenter au _controller_ les actions supportées par
-  l'agent.
-
-::: notes
-
-Il est possible d'utiliser plusieurs types de _RA_ différents au sein d'un même cluster:
-
-* OCF (Open Cluster Framework, type préconisé)
-* SYSV
-* systemd...
-
-Vous trouverez la liste des types supportés à l'adresse suivante:
-<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-supported.html>
-
-Les agents systemd ou sysV sont souvent limités aux seules actions `start`,
-`stop`, `monitor`.
-
-Les _RA_ implémentant les actions `promote` et `demote` pilotent des ressources
-"multistate": une ressource est alors clonée sur autant de nœuds que demandé,
-démarrée en tant que slave, puis le cluster promeut en master un ou plusieurs
-slaves.
-
-Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
-`migrate_to` et `migrate_from` qui ne sont disponibles qu'aux _RA_ non
-"multistate" (non implémenté dans Pacemaker pour les ressources multistate).
-
-:::
-
------
-
-## TP
-
-* installer les _resource agents_
-* lister les RA installés à l'aide de `pcs`
-* afficher les information relatives à l'agent `dummy`
-* afficher les information relatives à l'agent `pgsql`
-
-::: notes
-
-Installer le paquet `resource-agents` qui installe un grand nombre de RA par défaut: `yum install -y resource-agents`.
-
-Il est possible de lister les RA installés avec la commande suivante: `pcs resource agents`.
-
-Chaque agent embarque sa propre documentation qui est accessible à l'aide de la commande
-`pcs resource describe <agent>`.
-
-Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de PAF. Vous pouvez lister l'ensemble de ses
-options grâce à la commande `pcs resource describe pgsql`.
-
-:::
-
------
-
-## PostgreSQL Automatic Failover (PAF)
-
-* _RA_ spécifique à PostgreSQL pour Pacemaker
-* alternative à l'agent existant
-  * moins complexe et moins intrusif
-  * compatible avec PostgreSQL 9.3 et supérieur
-* Voir: <https://clusterlabs.github.io/PAF/FAQ.html>
-
-::: notes
-
-:::
-
-------
-
-## PostgreSQL Automatic Failover (PAF)
-
-![Schema](medias/pcmk_diag2.png)
-
-::: notes
-
-PAF se situe entre Pacemaker et PostgreSQL. C'est un _resource agent_
-qui permet au cluster d'administrer pleinement une instance PostgreSQL locale.
-
-Un chapitre entier est dédié à son installation, son fonctionnement et sa
-configuration plus loin dans ce workshop.
-
-:::
-
-------
 
 # Corosync
 
@@ -1450,7 +937,514 @@ Membership information
 
 -----
 
-# Paramétrage et administration d'un cluster
+
+# Composants du cluster
+
+![Diagramme complet](medias/pcmk_diag1.png)
+
+::: notes
+
+Dans ce chapitre, nous abordons rapidement l'architecture de Pacemaker en détaillant ses
+sous processus. Le but est de comprendre le rôle de chaque brique et ainsi mieux
+diagnostiquer l'état du cluster, son paramétrage et savoir interpréter les messages de
+log correctement. Voici les différents processus tel que démarrés par Pacemaker:
+
+~~~
+/usr/sbin/pacemakerd -f
+\_ /usr/libexec/pacemaker/cib
+\_ /usr/libexec/pacemaker/stonithd
+\_ /usr/libexec/pacemaker/lrmd
+\_ /usr/libexec/pacemaker/attrd
+\_ /usr/libexec/pacemaker/pengine
+\_ /usr/libexec/pacemaker/crmd
+~~~
+
+Le diagramme présente les différents éléments de Pacemaker au sein d'un cluster à trois
+nœuds. Une vue plus détaillée mais centrée sur un seul nœud est présenté dans la
+documentation de Pacemaker. Voir:
+
+[Schémas de l'architecture interne de Pacemaker](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_pacemaker_architecture.html#_internal_components)
+
+Cette architecture et le paramétrage de Pacemaker permet de supporter différents types de
+scénario de cluster dont certains (vieux) exemples sont présentés dans le wiki de
+Pacemaker:
+
+[Schémas des différentes configuration de nœuds possibles avec Pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
+
+:::
+
+-----
+
+## Cluster Information Base (CIB)
+
+* détient la configuration du cluster
+* l'état des différentes ressources
+* un historique des actions exécutées
+* stockage fichier au format XML
+* synchronisé automatiquement entre les nœuds
+* historisé
+* géré par le processus `cib`
+* renommé `pacemaker-based` depuis la version 2.0
+
+::: notes
+
+La CIB est la représentation interne de la configuration et de l'état des composantes du
+cluster. C'est un fichier XML, créée par Pacemaker à l'initialisation du cluster et qui
+évolue ensuite au fil des configurations et évènements du cluster.
+
+En fonction de cet ensemble d'états et du paramétrage fourni, le cluster détermine l'état
+idéal de chaque ressource qu'il gère (démarré/arrêté/promu et sur quel serveur) et
+calcule les transitions permettant d'atteindre cet état.
+
+Le processus `cib` est chargé d'appliquer les modifications dans la CIB, de
+conserver les information transitoires en mémoire (statuts, certains scores, etc) et de
+notifier les autres processus de ces modifications si nécessaire.
+
+Le contenu de la CIB est historisé puis systématiquement synchronisé entre les nœuds à
+chaque modification. Ces fichiers sont stockés dans `/var/lib/pacemaker/cib` :
+
+~~~
+ls /var/lib/pacemaker/cib/ -alh
+total 68K
+drwxr-x--- 2 hacluster haclient 4.0K Feb  7 16:46 .
+drwxr-x--- 6 hacluster haclient 4.0K Feb  7 12:16 ..
+-rw------- 1 hacluster haclient  258 Feb  7 16:43 cib-1.raw
+-rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-1.raw.sig
+-rw------- 1 hacluster haclient  442 Feb  7 16:43 cib-2.raw
+-rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-2.raw.sig
+-rw------- 1 hacluster haclient  639 Feb  7 16:43 cib-3.raw
+-rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-3.raw.sig
+-rw------- 1 hacluster haclient  959 Feb  7 16:43 cib-4.raw
+-rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-4.raw.sig
+-rw------- 1 hacluster haclient  959 Feb  7 16:43 cib-5.raw
+-rw------- 1 hacluster haclient   32 Feb  7 16:43 cib-5.raw.sig
+-rw------- 1 hacluster haclient  959 Feb  7 16:46 cib-6.raw
+-rw------- 1 hacluster haclient   32 Feb  7 16:46 cib-6.raw.sig
+-rw-r----- 1 hacluster haclient    1 Feb  7 16:46 cib.last
+-rw------- 1 hacluster haclient  959 Feb  7 16:46 cib.xml
+-rw------- 1 hacluster haclient   32 Feb  7 16:46 cib.xml.sig
+~~~
+
+`cib.xml` correspond à la version courante de la CIB, les autres fichiers `cib-*.raw`,
+aux versions précédentes.
+
+Par défaut, Pacemaker conserve toutes les versions de la CIB depuis la création du
+cluster. Il est recommandé de limiter ce nombre de fichier grâce aux paramètres
+`pe-error-series-max`, `pe-warn-series-max` et `pe-input-series-max`.
+
+Il n'est pas recommandé d'éditer la CIB directement en XML. Préférez toujours utiliser
+les commandes de haut niveau proposées par `pcs` ou `crm`. En dernier recours, utilisez
+l'outil `cibadmin`.
+
+:::
+
+-----
+
+### TP: CIB
+
+::: notes
+
+La CIB est synchronisée et versionnée entre tous les nœuds du cluster.
+
+Les fichiers sont stockés dans `/var/lib/pacemaker/cib`.
+
+* consulter le contenu de ce répertoire
+* identifier la dernière version de la CIB
+* comparer avec `cibadmin --query` et `pcs cluster cib`
+
+Vous devriez observer une section "\<status\>" supplémentaire dans le document
+XML présenté par `cibadmin`. Cette section contient l'état du cluster et est
+uniquement conservée en mémoire.
+
+:::
+
+-----
+
+## Designated Controler (DC)
+
+* daemon `CRMd` désigné pilote principal sur un nœud uniquement
+* lit et écrit dans la CIB
+* invoque PEngine pour générer les éventuelles transitions
+* contrôle le déroulement des transitions
+* envoie les actions à réaliser aux daemons `CRMd` des autres nœuds
+* possède les journaux applicatifs les plus complets
+
+::: notes
+
+Le *Designated Controler* est élu au sein du cluster une fois le groupe de communication
+établi au niveau de Corosync. Il pilote l'ensemble du cluster.
+
+Il est responsable de:
+
+* lire l'état courant dans la CIB * invoquer le `PEngine` en cas d'écart avec l'état
+  stable (changement d'état d'un service, changement de configuration, évolution des
+  scores ou des attributs, etc)
+* mettre à jour la CIB (mises à jour propagée aux autres nœuds)
+* transmettre aux `CRMd` distants une à une les actions à réaliser sur leur nœud
+
+C'est le DC qui maintient l'état primaire de la CIB ("master copy").
+
+:::
+
+-----
+
+### Designated Controler (DC) - Diagramme global
+
+FIXME diagram
+
+![Diagramme DC](medias/pcmk_diag1-dc.png)
+
+-----
+
+## Policy Engine (PEngine)
+
+* reçoit en entrée les informations d'état des ressources et le paramétrage
+* décide de l'état idéal du cluster
+* génère un graphe de transition pour atteindre cet état
+* renommé `Scheduler` depuis la version 2.0
+
+![Diagramme Scheduler - calcul graphe de transition](medias/pcmk_pengine.png)
+
+::: notes
+
+Le `PEngine` est la brique de Pacemaker qui calcule les transitions nécessaires pour
+passer d'un état à l'autre.
+
+Il reçoit en entrée des informations d'état et de paramétrage au format XML (extrait de
+la CIB), détermine si un nouvel état est disponible pour les ressources du cluster, et
+calcule toutes les actions à mettre en œuvre pour l'atteindre.
+
+Toutes ces actions sont regroupées au sein d'un graph de transition que le
+`Designated Controller`, qui pilote le cluster, devra ensuite mettre en œuvre.
+
+Voici un exemple de transition complexe présentant une bascule maître-esclave DRBD:
+![Diagramme exemple de transition complexe](medias/Policy-Engine-big.png)
+
+Ce diagramme vient de la documentation de Pacemaker. L'original est disponible à cette
+adresse:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/images/Policy-Engine-big.png>
+
+Les explications sur les codes couleurs sont disponibles à cette adresse:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/_visualizing_the_action_sequence.html>
+
+Dans cet exemple chaque flèche impose une dépendance et un ordre entre les actions. Pour
+qu'une action soit déclenchée, toutes les actions précédentes doivent être exécutées et
+réussies. Les textes en jaune sont des "actions virtuelles", simples points de passage
+permettant de synchroniser les actions entre elles avant de poursuivre les suivantes. Les
+textes en noir représentent des actions à exécuter sur l'un des nœuds du cluster.
+
+Le format des textes est le suivant: `<resource>_<action>_<interval>`
+
+Une action avec un intervalle à 0 est une action ponctuelle (`start`, `stop`, etc). Une
+action avec un intervalle supérieur à 0 est une action récurrente, tel que `monitor`.
+
+Dans cet exemple:
+
+* les actions 1 à 4 concernent l'exécution des actions `notify pre-demote` sur les nœuds
+  "frigg" et "odin" du cluster
+* l'action 1 déclenche en parallèle les deux actions 2 et 3
+* l'action 4 est réalisée une fois que les actions 1, 2 et 3 sont validées
+* l'action 5 est exécutée n'importe quand
+* l'action 5 interrompt l'exécution récurrente de l'action `monitor` sur la ressource
+  "drbd0:0" du serveur "frigg"
+* l'action 7 est exécutée après que 5 et 6 soient validées
+* l'action 7 effectue un `demote` de la ressource "drbd0:0" sur "frigg" (qui n'est donc
+  plus supervisée)
+* la pseudo action 8 est réalisée une fois que l'action `demote` est terminée
+* la pseudo action 9 initialise le déclenchement des actions `notify post-demote` et
+  dépend de la réalisation précédente de la notification "pre-demote" et de l'action
+  `demote` elle même
+* les actions 9 à 12 représentent l'exécution des notifications `post-demote` dans tout
+  le cluster
+* les actions 13 à 24 représentent les actions de `notify pre-promote`, `promote` de
+  drbd sur "odin" et `notify post-promote` au sein du cluster
+* les actions 25 et 27 peuvent alors être exécutées et redémarrent les actions de
+  monitoring récurrentes de drbd sur "odin" et "frigg"
+* les actions 26, 28 à 30 démarrent un groupe de ressource dépendant de la ressource
+  drbd
+
+:::
+
+-----
+
+### PEngine - Diagramme global
+
+FIXME diagram
+
+![Diagramme PEngine](medias/pcmk_diag1-pengine.png)
+
+-----
+
+### TP: PEngine
+
+::: notes
+
+* sur quels nœuds est lancé le processus `pengine` ?
+* où se trouvent les logs ?
+* quelles différences observer entre les différents nœuds (identifier le DC) ?
+
+:::
+
+-----
+
+## Cluster Resource Manager (CRM)
+
+* daemon `CRMd` local à chaque nœud
+* chargé du pilotage des événements
+* reçoit des instructions du `PEngine` s'il est DC ou du `CRMd` DC distant
+* transmet les actions à réaliser au sein des transitions
+  * au daemon `LRMd` local
+  * au daemon `STONITHd` local
+* récupère les codes retours des actions
+* transmets les codes retours de chaque action au `CRMd` DC
+* renommé `controller` depuis la version 2.0
+
+::: notes
+
+Le  daemon `CRMd` est local à chaque nœud qui pilote les événements. Il peut soit être
+actif (DC), et donc être chargé de l'ensemble du pilotage du cluster, soit passif, et
+attendre que le `CRMd` DC lui fournisse des instructions.
+
+Lorsque des instructions lui sont transmises, il les communique aux daemons `LRMd` et/ou
+`STONITHd` locaux pour qu'ils exécutent les actions appropriées auprès des _ressources
+agents_ et _fencing agents_.
+
+Une fois l'action réalisée, le `CRMd` récupère le statut de l'action (via
+son code retour) et le transmet au `CRMd` DC qui en valide la cohérence
+avec ce qui est attendu au sein de la transition.
+
+En cas de code retour différent de celui attendu, le `CRMd` DC décide d'annuler la
+transition en cours. Il demande alors une nouvelle transition au `PEngine`.
+
+:::
+
+-----
+
+### Cluster Resource Manager (CRM) - Diagramme global
+
+FIXME diagram
+
+![Diagramme CRM](medias/pcmk_diag1-crmd.png)
+
+-----
+
+### TP: Cluster Resource Manager
+
+Étude du daemon `CRMd`.
+
+::: notes
+
+* comment sont désignés les messages du `CRMd` dans les log ?
+* qui est le DC dans votre cluster ?
+
+Solutions possibles:
+
+* `crm_mon`
+* `pcs status`
+* log : "Set DC to "
+
+:::
+
+-----
+
+## `STONITHd` et _Fencing Agent_
+
+FIXME diagram
+
+![Diagramme Fencing](medias/pcmk_diag1-fencing.png)
+
+-----
+
+### `STONITHd`
+
+* daemon `STONITHd`
+* gestionnaire des agents de fencing (_FA_)
+* utilise l'API des fencing agent pour exécuter les actions demandées
+* reçoit des commandes du `CRMd` et les passe aux _FA_
+* renvoie le code de retour de l'action au `CRMd`
+* capable de gérer plusieurs niveau de fencing avec ordre de priorité
+* renommé `fenced` depuis la version 2.0
+
+::: notes
+
+Le daemon `STONITHd` joue sensiblement un rôle identique à celui du `LRMd` vis-à-vis des
+agents de fencing (_FA_).
+
+:::
+
+-----
+
+### _Fencing Agent_ (_FA_)
+
+* script permettant de traduire les instructions du _fencer_ vers l'outil de fencing
+* doit assurer que le nœud cible est bien complètement isolé du cluster
+* doit renvoyer des codes retours définis dans l'API des _FA_ en fonction des résultats
+
+::: notes
+
+Attention aux _FA_ qui dépendent du nœud cible !
+
+Exemple classique : la carte IPMI. Si le serveur a une coupure électrique le
+_FA_ (la carte IPMI donc) n'est plus joignable. Pacemaker ne reçoit donc
+aucune réponse et ne peut pas savoir si le fencing a fonctionné, ce qui
+empêche toute bascule.
+
+Il est conseillé de chaîner plusieurs _FA_ si la méthode de fencing présente
+un _SPoF_: IPMI, rack d'alimentation, switch réseau ou SAN, ...
+
+:::
+
+-----
+
+### TP: Fencing
+
+Découverte et installation du fencing
+
+::: notes
+
+Au cours de workshop, nous utilisons l'agent de fencing `fence_virsh`. Il ne
+fait pas parti des agents de fencing distribués par défaut et s'installe via le
+paquet `fence-agents-virsh`. Cet agent de fencing est basé sur SSH et la
+commande `virsh`.
+
+Installer les _FA_ : `yum install -y fence-agents-all fence-agents-virsh`
+
+Lister les FA à l'aide de la commande `pcs resource agents stonith` ou
+`stonith_admin -V -I`.
+
+Nous abordons la création d'une ressource de fencing plus loin dans le workshop.
+
+:::
+
+-----
+
+## `LRMd` et _Resources Agent_ - Diagramme global
+
+FIXME diagram
+
+![Diagramme LRM et ressources](medias/pcmk_diag1-resource.png)
+
+-----
+
+### Local Resource Manager (LRM)
+
+* daemon `lrmd`
+* interface entre le `CRMd` et les _resource agents_ (_RA_)
+* capable d'exécuter les différents types de _RA_ supportés (OCF, systemd, LSF, etc) et d'en comprendre la réponse
+* reçoit des commandes du `CRMd` et les passe aux _RA_
+* renvoie le résultat de l'action au `CRMd` de façon homogène, quelque
+  soit le type de _RA_ utilisé
+* est responsable d'exécuter les actions récurrentes en toute autonomie et de
+  prévenir le `CRMd` en cas d'écart avec le résultat attendu
+* renommé _local executor_ depuis la version 2.0 
+
+::: notes
+
+Lorsqu'une instruction doit être transmise à un agent, le `CRMd` passe
+cette information au `LRMd`, qui se charge de faire exécuter l'action
+appropriée par le _RA_.
+
+Le daemon `LRMd` reçoit un code de retour de l'agent, qu'il transmet au
+`CRMd`, lequel mettra à jour la CIB pour que cette information soit
+partagée au niveau du cluster.
+
+Pour les actions dont le paramètre `interval` est supérieur à 0, le
+`LRMd` est responsable d'exécuter les actions de façon récurrente
+à la période indiquée dans la configuration. Le `LRMd` ne
+reviendra vers le `CRMd` que si le code retour de l'action varie.
+
+:::
+
+-----
+
+### _Ressource Agent_ (_RA_)
+
+* exécutable permettant de traduire les instructions du `LRMd` vers la
+  ressource
+* doit renvoyer des codes retours bien définis en fonction du statut de sa
+  ressource
+* plusieurs types de _ressource agent_ supportés
+* la spécification "OCF" est l'API la plus poussée et complète pour écrire
+  un _RA_
+* l'API OCF permet de présenter au `CRMd` les actions supportées par
+  l'agent.
+
+::: notes
+
+Il est possible d'utiliser plusieurs types de _RA_ différents au sein d'un même cluster:
+
+* OCF (Open Cluster Framework, type préconisé)
+* SYSV
+* systemd...
+
+Vous trouverez la liste des types supportés à l'adresse suivante:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-supported.html>
+
+Les agents systemd ou sysV sont souvent limités aux seules actions `start`,
+`stop`, `monitor`.
+
+Les _RA_ implémentant les actions `promote` et `demote` pilotent des ressources
+"multistate": une ressource est alors clonée sur autant de nœuds que demandé,
+démarrée en tant que slave, puis le cluster promeut en master un ou plusieurs
+slaves.
+
+Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
+`migrate_to` et `migrate_from` qui ne sont disponibles qu'aux _RA_ non
+"multistate" (non implémenté dans Pacemaker pour les ressources multistate).
+
+:::
+
+-----
+
+### TP: _Resource Agents_
+
+* installer les _resource agents_
+* lister les RA installés à l'aide de `pcs`
+* afficher les information relatives à l'agent `dummy`
+* afficher les information relatives à l'agent `pgsql`
+
+::: notes
+
+Installer le paquet `resource-agents` qui installe un grand nombre de RA par défaut: `yum
+install -y resource-agents`.
+
+Il est possible de lister les RA installés avec la commande suivante: `pcs resource
+agents`.
+
+Chaque agent embarque sa propre documentation qui est accessible à l'aide de la commande
+`pcs resource describe <agent>`.
+
+Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de PAF. Vous
+pouvez lister l'ensemble de ses options grâce à la commande `pcs resource describe
+pgsql`.
+
+:::
+
+-----
+
+## PostgreSQL Automatic Failover (PAF)
+
+* _RA_ spécifique à PostgreSQL pour Pacemaker
+* alternative à l'agent existant
+  * moins complexe et moins intrusif
+  * compatible avec PostgreSQL 9.3 et supérieur
+* Voir: <https://clusterlabs.github.io/PAF/FAQ.html>
+
+::: notes
+
+PAF se situe entre Pacemaker et PostgreSQL. C'est un _resource agent_
+qui permet au cluster d'administrer pleinement une instance PostgreSQL locale.
+
+Un chapitre entier est dédié à son installation, son fonctionnement et sa
+configuration plus loin dans ce workshop.
+
+![Schema](medias/pcmk_diag2.png)
+
+:::
+
+------
+
+# Paramétrage du cluster
 
 Attention:
 
@@ -1460,14 +1454,46 @@ Attention:
 
 -----
 
-## Paramétrage global du cluster
+## Support du Quorum
 
-Paramètres globaux :
+Paramètre `no-quorum-policy`
 
-* `no-quorum-policy=ignore` : désactive la gestion du quorum (déconseillé !)
-* `stonith-enabled=false` : désactive la gestion du fencing (déconseillé !)
+* `ignore`: désactive la gestion du quorum (déconseillé !)
+* `stop`: (par défaut) arrête toutes les ressources
+* `freeze`: préserve les ressources encore disponible dans la partition
+* `suicide`: fencing des nœuds de la partition
 
 :::notes
+
+Il est fortement déconseillé de désactiver le quorum.
+
+La valeur par défaut est le plus souvent la plus adaptée.
+
+Le cas du `freeze` peut être utile afin de conserver les ressources actives au
+sein d'un cluster où il n'y a aucun risque de split brain en cas de partition
+réseau, eg. un serveur httpd.
+
+:::
+
+-----
+
+## Support du Stonith
+
+Paramètre `stonith-enabled`
+
+* `false` : désactive la gestion du fencing (déconseillé !)
+* activé par défaut
+* aucune ressource ne démarre sans présence de FA
+
+:::notes
+
+Ce paramètre contrôle la gestion du fencing au sein du cluster. Ce dernier
+est activé et il est vivement recommandé de ne pas le désactiver.
+
+Effectivement, il est possible de désactiver le fencing au cas par cas,
+ressource par ressource, grâce à leur méta-attribut `requires` (voir
+chapitre [Configuration des ressources][]), positionné par défaut à `fencing`.
+
 
 Il est techniquement possible de désactiver le [quorum][] ou [fencing][].
 
@@ -1485,12 +1511,14 @@ nœuds (conséquence d'un `split brain`).
 
 ## Cluster symétrique et asymétrique
 
-* l'attribut `symmetric-cluster` change l'effet des scores de préférence des
-  ressources:
-  * Asymétrique, ou _Opt-In_ : les ressources ne peuvent démarrer sur un nœud à moins
-    d'y avoir un score déclaré supérieur ou égal à `0`
-  * Symétrique ou _Opt-Out_ : les ressources peuvent démarrer sur tous les
-    nœuds à moins d'y avoir un score déclaré inférieur à `0`
+Paramètre `symmetric-cluster`:
+* change l'effet des scores de préférence des ressources
+* `true`: (par défaut) cluster symétrique ou _Opt-Out_. Les ressources
+  peuvent démarrer sur tous les nœuds à moins d'y avoir un score déclaré
+  inférieur à `0`
+* `false`: cluster asymétrique ou _Opt-In_. Les ressources ne peuvent
+  démarrer sur un nœud à moins  d'y avoir un score déclaré supérieur ou
+  égal à `0`
 
 ::: notes
 
@@ -1513,53 +1541,61 @@ La notion de contraintes de localisation est définie dans le chapitre
 
 -----
 
-## Maintenance - 1
+## Mode maintenance
 
-* ressource "unmanaged"
-  * désactive les actions "monitor" sur cette ressource
-  * aucune transition ne sera réalisée par le cluster
-  * permet de réaliser des tâches de maintenance sur la **ressource**
-    ou le nœud qui l'héberge
+Paramètre `maintenance_mode`:
+
+* désactive tout contrôle du cluster
+* plus aucun opération n'est exécutée
+* plus de monitoring des ressources
+* les ressources démarrée sont laissée dans leur état courant (elles ne
+  sont pas arrêtées)
+* toujours tester les transitions avec `crm_simulate` avant de sortir de la
+  maintenance
 
 ::: notes
 
-FIXME à simplifier
+Le paramètre `maintenance_mode` est utile pour réaliser des opérations de
+maintenance globales à tous les nœuds du cluster. Toutes les opérations
+`monitor` sont désactivées et le cluster ne réagit plus aucun événements.
+
+Ce paramètre, comme tous les autres, est préservé lors du redémarrage de
+Pacemaker, sur un ou tous les nœuds. Il est donc possible de redémarrer tout
+le cluster tout en conservant le mode maintenance actif.
+
+Attention toutefois aux scores de localisation. D'autant plus que ceux-ci
+peuvent être mis à jour lors du démarrage du cluster sur un nœud par exemple.
+Vérifiez toujours que les ressources sont bien dans l'état attendu sur chaque
+nœud avant de sortir du mode de maintenance afin d'éviter une intervention du
+cluster. Lorsque ce dernier reprend la main, il lance l'action `probe` sur
+toutes les ressources sur tous les nœuds pour détecter leur présence et
+comparer la réalité avec l'état de sa CIB.
 
 :::
 
 -----
 
-## Mode maintenance - 2
+## Autres paramètres utiles
 
-* propriété du cluster "maintenance-mode"
-  * passe toutes les ressources en "unmanaged"
-  * permet de réaliser des actions de maintenance sur **l'ensemble du cluster**
+* `stop-all-resources=false`: toutes les ressources sont arrêtées si
+  positionné à `true` 
+* `stonith-watchdog-timeout`: temps d'attente avant qu'un nœud disparu est
+  considéré comme "auto-fencé" par son watchdog si le cluster est configuré
+  avec
+* `cluster-recheck-interval=15min`: intervalle entre deux réveils forcé du
+  `PEngine` pour vérifier l'état du cluster
 
 ::: notes
 
-FIXME à simplifier
+Pour la liste complète des paramètres globaux du cluster, voir:
+
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-cluster-options.html>
 
 :::
 
 -----
 
-## Mode maintenance - 3
-
-* attention, les scores des ressources peuvent tout de même être mis à jour
-  * notamment au démarrage du service cluster sur un nœud ("startup probes")
-  * toujours tester les transitions avec `crm_simulate` avant de sortir de la maintenance
-
-::: notes
-
-FIXME à simplifier
-
-:::
-
------
-
-## TP
-
-Manipulation des propriétés du cluster
+## TP: paramètres du cluster
 
 ::: notes
 
@@ -1577,9 +1613,109 @@ Afficher les valeurs par défaut des paramètres abordés :
 
 -----
 
-# Fonctionnement du cluster
+# Attributs d'un nœud
 
-Mécanique interne
+## Généralité sur les attributs d'un nœud
+
+* attributs propres à chaque nœud
+* peut être persistant ou non
+* peut stocker n'importe quelle valeur sous n'importe quel nom, eg. `kernel`
+  avec la version du noyau système
+
+::: notes
+
+Il est possible de créer vos propres attributs avec l'outil `crm_attribute`.
+
+La persistance de vos attributs se contrôle avec l'argument `--lifetime`:
+
+* valeur réinitialisée au redémarrage (non persistant) : `--lifetime reboot`
+  * note : `--type status` est également accepté. Mentionné dans la
+    documentation mais pas dans le man de la commande 
+* valeur conservée au redémarrage (persistant) : `--lifetime forever`
+  * note : `--type nodes` est également accepté. Mentionnée dans la
+    documentation mais pas dans le `man` de la commande 
+
+Exemple pour stocker dans un attribut du nœud nommé `kernel` la version du
+noyau système :
+
+~~~
+crm_attribute -l forever --node hanode1 --name kernel --update $(uname -r)
+~~~
+
+Exemple de l'utilisation d'une rule basée sur un attribut de ce type:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_using_rules_to_determine_resource_location.html#_location_rules_based_on_other_node_properties>
+
+Le _RA_ PAF utilise également les attributs non persistants. À l'annonce d'une
+promotion, chaque esclave renseigne son LSN dans un attribut transient. Lors de
+la promotion, le nœud "élu" compare son LSN avec celui des autres nœuds en
+consultant leur attribut `lsn_location` pour s'assurer qu'il est bien le plus
+avancé.
+
+:::
+
+-----
+
+## Attributs de nœuds spéciaux
+
+* plusieurs attributs font office de paramètres de configuration
+* `maintenance`: mode maintenance au niveau du nœud
+* `standby`: migrer toutes les ressources hors du nœud
+
+::: notes
+
+Il existe plusieurs attributs de nœuds spéciaux qui font offices de
+paramétrage. Les deux plus utiles sont `maintenance` et `standby`.
+
+L'attribut `maintenance` a le même effet que le `maintenance_mode` au niveau
+du cluster, mais localisé au seul nœud sur lequel il est activé.
+
+Lorsque l'attribut `standby` est activé, il indique que le nœud ne doit plus
+héberger aucune ressource. Elle sont alors migré vers d'autres nœuds ou
+arrêté le cas échéant.
+
+Vous trouverez la liste complète de ces attributs de nœud spéciaux à
+l'adresse suivante:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_special_node_attributes.html>
+
+:::
+
+-----
+
+## Attributs de nœuds particuliers
+
+Quelques autres attributs particuliers:
+
+* `fail-count-*`: mode maintenance au niveau du nœud
+* `master-*`: migrer toutes les ressources hors du nœud
+
+::: notes
+
+Un attribut `fail-count-*` de type non persistant est utilisés pour
+mémoriser le nombre d'erreur de chaque ressources sur chaque nœud. Préférez
+utiliser `crm_failcount` ou `pcs resource failcount` pour accéder à ces
+informations.
+
+Enfin, il existe des _master score_ pour les ressources de type multistate
+(primaire/secondaire), permettant d'indiquer où l'instance primaire peut ou
+doit se trouver dans le cluster. Il sont préfixé par `master-*`. PAF positionne
+ces scores comme attributs persistants des nœuds. La position de l'instance
+primaire est ainsi préservée lors du redémarrage du cluster.
+
+Vous pouvez consulter ou modifier les _master score_ à l'aide de l'outil
+`crm_master`. Attention toutefois, ces scores sont positionnés habituellement
+par le _RA_ lui même. À moins de vous trouver dans une situation où le
+cluster ne nomme aucune ressource primaire, vous ne devriez pas vous même
+positionner un _maser score_.
+
+:::
+
+-----
+
+# Configuration des ressources
+
+* mécanique interne
+* __tout__ dépend des scores !
+* chapitre organisé dans l'ordre des besoins de configuration
 
 -----
 
@@ -1601,20 +1737,23 @@ FIXME
 
 -----
 
-## Paramétrage par défaut des ressources
+## Méta-attributs des ressources
 
 * un ensemble de _meta-attributes_ s'appliquent à n'importe quelle ressource:
-  * il est possible de positionner une valeur par défaut à ces attributs
-  * il est possible de surcharger ces valeurs par défaut pour chaque ressource
+  * il est possible de leur positionner une valeur par défaut qui s'applique
+    à toutes les ressources
+  * il est possible de surcharger les valeurs par défaut pour chaque ressource
 * quelques exemple de méta-attributs:
+  * `target-role`: rôle attendu: `Started`, `Stopped`, `Slave`, ou `Master`
   * `migration-threshold` : combien d'erreurs "soft" avant de déclencher un failover
   * `failure-timeout` : durée à partir de laquelle les erreurs "soft" sont réinitialisées
   * `resource-stickiness` : score de maintien d'une ressource sur le nœud courant
+  * `is-managed`: le cluster doit-il agir en cas d'événement ?
 
 ::: notes
 
 Les _meta-attributes_ est un ensemble d'attributs commun à n'importe quelle
-type de ressource. Il est possible de créer une valeur par défaut qui
+type de ressource. Il est possible de leur créer une valeur par défaut qui
 sera appliquée automatiquement à toute ressource présente dans le cluster.
 
 Par exemple avec `pcs`:
@@ -1632,13 +1771,14 @@ crm_attribute --type rsc_defaults --name <nom_attribut> --update valeur
 La valeur d'un méta attribut positionné au niveau de la ressource elle même
 surcharge la valeur par défaut positionné précédemment.
 
+La liste complète des méta-attributs est disponible à cette adresse:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-options.html#_resource_meta_attributes>
+
 :::
 
 -----
 
-## TP
-
-paramétrage général
+### TP: paramétrage par défaut des ressources
 
 ::: notes
 
@@ -1710,21 +1850,24 @@ FIXME: paramétrage coté cluster
 
 -----
 
-## TP: Fencing Agent
+### TP: Fencing Agent
 
 Nous allons créer les ressources de fencing au sein de notre cluster.
 
 ::: notes
 
-### créer les agents de fencing
-
-Par défaut le cluster refuse de prendre en charge des ressources en HA sans fencing configuré
+Par défaut le cluster refuse de prendre en charge des ressources en HA sans
+fencing configuré.
 
 ~~~console
 # crm_verify -VL
 ~~~
 
-Afficher la description de l'agent de fencing fence_virsh : `pcs resource describe stonith:fence_virsh`
+Afficher la description de l'agent de fencing fence_virsh :
+
+~~~
+pcs resource describe stonith:fence_virsh
+~~~
 
 * Certaines propriétés sont spécifiques à l'agent
 * D'autres globales à pacemaker : "pcmk_\*"
@@ -1758,7 +1901,7 @@ identity_file="/root/.ssh/id_rsa" login_timeout=15
 # pcs status
 ~~~
 
-L'outil `stonith-admin` permet d'interagir avec le démon `fenced`? Notamment:
+L'outil `stonith-admin` permet d'interagir avec le daemon `STONITd`, notamment:
 
 * `stonith_admin -V --list-registered` : liste les agents configurés
 * `stonith_admin -V --list-installed` : liste tous les agents disponibles
@@ -1789,7 +1932,8 @@ pcs stonith show --full
 ## Contraintes de localisation
 
 * score de préférence d'une ressource pour un nœud
-* `stickiness` : score de maintien en place d'une ressource sur son nœud actuel
+* `stickiness` : score de maintien en place d'une ressource sur son nœud
+  actuel
 
 ::: notes
 
@@ -1818,7 +1962,7 @@ Ce paramètre peut être défini globalement ou par ressource.
 
 -----
 
-## TP: création des contraintes de localisation
+### TP: création des contraintes de localisation
 
 Définition des contraintes sur les ressources de fencing
 
@@ -1881,9 +2025,10 @@ nœud ou plus.
 
 ## mécanique des _RA_ (OCF)
 
-* dix actions définies dans l'API
-* toutes les actions ne sont pas obligatoires
+* dix opérations définies dans l'API
+* toutes ne sont pas obligatoires
 * le code retour de l'agent informe le cluster sur le statut de la ressource manipulée
+* `action` et `operation` sont deux termes synonymes
 
 ::: notes
 
@@ -1901,7 +2046,7 @@ différents pour définir l'état de sa ressource:
 * `OCF_RUNNING_MASTER` (8)
 * `OCF_FAILED_MASTER` (9)
 
-Voici les actions disponibles aux RA implémentant la spec OCF:
+Voici les opérations disponibles aux RA implémentant la spec OCF:
 
 * `start`: démarre la ressource
 * `stop`: arrête la ressource
@@ -1915,9 +2060,9 @@ Voici les actions disponibles aux RA implémentant la spec OCF:
 * `notify`: action à exécuter lorsque le cluster notifie l'agent des actions
   le concernant au sein du cluster
 
-En terme de configuration, chaque action peut avoir son propre délais
-d'exécution ( `timeout` ), avoir une éventuelle récurrence d'exécution (
-`interval` ), etc.
+En terme de configuration, chaque opération peut avoir son propre délais
+d'exécution (`timeout`), avoir une éventuelle récurrence d'exécution
+(`interval`), etc.
 
 :::
 
@@ -1962,7 +2107,7 @@ les différents timeout en tenant compte de cette recommandation.
 
 Enfin, si une action ne se termine dans le temps imparti par son timeout,
 
-Le démon `execd`, qui exécute l'action, se charge d'interrompre une action
+Le daemon `execd`, qui exécute l'action, se charge d'interrompre une action
 dès que son timeout est atteint. Habituellement, le cluster planifie des
 actions palliatives à cette erreur (eg. _recovery_ ou _failover_).
 
@@ -1970,7 +2115,7 @@ actions palliatives à cette erreur (eg. _recovery_ ou _failover_).
 
 -----
 
-## TP: création des RA (dummy1) dans le cluster
+### TP: création des RA (dummy1) dans le cluster
 
 Création d'une première ressource "Dummy" en HA.
 
@@ -2033,7 +2178,7 @@ Observer les changements opérés par le _scheduler_.
 
 -----
 
-## Contraintes de "colocation"
+## Contraintes de colocation
 
 * définit un lien entre plusieurs ressources
 * peut être un lien de colocalisation ou d'exclusion
@@ -2061,7 +2206,7 @@ soit montée sur le même nœud que le master.
 
 -----
 
-## TP: création des _RA_ (dummy2) dans le cluster
+### TP: création des _RA_ (dummy2) dans le cluster
 
 Ajout d'un second service Dummy et de contraintes de localisation.
 
@@ -2153,13 +2298,15 @@ master et la VIP.
 
 -----
 
-## TP
+### TP
 
 * créer un ressource dummy3 en spécifiant un interval de monitoring, ainsi que les paramètres migration-threshold failure-timeout et resource-stickiness
 * créer un group dummygroup qui regroupe les ressources dummy3 et dummy2 dans cet ordre
 * créer une contrainte d'ordre entre le démarrage de la ressource dummy1 et dummy3
 * redémarrer le cluster et se connecter sur le DC
 * observer l'ordre choisi par pengine pour le démarrage de l'ensemble des ressources
+
+::: notes
 
 ~~~console
 # pcs cluster cib > dummy3.xml
@@ -2178,125 +2325,11 @@ Adding dummy1 dummy3 (kind: Mandatory) (Options: first-action=start then-action=
 CIB updated
 ~~~
 
------
-
-## Règles
-
-* possibilité de modifier les contraintes selon des conditions
-  * par exemple une plage horaire
-
-::: notes
-
-Les règles permettent de définir :
-* les contraintes de localisation ,
-* les options et attributs d'instance d'une ressource ,
-* les options du cluster ,
-en fonction :
-* des attributs d'un noeud ,
-* de l'heure, de la date ou de la périodicité  (à la manière d'une crontab) ,
-* d'une durée.
-
-Pacemaker recalcule l'état du cluster sur la base d'évènements. Il est possible
-qu'aucun évènement ne se produise pendant une période, ce qui empêcherait le
-déclenchement d'une modification de configuration lié à une règle temporelle.
-Il faut donc configurer le paramètre `cluster-recheck-interval` a une valeur adaptée
-pour s'assurer que les règles basées sur le temps soient exécutées.
-
-Les règles peuvent être utilisées pour favoriser l'utilisation d'un noeud plus
-puissant en fonction de la périodes de la journée ou du nombre de CPU.
-
-Il faut cependant garder à l'esprit que la bascule d'une ressource PostgreSQL n'est
-pas transparente et que la [simplicité][KISS] doit rester de mise.
-
 :::
 
 -----
 
-## Attributs d'un nœud
-
-* association clé-valeur affectées à un nœud
-  * non directement lié à une ressource
-  * peut être persistant ou non : `--lifetime [reboot|forever]`
-* Exemple pour stocker dans un attribut du nœud nommé "kernel" la version du noyau système
-
-::: notes
-
-* valeur réinitialisée au redémarrage (non persistant) : `--lifetime reboot`
-  * note : `--type status` est également accepté. Mentionné dans la documentation mais pas dans le man de la commande
-* valeur conservée au redémarrage (persistant) : `--lifetime forever`
-  * note : `--type nodes` est également accepté. Mentionnée dans la documentation mais pas dans le man de la commande
-
-Exemple pour stocker dans un attribut du nœud nommé `kernel` la version du noyau système :
-
-~~~
-crm_attribute -l forever --node hanode1 --name kernel --update $(uname -r)
-~~~
-
-[Exemple de l'utilisation d'une rule basée sur un attribut de ce type](http://clusterlabs.org/doc/en-US/Pacemaker/1.1-pcs/html/Pacemaker_Explained/_using_rules_to_determine_resource_location.html#_location_rules_based_on_other_node_properties)
-
-Les attributs de type non persistant sont utilisés au sein du cluster pour mémoriser les failcount des ressources.
-
-Le Resource Agent PAF utilise également les attributs non persistants. À l'annonce d'une promotion, chaque esclave
-renseigne son LSN dans un attribut transient. Lors de la promotion, le nœud "élu" compare son LSN avec celui des
-autres nœuds en consultant leur attribut `lsn_location` pour s'assurer qu'il est bien le plus avancé.
-
-FIXME
-Complément: PAF utilise aussi des attributs persistant pour les master_score, qui sont des attributs de nœuds "spéciaux"
-
-:::
-
------
-
-# Administration du cluster
-
-Administration usuelle du cluster
-
------
-
-## mode maintenance vs resource unmanaged
-
-Différences entre les deux
-
-::: notes
-
-Pour éviter que les cluster ne réagissent à un incident, il est possible de le passer en mode maintenance :
-
-~~~console
-# pcs property set maintenance-mode=true
-~~~
-
-Pour l'en sortir :
-
-~~~console
-# pcs property set maintenance-mode=false
-~~~
-
-Si passer tout le cluster en mode maintenance est trop contraignant, il est possible de désactiver la supervision
-d'une ressource en particulier.
-
-~~~console
-# pcs resource unmanage dummy1
-~~~
-
-L'attribut `is-managed=false` est alors attaché à cette ressource. Cela est visible avec la commande :
-
-~~~console
-# pcs resource show dummy1
-~~~
-
-L'opération inverse peut ensuite être réalisée :
-
-~~~console
-# pcs resource manage dummy1
-~~~
-
-:::
-
------
-
-## TP
-
-failcounts
+### TP: failcounts
 
 ::: notes
 
@@ -2340,9 +2373,41 @@ La ressource `dummy1` revient à sa position d'origine. Expliquer pourquoi? (sco
 
 -----
 
+## Règles
+
+* possibilité de modifier les contraintes selon des conditions
+  * par exemple une plage horaire
+
+::: notes
+
+Les règles permettent de définir :
+* les contraintes de localisation ,
+* les options et attributs d'instance d'une ressource ,
+* les options du cluster ,
+en fonction :
+* des attributs d'un noeud ,
+* de l'heure, de la date ou de la périodicité  (à la manière d'une crontab) ,
+* d'une durée.
+
+Pacemaker recalcule l'état du cluster sur la base d'évènements. Il est possible
+qu'aucun évènement ne se produise pendant une période, ce qui empêcherait le
+déclenchement d'une modification de configuration lié à une règle temporelle.
+Il faut donc configurer le paramètre `cluster-recheck-interval` a une valeur adaptée
+pour s'assurer que les règles basées sur le temps soient exécutées.
+
+Les règles peuvent être utilisées pour favoriser l'utilisation d'un noeud plus
+puissant en fonction de la périodes de la journée ou du nombre de CPU.
+
+Il faut cependant garder à l'esprit que la bascule d'une ressource PostgreSQL n'est
+pas transparente et que la [simplicité][KISS] doit rester de mise.
+
+:::
+
+-----
+
 ## Édition des ressources
 
-modification de la configuration d'une ressource
+Modification de la configuration d'une ressource
 
 ::: notes
 
@@ -2359,9 +2424,7 @@ Les outils pcs et crmsh peuvent également être utilisés.
 
 -----
 
-## TP
-
-modification param avec reload ou restart
+### TP: modification paramètre avec reload ou restart
 
 ::: notes
 
@@ -2422,7 +2485,7 @@ FIXME
 
 -----
 
-## TP: supprimer les dummy
+### TP: supprimer les dummy
 
 FIXME
 
@@ -2487,7 +2550,7 @@ lisible, plus efficace, plus fonctionnel.
 
 -----
 
-## TP: installation de PAF
+### TP: installation de PAF
 
 Installation de PostreSQL et de PAF via le dépôt PGDG RPM.
 
@@ -2575,7 +2638,7 @@ paramètre `recovery_target_timeline` que l'on doit valoriser à `latest`.
 
 -----
 
-## TP: création du cluster PostgreSQL
+### TP: création du cluster PostgreSQL
 
 La configuration de PostgreSQL réalisée ci-dessous est une version simple et rapide. Elle convient au cadre de ce TP
 dont le sujet principal est Pacemaker et PAF, mais ne convient pas pour une utilisation en production.
@@ -2723,7 +2786,7 @@ La configuration de la ressource PostgreSQL est faite avec les paramètres :
 
 -----
 
-## TP: ressource PAF
+### TP: ressource PAF
 
 La ressource `pgsqld` défini les propriétés des instances PostgreSQL :
 
@@ -2792,7 +2855,7 @@ FIXME
 
 -----
 
-## TP
+### TP
 
 FIXME
 
@@ -2867,9 +2930,7 @@ FIXME
 
 -----
 
-## TP
-
-faire un switchover
+### TP: switchover
 
 ::: notes
 
@@ -2960,9 +3021,7 @@ FIXME
 
 -----
 
-## TP
-
-TP failover
+### TP: failover
 
 ::: notes
 
@@ -3058,6 +3117,47 @@ FIXME
 # Réactions du cluster
 
 FIXME
+
+-----
+
+## Mode maintenance vs resource unmanaged
+
+Différences entre les deux FIXME FIXME
+
+::: notes
+
+Pour éviter que les cluster ne réagissent à un incident, il est possible de le passer en mode maintenance :
+
+~~~console
+# pcs property set maintenance-mode=true
+~~~
+
+Pour l'en sortir :
+
+~~~console
+# pcs property set maintenance-mode=false
+~~~
+
+Si passer tout le cluster en mode maintenance est trop contraignant, il est possible de désactiver la supervision
+d'une ressource en particulier.
+
+~~~console
+# pcs resource unmanage dummy1
+~~~
+
+L'attribut `is-managed=false` est alors attaché à cette ressource. Cela est visible avec la commande :
+
+~~~console
+# pcs resource show dummy1
+~~~
+
+L'opération inverse peut ensuite être réalisée :
+
+~~~console
+# pcs resource manage dummy1
+~~~
+
+:::
 
 -----
 
