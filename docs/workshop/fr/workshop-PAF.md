@@ -997,7 +997,6 @@ idéal de chaque ressource qu'il gère (démarré/arrêté/promu et sur quel ser
 calcule les transitions permettant d'atteindre cet état.
 
 Le processus `cib` est chargé d'appliquer les modifications dans la CIB, de
-conserver les information transitoires en mémoire (statuts, certains scores, etc) et de
 notifier les autres processus de ces modifications si nécessaire.
 
 Le contenu de la CIB est historisé puis systématiquement synchronisé entre les nœuds à
@@ -1512,6 +1511,7 @@ nœuds (conséquence d'un `split brain`).
 ## Cluster symétrique et asymétrique
 
 Paramètre `symmetric-cluster`:
+
 * change l'effet des scores de préférence des ressources
 * `true`: (par défaut) cluster symétrique ou _Opt-Out_. Les ressources
   peuvent démarrer sur tous les nœuds à moins d'y avoir un score déclaré
@@ -1731,7 +1731,25 @@ positionner un _maser score_.
 
 ::: notes
 
-FIXME
+Pacemaker se base sur la configuration et les scores des ressources pour
+calculer l'état idéal du cluster. Le cluster choisi le nœud où une ressource à
+le score le plus haut pour l'y placer. Un score négatif empêche le
+placement d'une ressource sur un nœud. Les scores `+INFINITY` et `-INFINITY`
+permettent de forcer une ressource à rejoindre ou quitter un nœud de manière
+inconditionnelle.
+
+Les scores peuvent être placées par :
+
+* l'administrateur en configurant :
+  * les [contraintes de localisation][Contraintes de localisation] ;
+  * les options :
+     * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
+       ressources ;
+     * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
+* les [commandes][Détail d'un switchover ] passées par l'administrateur :
+  * ban : place un score `-INFINITY` sur le nœud courant ;
+  * move : place un score `+INFINITY` sur le nœud cible ;
+* les ressources agents lors de l'action `monitor`.
 
 :::
 
@@ -1940,21 +1958,22 @@ pcs stonith show --full
 Les contraintes de localisation ont pour fonction d'aider pacemaker à savoir où
 démarrer les ressources.
 
-Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le même
-score alors pacemaker choisi aléatoirement parmi les nœuds candidats.
+Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le
+même score alors pacemaker choisi aléatoirement parmi les nœuds candidats.
 
-Si un nœud est sorti momentanément du cluster, ses ressources peuvent être déplacées
-vers d'autres nœuds. Lors de sa réintroduction, les contraintes de localisation
-définies peuvent provoquer une nouvelle bascule des ressources.
+Si un nœud est sorti momentanément du cluster, ses ressources peuvent être
+déplacées vers d'autres nœuds. Lors de sa réintroduction, les contraintes de
+localisation définies peuvent provoquer une nouvelle bascule des ressources.
 
-La plus part du temps, il est préférable d'éviter de déplacer des ressources qui
-fonctionnent correctement. C'est particulièrement vrai pour les base de données
-dont le temps de bascule peut prendre plusieurs secondes.
+La plus part du temps, il est préférable d'éviter de déplacer des ressources
+qui fonctionnent correctement. C'est particulièrement vrai pour les base de
+données dont le temps de bascule peut prendre plusieurs secondes.
 
-Le paramètre `stickiness` permet d'indiquer à pacemaker à quel point une ressource
-en bonne santé préfère rester où elle se trouve. Pour cela la valeur du paramètre
-`stickiness` est additionnée au score de la ressource sur le nœud courant et
-comparé aux scores sur les autres nœuds pour déterminer le nœud "idéal".
+Le paramètre `stickiness` permet d'indiquer à pacemaker à quel point une
+ressource en bonne santé préfère rester où elle se trouve. Pour cela la valeur
+du paramètre `stickiness` est additionnée au score de la ressource sur le nœud
+courant et comparé aux scores sur les autres nœuds pour déterminer le nœud
+"idéal".
 
 Ce paramètre peut être défini globalement ou par ressource.
 
@@ -2381,11 +2400,14 @@ La ressource `dummy1` revient à sa position d'origine. Expliquer pourquoi? (sco
 ::: notes
 
 Les règles permettent de définir :
+
 * les contraintes de localisation ,
 * les options et attributs d'instance d'une ressource ,
 * les options du cluster ,
+
 en fonction :
-* des attributs d'un noeud ,
+
+* des attributs d'un nœud ,
 * de l'heure, de la date ou de la périodicité  (à la manière d'une crontab) ,
 * d'une durée.
 
@@ -2395,7 +2417,7 @@ déclenchement d'une modification de configuration lié à une règle temporelle
 Il faut donc configurer le paramètre `cluster-recheck-interval` a une valeur adaptée
 pour s'assurer que les règles basées sur le temps soient exécutées.
 
-Les règles peuvent être utilisées pour favoriser l'utilisation d'un noeud plus
+Les règles peuvent être utilisées pour favoriser l'utilisation d'un nœud plus
 puissant en fonction de la périodes de la journée ou du nombre de CPU.
 
 Il faut cependant garder à l'esprit que la bascule d'une ressource PostgreSQL n'est
@@ -2415,6 +2437,7 @@ La configuration des ressources peut être faite avec l'outil `crm_resource` et
 l'option `-s / --set-parameter` ou `-d / --delete-parameter`.
 
 On distingue les paramètres de :
+
 * configuration de la ressource (modifiable avec l'option --meta)
 * configuration du ressource agent.
 
@@ -2512,6 +2535,44 @@ Attempting to stop: dummy1... Stopped
 
 # pcs resource delete dummy2
 Attempting to stop: dummy2... Stopped
+~~~
+
+Créer deux ressources dummy dans un groupe :
+
+~~~console
+# pcs resource create dummy1 ocf:pacemaker:Dummy
+# pcs resource create dummy2 ocf:pacemaker:Dummy
+# pcs resource group add dummyGroup dummy1 dummy2
+~~~
+
+Afficher le groupe:
+
+~~~console
+# pcs resource show dummyGroup dummy1
+ Group: dummyGroup
+ Resource: dummy1 (class=ocf provider=pacemaker type=Dummy)
+  Operations: migrate_from interval=0s timeout=20 (dummy1-migrate_from-interval-0s)
+              migrate_to interval=0s timeout=20 (dummy1-migrate_to-interval-0s)
+              monitor interval=10 timeout=20 (dummy1-monitor-interval-10)
+              reload interval=0s timeout=20 (dummy1-reload-interval-0s)
+              start interval=0s timeout=20 (dummy1-start-interval-0s)
+              stop interval=0s timeout=20 (dummy1-stop-interval-0s)
+  Resource: dummy2 (class=ocf provider=pacemaker type=Dummy)
+   Operations: migrate_from interval=0s timeout=20 (dummy2-migrate_from-interval-0s)
+               migrate_to interval=0s timeout=20 (dummy2-migrate_to-interval-0s)
+               monitor interval=10 timeout=20 (dummy2-monitor-interval-10)
+               reload interval=0s timeout=20 (dummy2-reload-interval-0s)
+               start interval=0s timeout=20 (dummy2-start-interval-0s)
+               stop interval=0s timeout=20 (dummy2-stop-interval-0s)
+~~~
+
+Supprimer le groupe :
+
+~~~console
+# pcs resource delete dummyGroup
+Removing group: dummyGroup (and all resources within group)
+Stopping all resources in group: dummyGroup...
+Deleting Resource (and group) - dummy2
 ~~~
 
 :::
@@ -2780,8 +2841,8 @@ La configuration de la ressource PostgreSQL est faite avec les paramètres :
 
 * recovery_template : un template local pour le fichier PGDATA/recovery.conf
 (defaut: $PGDATA/recovery.conf.pcmk)
-  * avant PG12 : Ce fichier doit exister sur tous les noeuds ;
-  * à partir de PG12 : Ce fichier ne doit exister sur aucun noeud.
+  * avant PG12 : Ce fichier doit exister sur tous les nœuds ;
+  * à partir de PG12 : Ce fichier ne doit exister sur aucun nœuds.
 
 * start_opts : Argument supplémentaire à donner au processus PostgreSQL au démarrage
   de PostgreSQL. (defaut : '') C'est utile notamment si le fichier de configuration
@@ -2848,7 +2909,19 @@ Enfin, pousser la configuration vers la cib :
 
 Observer l'état du cluster avec `pcs status`
 
-FIXME: Découverte des scores ?
+FIXME: Découverte des scores ? Est ce que cela réponds a la question ??
+
+Afficher le score des ressources calculé par le cluster:
+
+~~~console
+# crm_simulate -sL | grep "promotion score"
+~~~
+
+Le score des ressources est mis à jour à chaque exécution de l'action `monitor`
+de PAF. Cette action est planifiée à interval régulier par `LRMd`. L'interval
+est spécifié dans la configuraiton de la ressource. Il peut donc être
+nécessaire d'attendre après une action comme une bascule avant que le `monitor`
+ne passe et les scores soient mis à jour.
 
 :::
 
@@ -2935,13 +3008,59 @@ Décrire le démarrage :
 
 ::: notes
 
-FIXME
+Dans le cadre de PostgreSQL, un switchover désigne la promotion planifiée d'une
+instance secondaire.
+
+Le switchover s'appuie sur la procédure standard de PostgreSQL pour effectuer
+la bascule :
+
+* `demote` de la primaire : cette étape consiste à éteindre l'instance primaire.
+  Avant qu'elle ne s'arrête, l'instance primaire envoie tous les journaux de
+  transactions nécessaires aux secondaires **connectées**.
+* `promote` de la secondaire élue : cette étape consiste à effectuer un `pg_ctl
+  promote` sur l'instance. L'instance secondaire fini de rejouer ses journaux
+  de transactions avant que l'action `promote` ne se termine.
+* `start` de l'ancienne primaire en standby. L'instance primaire est transformée
+  en standby et raccorchée à la nouvelle primaire. Pour se faire l'instance est
+  démarrée après avoir :
+  * créer un fichier `recovery.conf` dans PGDATA en utilisant le fichier
+    `recovery_template` pour les versions précédent PostgreSQL 12.
+  * créet un fichier `standby.signal` dans PGDATA pour les autres versions.
+
+Au moment de la promotion, si la standby choisie n'est plus la plus récente.
+C'est à dire qu'elle a été déconnectée entre le dernier monitor et le demote du
+master. La transition créé par pacemaker est annulée. Une nouvelle secondaire
+est choisie et le processus se répète.
+
+Le choix de la secondaire dépend de la procédure de switchover choisie :
+
+* `pcs resource move <resource_name> <node_name> --master` : dans ce cas on
+  choisi nous même le nœud cible du switchover.
+* `pcs resource ban <resource_name> --master` : dans ce cas la ressource
+  PostgreSQL ne peut plus tourner sur le nœud d'ou elle a été bannie.
+  L'instance secondaire avec le LSN le plus élevé sera promue.
+* `pcs resource move <resource_name> --master` : cette commande est équivalente
+  à un `ban` de la ressource.
+
+Les deux méthodes s'appuient sur des contraintes de localisation pour provoquer
+la bascule :
+* `ban` ou `move` sans cible: une contrainte de localisation avec un score
+  `-INFINITY` est placée sur le nœud courant ;
+* `move` avec une cible : une contrainte de localisation avec un score de
+  `+INFINITY` est placée sur le nœud cible.
+
+Dans les deux cas, il faut penser à supprimer ces contraintes après le
+switchover avec la commande `pcs resource clear <resource_name>`.
+L'utilisation de l'option `resource-stickiness` au niveau du cluster ou des
+ressources permet à la ressource de rester sur son nouveau nœud après la
+suppression de la contrainte de localisation.
 
 :::
 
 -----
 
 ### TP: switchover
+
 
 ::: notes
 
@@ -2993,8 +3112,81 @@ Location Constraints:
 Il faut penser à faire un clear sinon le score restera en place :
 
 ~~~
-pcs resource clear pgsql-ha
+#pcs resource clear pgsql-ha
 ~~~
+
+Répéter les même opérations en effectuant le switchover avec chacune des
+commandes suivantes :
+
+* `pcs resource move pgsql-ha --master`
+* `pcs resource ban pgsql-ha --master`
+
+Observer :
+
+* les contraintes posées par `pcs` ;
+* le statut de la ressource sur le nœud ou la contrainte est posée.
+
+
+Nettoyer la ressource et effectuer un switchover avec la commande `move` sans
+l'option `--master` :
+
+~~~console
+# pcs resource clear pgsql-ha
+# pcs resource move pgsql-ha hanode1
+~~~
+
+Observer la contrainte de localisation posée par `pcs` :
+
+~~~ console
+# pcs constraint location show resource pgsql-ha
+Location Constraints:
+  Resource: pgsql-ha
+    Enabled on: hanode1 (score:INFINITY) (role: Started)
+~~~
+
+Pour un ressource multi-state, les commandes qui peuvent être influencées par
+le rôle de la ressource utilisent la valeur par défaut `role: Started`.
+
+La contrainte posée par `pcs` signifie que la ressource doit être démarée sur
+le nœud `hanode1`. La ressource PostgreSQL est une resource multi-state, elle
+doit être démarée en tant que `slave` par pacemaker. Le cluster procède ensuite
+à la promotion de la ressource sur le nœud avec le score le plus élevé (ici
+c'est aussi `hanode1`).
+
+La même commande lancée avec l'option `--master` demande explicitement la
+promotion sur le nœud `hanode1` (role: Master). Dans ce cas, il n'y a pas de
+différence entre le résultat final des deux commandes. Cependant dans certains
+scénarios d'incident, il est possible que le résultat diffère.
+
+Nettoyer la ressource et effetuer maintenant le test avec la commande `ban`
+sans `--master`:
+
+~~~console
+# pcs resource clear pgsql-ha
+# pcs resource ban pgsql-ha
+~~~
+
+Afficher la contrainte pour la ressource `pgsql-ha` :
+
+~~~ console
+# pcs constraint location show resource pgsqld-clone
+Location Constraints:
+  Resource: pgsql-ha
+    Disabled on: hanode1 (score:-INFINITY) (role: Started)
+~~~
+
+La contrainte posée par `pcs` interdit le démarrage de la ressource.
+
+La même commande lancée avec l'option `--master` empêche la promotion de
+l'instance sur le nœud (role: Master), la ressource reste donc démarée en tant
+que `slave`. Dans ce cas, on voit une grosse différence entre la version avec
+et sans `--master`.
+
+Lorsque l'on travaille avec des ressources multi-state, il est donc préférable
+d'utiliser les commandes `ban` et `move` avec l'option `--master` pour faire
+une switchover car elle décrit exactement ce que l'on souhaite.
+
+Avant de terminer ce TP, penser à nettoyer la ressource.
 
 :::
 
@@ -3033,9 +3225,10 @@ d'une instance secondaire suite à un incident.
 
 Pour pacemaker, cette promotion correspond au déplacement du rôle `master` vers
 un autre nœud. Du fait de la présence d'une containte de colocation entre le
-role `master` et la VIP, cette dernière bascule aussi.
+rôle `master` et la VIP, cette dernière bascule aussi.
 
 Le failover n'aura lieu que si :
+
 * l'incident concerne le nœud ou se trouve la ressource PostgreSQL avec le rôle
   master ;
 * la ressource master ne peut pas redémarrer sur le nœud dans le temps qui lui
@@ -3047,8 +3240,8 @@ dicté par le fait que la propriété `on-fail` de l'action start est `fence`
 
 Le choix de l'instance qui va devenir primaire se fait en fonction du LSN des
 instances secondaires.  L'instance ayant le LSN le plus élevé est choisie.
-Pendant la promotion, les LSN sont à nouveau comparés. Si le secondaire choisi
-n'est plus le plus récent alors la transition est annulée et une nouvelle
+Pendant la promotion, les LSN sont à nouveau comparés. Si le secondaire élu
+n'est plus le plus récent alors la transition est annulé et une nouvelle
 élection est réalisée.
 
 :::
@@ -3088,7 +3281,7 @@ Suppression du fichier `/var/lib/pgsql/10/data/global/pg_control`
 * Faire attention à ce qu'aucune ressource ne soit démarrée sur le nœud avant
   de l'arrêter.
   * désactiver les ressources
-  * mettre le noeud en standby
+  * mettre le nœud en standby
 
 ::: notes
 
@@ -3136,6 +3329,7 @@ Une incohérence entre l'état de l'instance et le controldata provoque une erre
  `pg_ctl -m immediate stop` !
 
 Limitations levees:
+
 * ne gère pas plusieurs instances PostgreSQL sur un seul nœud. Corrigé dans le commit 1a7d375.
 * n'exclut pas une instance secondaire quel que soit son retard. Ajout du parametre maxlag dans le commit a3bbfa3.
 
