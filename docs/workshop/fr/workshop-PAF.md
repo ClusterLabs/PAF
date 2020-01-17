@@ -997,6 +997,7 @@ idéal de chaque ressource qu'il gère (démarré/arrêté/promu et sur quel ser
 calcule les transitions permettant d'atteindre cet état.
 
 Le processus `cib` est chargé d'appliquer les modifications dans la CIB, de
+conserver les information transitoires en mémoire (statuts, certains scores, etc) et de
 notifier les autres processus de ces modifications si nécessaire.
 
 Le contenu de la CIB est historisé puis systématiquement synchronisé entre les nœuds à
@@ -1738,18 +1739,20 @@ placement d'une ressource sur un nœud. Les scores `+INFINITY` et `-INFINITY`
 permettent de forcer une ressource à rejoindre ou quitter un nœud de manière
 inconditionnelle.
 
-Les scores peuvent être placées par :
+Les scores peuvent être positionné dans la configuration comme:
 
-* l'administrateur en configurant :
-  * les [contraintes de localisation][Contraintes de localisation] ;
-  * les options :
-     * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
-       ressources ;
-     * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
-* les [commandes][Détail d'un switchover ] passées par l'administrateur :
+* [contraintes de localisation][Contraintes de localisation] ;
+* attributs:
+  * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
+    ressources ;
+  * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
+
+Ils sont aussi être manipulés tout au long de la vie du cluster. Eg.:
+
+* [bascule][Détail d'un switchover] effectuée par l'administrateur :
   * ban : place un score `-INFINITY` sur le nœud courant ;
   * move : place un score `+INFINITY` sur le nœud cible ;
-* les ressources agents lors de l'action `monitor`.
+* les ressources agents pour désigner l'instance primaire.
 
 :::
 
@@ -2527,7 +2530,7 @@ Lister les ressources du cluster :
  dummy2 (ocf::pacemaker:Dummy): Started hanode3
 ~~~
 
-Utiliser `pcs resource delete <node_name>` pour supprimer les ressources :
+Utiliser `pcs resource delete <rsc_name>` pour supprimer les ressources :
 
 ~~~console
 # pcs resource delete dummy1
@@ -2572,6 +2575,7 @@ Supprimer le groupe :
 # pcs resource delete dummyGroup
 Removing group: dummyGroup (and all resources within group)
 Stopping all resources in group: dummyGroup...
+Deleting Resource - dummy1
 Deleting Resource (and group) - dummy2
 ~~~
 
@@ -2877,15 +2881,30 @@ La ressource `pgsqld` défini les propriétés des instances PostgreSQL :
     op notify timeout=60s
 ~~~
 
-La ressource `pgsql-ha` contrôle toutes les instances PostgreSQL `pgsqld` du cluster, décide où le primaire est
-promu et où sont démarrés les standbys.
+La ressource `pgsql-ha` clone et contrôle toutes les instances PostgreSQL
+`pgsqld` du cluster, décide où le primaire est promu et où sont démarrés les
+standbys.
 
 ~~~console
 # pcs -f pgsqld.xml resource master pgsql-ha pgsqld notify=true
 ~~~
 
-La ressource `pgsql-master-ip` gère l'adresse IP virtuelle ha-vip. Elle sera démarrée sur le nœud hébergeant la
-ressource PostgreSQL maître.
+Nous ne précisons ici la seule option `notify` qui est __essentielle__ à PAF
+et qui est par défaut à `false`. Elle permet d'activer les action `notify`
+avant et après chaque action sur la ressource.
+
+Nous laissons les autres options à leur valeur par défaut, notamment:
+
+* `clone-max`: nombre de clone dans tous le cluster, par défaut le nombre de
+  nœud du cluster
+* `clone-node-max`: nombre de clone maximum sur chaque nœud, par défaut à `1`
+* `master-max`: nombre maximum de clone promu au sein du cluster, par défaut
+  à `1`
+* `master-node-max`: nombre maximum de clone promu sur chaque nœud, par
+  défaut à `1`
+
+La ressource `pgsql-master-ip` gère l'adresse IP virtuelle ha-vip. Elle sera
+démarrée sur le nœud hébergeant la ressource PostgreSQL maître.
 
 ~~~console
 # pcs -f pgsqld.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
@@ -2907,21 +2926,65 @@ Enfin, pousser la configuration vers la cib :
 # pcs cluster cib-push pgsqld.xml
 ~~~
 
-Observer l'état du cluster avec `pcs status`
+Observer l'état du cluster avec `pcs status`.
 
-FIXME: Découverte des scores ? Est ce que cela réponds a la question ??
+Observer le score des ressources `master-pgsqld` dans le cluster, tel que
+positionné par PAF:
 
-Afficher le score des ressources calculé par le cluster:
+~~~console
+# crm_mon -DnA1
+# pcs node attribute
+~~~
+
+Le score des ressources est mis à jour si nécessaire lors de l'exécution de
+l'action `monitor` de PAF. Cette action est planifiée à intervalle régulier par
+`LRMd`. L'intervalle est spécifié dans la configuration de la ressource. Il
+peut donc être nécessaire d'attendre après une action comme une bascule avant
+que le `monitor` ne passe et les scores soient mis à jour.
+
+Les scores positionnés par l'agent sont de:
+
+* `1001` pour l'instance promue
+* un score décroissant à partir de `1000` avec un pas de `10` pour les
+  instances standby
+* le score des instance standby est décroissant par ordre alphabétique.
+
+Observer désormais les scores tel que calculés par le cluster:
 
 ~~~console
 # crm_simulate -sL | grep "promotion score"
+pgsqld:0 promotion score on srv1: 1003
+pgsqld:1 promotion score on srv2: 1000
+pgsqld:2 promotion score on srv3: 990
+
 ~~~
 
-Le score des ressources est mis à jour à chaque exécution de l'action `monitor`
-de PAF. Cette action est planifiée à interval régulier par `LRMd`. L'interval
-est spécifié dans la configuraiton de la ressource. Il peut donc être
-nécessaire d'attendre après une action comme une bascule avant que le `monitor`
-ne passe et les scores soient mis à jour.
+Ces scores tiennent compte de tous les scores existants dans la configuration:
+stickiness, score de localisation ou de colocation, etc. Attention, les
+stickiness peuvent s'accumuler ! Effectivement, ils s'appliquent aux
+ressources, mais aussi aux groupes qui contiennent des ressources ou aux
+ressources gérant clone promu.
+
+Si nous prenons l'exemple du clone `pgsqld:0` de la ressource `pgsqld`, ce
+dernier a un promotion score de `1003` sur `srv1`. Ce score est la somme de:
+
+* `pgsqld:0 allocation score on srv1: 1002`: master score de `1001` + stickiness de `1`
+* `pgsqld-ha allocation score on srv1: 1`: stickiness du rôle master au sein
+  de `pgsqld-ha`
+
+La ressource `pgsqld` étant un des clones de la ressource `pgsqld-ha`, le
+rôle `master` de cette dernière hérite aussi du score de stickiness de sa
+ressource parent.
+
+Concernant les scores `-INFINITY`, nous devinons bien ici comment ils sont
+distribués:
+
+1. le premier clone `pgsqld:0` pouvait démarrer n'importe où.
+2. une fois `pgsqld:0` démarré sur `srv1`, les clones ne pouvant coexister sur
+   le même nœud, `pgsqld:1` a un score `-INFINITY` sur `srv1`, mais peu
+   démarrer sur n'importe lequel des deux autres nœuds
+3. `pgsqld:2` a un score de `-INFINITY` sur `srv1` et `srv2` à cause de la
+   présence des deux autres clones. Il ne peut démarrer que sur `srv3`.
 
 :::
 
