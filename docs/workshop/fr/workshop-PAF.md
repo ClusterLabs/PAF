@@ -1279,6 +1279,7 @@ agents de fencing (_FA_).
 * script permettant de traduire les instructions du _fencer_ vers l'outil de fencing
 * doit assurer que le nœud cible est bien complètement isolé du cluster
 * doit renvoyer des codes retours définis dans l'API des _FA_ en fonction des résultats
+* dix actions disponibles dans l'API, toutes ne sont pas obligatoires
 
 ::: notes
 
@@ -1291,6 +1292,20 @@ empêche toute bascule.
 
 Il est conseillé de chaîner plusieurs _FA_ si la méthode de fencing présente
 un _SPoF_: IPMI, rack d'alimentation, switch réseau ou SAN, ...
+
+Voici les actions disponibles de l'API des FA:
+
+* `off`: implémentation obligatoire. Permet d'isoler la ressource ou le serveur
+* `on`: libère la ressource ou démarre le serveur
+* `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon exécute les actions off et on.
+* `status`: permet de vérifier la disponibilité de l'agent de fencing et le statu du dispositif concerné: on ou off
+* `monitor`: permet de vérifier la disponibilité de l'agent de fencing
+* `list`: permet de vérifier la disponibilité de l'agent de fencing et de lister l'ensemble des dispositifs que l'agent
+  est capable d'isoler (cas d'un hyperviseur, d'un PDU, etc)
+* `list-status`: comme l'action `list`, mais ajoute le statut de chaque dispositif
+* `validate-all`: valide la configuration de la ressource
+* `meta-data`: présente les capacités de l'agent au cluster
+* `manpage`: nom de la page de manuelle de l'agent de fencing
 
 :::
 
@@ -1841,31 +1856,50 @@ pcs property list --defaults |grep -E "resource-stickiness"
 
 -----
 
-## Actions des _FA_
+## Configuration du fencing
 
-* dix actions disponibles dans l'API, toutes ne sont pas obligatoires
-* les _FA_ peuvent isoler un seul nœud ou plusieurs en fonction de la méthode
-* tous les _FA_ ont un ensemble de paramètres en commun, plus des paramètres qui leurs sont propres
+* les _FA_ sont gérés comme des ressources classiques
+* les _FA_ ont un certain nombre de paramètres en commun: `pcmk_*`
+* les autres paramètres sont propres à chaque _FA_, eg. `port`, `identity_file`, `username`, ...
+* chaque _FA_ configuré peut être appelé de n'importe quel nœud
 
 ::: notes
 
-FIXME : Est-ce qu'il faut toutes les lister? Source <https://github.com/ClusterLabs/fence-agents/blob/master/fence/agents/lib/fencing.py.py#L1494>
+Pour chaque agent de fencing configuré, un certain nombre de méta attributs
+définissent les capacités de l'agent auprès du cluster. Quelque exemples
+notables:
 
-Voici les actions disponibles de l'API des FA:
+* `pcmk_reboot_action`: détermine quelle action exécuter pour isoler un nœud.
+  Par exemple `reboot` ou `off`. L'action indiquée dépend de ce que supporte
+  l'agent
+* `pcmk_host_check`: détermine si l'agent doit interroger l'équipement pour
+  établir la liste des nœuds qu'il peut isoler, ou s'il doit se reposer sur
+  le paramètre `pcmk_host_list`
+* `pcmk_host_list`: liste des nœuds que peut isoler l'agent de fencing
+* `pcmk_delay_base`: temps d'attente minimum avant de lancer l'action de
+  fencing. Pratique dans les cluster à deux nœuds pour privilégier un des
+  nœuds
 
-* `off`: implémentation obligatoire. Permet d'isoler la ressource ou le serveur
-* `on`: libère la ressource ou démarre le serveur
-* `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon exécute les actions off et on.
-* `status`: permet de vérifier la disponibilité de l'agent de fencing et le statu du dispositif concerné: on ou off
-* `monitor`: permet de vérifier la disponibilité de l'agent de fencing
-* `list`: permet de vérifier la disponibilité de l'agent de fencing et de lister l'ensemble des dispositifs que l'agent
-  est capable d'isoler (cas d'un hyperviseur, d'un PDU, etc)
-* `list-status`: comme l'action `list`, mais ajoute le statut de chaque dispositif
-* `validate-all`: valide la configuration de la ressource
-* `meta-data`: présente les capacités de l'agent au cluster
-* `manpage`: nom de la page de manuelle de l'agent de fencing
+Vous trouverez la liste complète à l'adresse suivante:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_special_options_for_fencing_resources.html>
 
-FIXME: paramétrage coté cluster
+Tous les paramètres ne débutants pas par `pcmk_*` sont propres à chaque
+_fencing agent_. Dans le cadre de notre workshop, nous utiliserons l'agent
+`fence_virsh` qui nécessite des paramètres de connexion SSH ainsi que le nom
+de la machine virtuelle à interrompre.
+
+Une fois paramétrés, Pacemaker s'assure que les _FA_ restent disponibles en
+exécutant à intervalle régulier l'action `monitor`, positionnée par défaut
+à une minute. À cause de cette action récurrente, les _FA_ apparaissent au
+sein du cluster au même titre que les autres ressources. Mais notez qu'une
+ressource de fencing ne démarre pas sur les nœud du cluster, ces équipement
+sont actifs _ailleurs_ dans votre architecture.
+
+Lorsqu'une action de fencing commandée par Pacemaker, celle-ci sera déclenchée
+en priorité depuis le nœud d'où la ressource est supervisée. Si le nœud ou
+la ressource de fencing sont devenus indisponibles depuis la dernière action de
+monitor, n'importe quel autre nœud du cluster peut être utilisé pour
+exécuter la commande.
 
 :::
 
@@ -1873,11 +1907,11 @@ FIXME: paramétrage coté cluster
 
 ### TP: Fencing Agent
 
-Nous allons créer les ressources de fencing au sein de notre cluster.
+Nous créons dans ce TP les ressources de fencing au sein de notre cluster.
 
 ::: notes
 
-Par défaut le cluster refuse de prendre en charge des ressources en HA sans
+Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
 fencing configuré.
 
 ~~~console
@@ -1899,8 +1933,14 @@ chacune responsable d'isoler un nœud.
 
 Concernant la configuration de l'agent:
 
-* `port`: nom de la VM à isoler dans libvirt
+* `ipaddr`: adresse de l'hyperviseur sur lequel se connecter en SSH
 * `login`: utilisateur SSH pour se connecter à l'hyperviseur
+* `identity_file`: chemin vers la clé privée SSH à utiliser pour l'authentification
+* `login_timeout`: timeout du login SSH
+* `port`: nom de la VM à isoler dans libvirtd
+* les autres paramètres sont décrits dans le slide précédent
+* bien s'assurer que chaque nœud peut se connecter en SSH sans mot de passe à
+  l'hyperviseur
 
 ~~~console
 # pcs stonith create fence_vm_hanode1 fence_virsh pcmk_host_check="static-list" \
@@ -1922,19 +1962,22 @@ identity_file="/root/.ssh/id_rsa" login_timeout=15
 # pcs status
 ~~~
 
-L'outil `stonith-admin` permet d'interagir avec le daemon `STONITd`, notamment:
+L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
 
 * `stonith_admin -V --list-registered` : liste les agents configurés
 * `stonith_admin -V --list-installed` : liste tous les agents disponibles
 * `stonith_admin -V -l <nœud>` : liste les agents contrôlant le nœud spécifié.
 * `stonith_admin -V -Q <nœud>` : contrôle l'état d'un nœud.
-  
-  ~~~
-  lrmd:    debug: log_execute:        executing - rsc:fence_vm_paf1 action:monitor call_id:36
-  lrmd:    debug: log_finished:       finished - rsc:fence_vm_paf1 action:monitor call_id:36  exit-code:0 exec-time:1248ms queue-time:0ms
-  ~~~
 
-Trouver le status de chaque nœud ?
+Une fois les agents configuré, le debug dans log présente régulièrement
+l'activité de surveillance de ceux-ci. Par exemple:
+
+~~~
+lrmd:    debug: log_execute:        executing - rsc:fence_vm_hanode1 action:monitor call_id:36
+lrmd:    debug: log_finished:       finished - rsc:fence_vm_hanode1 action:monitor call_id:36  exit-code:0 exec-time:1248ms queue-time:0ms
+~~~
+
+Maintenant que les _FA_ ont été créés, observer où ils sont _démarré_:
 
 ~~~
 pcs status
@@ -1953,20 +1996,22 @@ pcs stonith show --full
 ## Contraintes de localisation
 
 * score de préférence d'une ressource pour un nœud
+* peut définir une exclusion si le score est négatif
 * `stickiness` : score de maintien en place d'une ressource sur son nœud
   actuel
+* éviter d'exclure un agent de fencing de son propre nœud définitivement
 
 ::: notes
 
 Les contraintes de localisation ont pour fonction d'aider pacemaker à savoir où
-démarrer les ressources.
-
-Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le
-même score alors pacemaker choisi aléatoirement parmi les nœuds candidats.
+démarrer les ressources. Si pacemaker n'a pas d'instruction ou si les
+contraintes de localisation ont le même score alors pacemaker choisi
+aléatoirement parmi les nœuds candidats.
 
 Si un nœud est sorti momentanément du cluster, ses ressources peuvent être
 déplacées vers d'autres nœuds. Lors de sa réintroduction, les contraintes de
-localisation définies peuvent provoquer une nouvelle bascule des ressources.
+localisation définies peuvent provoquer une nouvelle bascule des ressources si
+les scores y sont supérieurs ou égaux à ceux présents sur les autres nœuds.
 
 La plus part du temps, il est préférable d'éviter de déplacer des ressources
 qui fonctionnent correctement. C'est particulièrement vrai pour les base de
@@ -1976,9 +2021,17 @@ Le paramètre `stickiness` permet d'indiquer à pacemaker à quel point une
 ressource en bonne santé préfère rester où elle se trouve. Pour cela la valeur
 du paramètre `stickiness` est additionnée au score de la ressource sur le nœud
 courant et comparé aux scores sur les autres nœuds pour déterminer le nœud
-"idéal".
+"idéal". Ce paramètre peut être défini globalement ou par ressource.
 
-Ce paramètre peut être défini globalement ou par ressource.
+Les scores de localisation sont aussi utilisés pour positionner les ressources
+de fencing. Vous pouvez les empêcher d'être exécutée depuis un nœud en
+utilisant un score d'exclusion de `-INFINITY`. Cette ressource ne sera alors ni
+supervisée, ni exécutée depuis ce nœud. Une telle configuration est souvent
+utilisée pour empêcher une ressource de fencing d'être priorisée ou déclenchée
+depuis le nœud qu'elle doit isoler. Néanmoins, il n'est pas recommandé
+d'empêcher ce comporter à tout prix. Un score négatif reste une bonne
+pratique, mais il est préférable d'autoriser le fencing d'un nœud depuis lui
+même, en dernier recours.
 
 :::
 
@@ -1990,12 +2043,6 @@ Définition des contraintes sur les ressources de fencing
 
 ::: notes
 
-Quel serait le risque si un nœud est responsable de sa propre ressource de
-fencing? FIXME: aucun ? En fait, les resources de fencing seraient déclenchable de
-n'importe où. Elle ne sont prise en compte comme des ressources que pour
-valider leur bonne disponibilité. Ça n'influerait pas sur l'emplacement
-depuis lequel un fencer serait déclenché ?
-
 Afficher la configuration et noter quel nœud est responsable de chaque
 ressource de fencing.
 
@@ -2004,18 +2051,20 @@ dont il est responsable.
 
 Observer les changements par rapport à l'état précédent.
 
-
 ~~~console
-# pcs constraint location fence_vm_hanode1 avoids hanode1=INFINITY
-# pcs constraint location fence_vm_hanode2 avoids hanode2=INFINITY
-# pcs constraint location fence_vm_hanode3 avoids hanode3=INFINITY
+# pcs constraint location fence_vm_hanode1 avoids hanode1=100
+# pcs constraint location fence_vm_hanode2 avoids hanode2=100
+# pcs constraint location fence_vm_hanode3 avoids hanode3=100
 ~~~
 
-Vérifier l'état du cluster
+Vérifier l'état du cluster:
 
 ~~~console
 # crm_verify -VL
 # pcs status
+# pcs constraint location show
+# pcs constraint location show nodes
+# pcs constraint location show resources fence_vm_hanode1
 ~~~
 
 :::
