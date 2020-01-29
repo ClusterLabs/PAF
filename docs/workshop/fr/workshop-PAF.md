@@ -1102,6 +1102,7 @@ FIXME diagram
 * décide de l'état idéal du cluster
 * génère un graphe de transition pour atteindre cet état
 * renommé `Scheduler` depuis la version 2.0
+* peut être consulté grâce à la commande `crm_simulate`
 
 ![Diagramme Scheduler - calcul graphe de transition](medias/pcmk_pengine.png)
 
@@ -1163,6 +1164,11 @@ Dans cet exemple:
 * les actions 26, 28 à 30 démarrent un groupe de ressource dépendant de la ressource
   drbd
 
+Enfin, il est possible de consulter les transitions proposées par le PEngine
+grâce à la commande `crm_simulate`. Cette commande est aussi parfois utile
+pour en extraire des informations disponibles nulles par ailleurs, comme les
+[scores de localisation][Contraintes de localisation].
+
 :::
 
 -----
@@ -1182,6 +1188,7 @@ FIXME diagram
 * sur quels nœuds est lancé le processus `pengine` ?
 * où se trouvent les logs ?
 * quelles différences observer entre les différents nœuds (identifier le DC) ?
+* quelle est la vision de PEngine sur le cluster ? `crm_simulate -L`
 
 :::
 
@@ -1543,8 +1550,9 @@ où démarrer les ressources.
 
 Configuré à `true` (defaut), le cluster est dit symétrique. Les ressources
 peuvent être démarrées sur n'importe quel nœud. Le choix se fait par ordre
-décroissant des valeurs des contraintes de localisation. Une contrainte de
-localisation négative empêchera la ressource de démarrer sur un nœud.
+décroissant des valeurs des [contraintes de localisation][Scores etlocalisation].
+Une contrainte de localisation négative empêchera la ressource de démarrer
+sur un nœud.
 
 Configuré à `false`, le cluster est dit asymétrique. Les ressources ne peuvent
 démarrer nulle part. La définition des contraintes de localisation doit définir
@@ -1735,44 +1743,6 @@ positionner un _maser score_.
 
 -----
 
-## Score d'une ressource
-
-* pondération interne d'une ressource sur un nœud
-* une valeur négative empêche toujours de lancer la ressource sur le nœud
-* gestion de `INFINITY`
-  * `Any value + INFINITY = INFINITY`
-  * `Any value - INFINITY = -INFINITY`
-  * `INFINITY - INFINITY = -INFINITY`
-  * `1000000 = INFINITY`
-
-::: notes
-
-Pacemaker se base sur la configuration et les scores des ressources pour
-calculer l'état idéal du cluster. Le cluster choisi le nœud où une ressource à
-le score le plus haut pour l'y placer. Un score négatif empêche le
-placement d'une ressource sur un nœud. Les scores `+INFINITY` et `-INFINITY`
-permettent de forcer une ressource à rejoindre ou quitter un nœud de manière
-inconditionnelle.
-
-Les scores peuvent être positionné dans la configuration comme:
-
-* [contraintes de localisation][Contraintes de localisation] ;
-* attributs:
-  * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
-    ressources ;
-  * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
-
-Ils sont aussi être manipulés tout au long de la vie du cluster. Eg.:
-
-* [bascule][Détail d'un switchover] effectuée par l'administrateur :
-  * ban : place un score `-INFINITY` sur le nœud courant ;
-  * move : place un score `+INFINITY` sur le nœud cible ;
-* les ressources agents pour désigner l'instance primaire.
-
-:::
-
------
-
 ## Méta-attributs des ressources
 
 * un ensemble de _meta-attributes_ s'appliquent à n'importe quelle ressource:
@@ -1789,8 +1759,9 @@ Ils sont aussi être manipulés tout au long de la vie du cluster. Eg.:
 ::: notes
 
 Les _meta-attributes_ est un ensemble d'attributs commun à n'importe quelle
-type de ressource. Il est possible de leur créer une valeur par défaut qui
-sera appliquée automatiquement à toute ressource présente dans le cluster.
+type de ressource. Ils se positionnent ressource par ressource. Il est possible
+de leur créer une valeur par défaut qui sera appliquée automatiquement à toute
+ressource présente dans le cluster.
 
 Par exemple avec `pcs`:
 
@@ -1807,7 +1778,8 @@ crm_attribute --type rsc_defaults --name <nom_attribut> --update valeur
 La valeur d'un méta attribut positionné au niveau de la ressource elle même
 surcharge la valeur par défaut positionné précédemment.
 
-La liste complète des méta-attributs est disponible à cette adresse:
+La liste complète des méta-attributs et leur valeur par défaut est disponible à
+cette adresse:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-options.html#_resource_meta_attributes>
 
 :::
@@ -1818,25 +1790,22 @@ La liste complète des méta-attributs est disponible à cette adresse:
 
 ::: notes
 
-Afficher et modifier la valeur du paramétrage par défaut des ressources suivantes :
-
-* `migration-threshold: 3`
-* `resource-stickiness: 1`
+Quelle est la valeur par défaut du paramètre `migration-threshold` ?
+ 
+Positionner sa valeur à trois:
 
 ~~~console
 # pcs resource defaults
 No defaults set
 # pcs resource defaults migration-threshold=3
-# pcs resource defaults resource-stickiness=1
 # pcs resource defaults
 migration-threshold: 3
-resource-stickiness: 1
 ~~~
 
 Pour supprimer une valeur par defaut:
 
 ~~~console
-# pcs resource defaults resource-stickiness=
+# pcs resource defaults is-managed=
 Warning: Defaults do not apply to resources which override them with their own defined values
 ~~~
 
@@ -1993,35 +1962,70 @@ pcs stonith show --full
 
 -----
 
-## Contraintes de localisation
+-----
 
-* score de préférence d'une ressource pour un nœud
+## Scores et localisation
+
+* pondération interne d'une ressource sur un nœud
 * peut définir une exclusion si le score est négatif
 * `stickiness` : score de maintien en place d'une ressource sur son nœud
   actuel
 * éviter d'exclure un agent de fencing de son propre nœud définitivement
+* scores accessibles grâce à `crm_simulate`
 
 ::: notes
 
-Les contraintes de localisation ont pour fonction d'aider pacemaker à savoir où
-démarrer les ressources. Si pacemaker n'a pas d'instruction ou si les
-contraintes de localisation ont le même score alors pacemaker choisi
-aléatoirement parmi les nœuds candidats.
+Pacemaker se base sur la configuration et les scores des ressources pour
+calculer l'état idéal du cluster. Le cluster choisi le nœud où une ressource à
+le score le plus haut pour l'y placer.
 
-Si un nœud est sorti momentanément du cluster, ses ressources peuvent être
+Les scores peuvent être positionnés comme:
+
+* contraintes de localisation ;
+* [contraintes de colocation][Contraintes de colocation] ;
+* attributs:
+  * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
+    ressources ;
+  * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
+
+Ils sont aussi être manipulés tout au long de la vie du cluster. Eg.:
+
+* [bascule][Détail d'un switchover] effectuée par l'administrateur :
+  * ban : place un score de localisation de `-INFINITY` sur le nœud courant ;
+  * move : place un score de localisation de `+INFINITY` sur le nœud cible ;
+* les ressources agents pour désigner l'instance primaire grâce à un score de
+  localisation du rôle `master`.
+
+Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le
+même score alors pacemaker tente de répartir équitablement les ressources parmi
+les nœuds candidats. Ce comportement peut placer vos ressource de façon plus ou
+moins aléatoire. Un score négatif empêche le placement d'une ressource sur un nœud.
+
+Les scores `+INFINITY` et `-INFINITY` permettent de forcer une ressource à
+rejoindre ou quitter un nœud de manière inconditionnelle. Voici l'arithmétique
+utilisée avec `INFINITY`:
+
+~~~
+INFINITY =< 1000000
+Any value + INFINITY = INFINITY
+Any value - INFINITY = -INFINITY
+INFINITY - INFINITY = -INFINITY
+~~~
+
+Si un nœud est sorti momentanément du cluster, par défaut ses ressources sont
 déplacées vers d'autres nœuds. Lors de sa réintroduction, les contraintes de
 localisation définies peuvent provoquer une nouvelle bascule des ressources si
-les scores y sont supérieurs ou égaux à ceux présents sur les autres nœuds.
-
-La plus part du temps, il est préférable d'éviter de déplacer des ressources
-qui fonctionnent correctement. C'est particulièrement vrai pour les base de
-données dont le temps de bascule peut prendre plusieurs secondes.
+les scores y sont supérieurs ou égaux à ceux présents sur les autres nœuds. La
+plus part du temps, il est préférable d'éviter de déplacer des ressources qui
+fonctionnent correctement. C'est particulièrement vrai pour les base de données
+dont le temps de bascule peut prendre plusieurs secondes.
 
 Le paramètre `stickiness` permet d'indiquer à pacemaker à quel point une
 ressource en bonne santé préfère rester où elle se trouve. Pour cela la valeur
-du paramètre `stickiness` est additionnée au score de la ressource sur le nœud
-courant et comparé aux scores sur les autres nœuds pour déterminer le nœud
-"idéal". Ce paramètre peut être défini globalement ou par ressource.
+du paramètre `stickiness` est additionnée au score de localisation de la
+ressource sur le nœud courant et comparé aux scores sur les autres nœuds pour
+déterminer le nœud "idéal". Ce paramètre peut être défini globalement ou par
+ressource.
 
 Les scores de localisation sont aussi utilisés pour positionner les ressources
 de fencing. Vous pouvez les empêcher d'être exécutée depuis un nœud en
@@ -2033,6 +2037,7 @@ d'empêcher ce comporter à tout prix. Un score négatif reste une bonne
 pratique, mais il est préférable d'autoriser le fencing d'un nœud depuis lui
 même, en dernier recours.
 
+Enfin, les scores sont consultables grâce à l'outil `crm_simulate`.
 :::
 
 -----
@@ -2046,21 +2051,42 @@ Définition des contraintes sur les ressources de fencing
 Afficher la configuration et noter quel nœud est responsable de chaque
 ressource de fencing.
 
-Ajouter des contraintes d'exclusion pour que chaque stonith évite le nœud
-dont il est responsable.
+Quels sont les scores au sein du cluster?
 
-Observer les changements par rapport à l'état précédent.
+~~~console
+# crm_simulate -sL
+~~~
+
+Ajouter une valeur de `1` au stickiness de toutes les ressources:
+
+~~~console
+# pcs resource defaults resource-stickiness=1
+~~~
+
+Comparer l'évolution des scores.
+
+Ajouter des contraintes d'exclusion pour que chaque stonith évite le nœud dont
+il est responsable. Utiliser un poids de 100 pour ces contraintes. Observer les
+changements de placement et de score par rapport à l'état précédent.
 
 ~~~console
 # pcs constraint location fence_vm_hanode1 avoids hanode1=100
-# pcs constraint location fence_vm_hanode2 avoids hanode2=100
+# pcs constraint location fence_vm_hanode2 prefers hanode2=-100
 # pcs constraint location fence_vm_hanode3 avoids hanode3=100
 ~~~
 
-Vérifier l'état du cluster:
+Notez que les deux syntaxes proposées sont équivalentes du poitn de vue du
+résultat dans la CIB.
+
+~~~
+cibadmin -Q --xpath='//rsc_location'
+~~~
+
+Vérifier l'état du cluster et les nouveaux scores:
 
 ~~~console
 # crm_verify -VL
+# crm_simulate -sL
 # pcs status
 # pcs constraint location show
 # pcs constraint location show nodes
@@ -3063,7 +3089,7 @@ Identifier dans les logs le "push" de la CIB ("cib_process_request")
 cib_process_replace:  Replaced 0.85.23 with 0.91.0 from hanode1
 ~~~
 
-Identifier le DC et les actions du pgengine :
+Identifier le DC et les actions du pengine :
 
 * Décide du monitor des ressources => identifier les actions du lrmd de chaque nœud
 * Observer le comportement de PAF et lire le diagramme de monitor en //
