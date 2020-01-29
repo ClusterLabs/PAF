@@ -1381,15 +1381,13 @@ reviendra vers le `CRMd` que si le code retour de l'action varie.
 
 ### _Ressource Agent_ (_RA_)
 
-* exécutable permettant de traduire les instructions du `LRMd` vers la
-  ressource
-* doit renvoyer des codes retours bien définis en fonction du statut de sa
-  ressource
-* plusieurs types de _ressource agent_ supportés
-* la spécification "OCF" est l'API la plus poussée et complète pour écrire
-  un _RA_
-* l'API OCF permet de présenter au `CRMd` les actions supportées par
-  l'agent.
+* applique les instructions du `LRMd` une ressource sous-jacente
+* renvoie des codes retours stricts reflétant le statut de sa ressource
+* plusieurs types/API de _ressource agent_ supportés
+* la spécification "OCF" la plus complète
+* l'API OCF présente au `CRMd` les actions supportées par l'agent
+* `action` et `operation` sont deux termes synonymes
+* chaque opérations a un timeout propre et éventuellement une récurrence
 
 ::: notes
 
@@ -1402,13 +1400,53 @@ Il est possible d'utiliser plusieurs types de _RA_ différents au sein d'un mêm
 Vous trouverez la liste des types supportés à l'adresse suivante:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-supported.html>
 
-Les agents systemd ou sysV sont souvent limités aux seules actions `start`,
-`stop`, `monitor`.
+Dans les spécifications du type OCF, un agent a le choix parmi dix codes retours
+différents pour communiquer l'état de son opération à `LRMd`:
 
-Les _RA_ implémentant les actions `promote` et `demote` pilotent des ressources
-"multistate": une ressource est alors clonée sur autant de nœuds que demandé,
-démarrée en tant que slave, puis le cluster promeut en master un ou plusieurs
-slaves.
+* `OCF_SUCCESS` (0)
+* `OCF_ERR_GENERIC` (1)
+* `OCF_ERR_ARGS` (2)
+* `OCF_ERR_UNIMPLEMENTED` (3)
+* `OCF_ERR_PERM` (4)
+* `OCF_ERR_INSTALLED` (5)
+* `OCF_ERR_CONFIGURED` (6)
+* `OCF_NOT_RUNNING` (7)
+* `OCF_RUNNING_MASTER` (8)
+* `OCF_FAILED_MASTER` (9)
+
+Voici les opérations disponibles aux agents implémentant la specification OCF:
+
+* `start`: démarre la ressource
+* `stop`: arrête la ressource
+* `monitor`: vérifie l'état de la ressource
+* `validate-all`: valide la configuration de la ressource
+* `meta-data`: présente les capacités de l'agent au cluster
+* `promote`: promote la ressource slave en master
+* `demote`: démote la ressource master en slave
+* `migrate_to`: actions à réaliser pour déplacer une ressource vers un autre nœud
+* `migrate_from`: actions à réaliser pour déplacer une ressource vers le nœud local
+* `notify`: action à exécuter lorsque le cluster notifie l'agent des actions
+  le concernant au sein du cluster
+
+L'opération `meta-data` permet à l'agent de documenter ses paramètres et
+d'exposer ses capacités au cluster qui adapte donc ses décisions en fonction
+des actions possibles. Par exemple, si les actions `migrate_*` ne sont pas
+disponibles, le cluster utilisera les action `stop` et `start` pour déplacer
+une ressource.
+
+Les agents systemd ou sysV sont limités aux seules actions `start`, `stop`,
+`monitor`. Dans ces deux cas, les codes retours sont interprété par `LRMd`
+comme étant ceux définis par la spécification LSB:
+<http://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html>
+
+Un ressource peut gérer un service seul (eg. une vIP) au sein du cluster, un
+ensemble de service cloné (eg. Nginx) ou un ensemble de clone "multistate"
+pour lesquels un statut `master` et `slave` est géré par le cluster et le _RA_.
+
+Les _RA_ qui pilotent des ressources "multistate" implémentent obligatoirement
+les actions `promote` et `demote` : une ressource est clonée sur autant de
+nœuds que demandé, démarrée en tant que slave, puis le cluster promeut un ou
+plusieurs `master` parmi les `slave`.
 
 Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
 `migrate_to` et `migrate_from` qui ne sont disponibles qu'aux _RA_ non
@@ -1434,7 +1472,7 @@ Il est possible de lister les RA installés avec la commande suivante: `pcs reso
 agents`.
 
 Chaque agent embarque sa propre documentation qui est accessible à l'aide de la commande
-`pcs resource describe <agent>`.
+`pcs resource describe <resource agent>`.
 
 Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de PAF. Vous
 pouvez lister l'ensemble de ses options grâce à la commande `pcs resource describe
@@ -1964,7 +2002,7 @@ pcs stonith show --full
 
 -----
 
-## Scores et localisation
+## Scores et contrainte localisation
 
 * pondération interne d'une ressource sur un nœud
 * peut définir une exclusion si le score est négatif
@@ -2097,122 +2135,110 @@ Vérifier l'état du cluster et les nouveaux scores:
 
 -----
 
-## Types de ressources
+## Création d'une ressource
 
-* _single resource_
-* _clone resource_
-* _multistate resource_
-
-::: notes
-
-_Single resource_: la ressource ne peut être active qu'à un seul emplacement
-sur le cluster. Par exemple, une adresse IP.
-
-_Clone resource_: la ressource peut avoir plusieurs instances actives, sur des
-nœuds différents ("anonymous clone") ou sur un même nœud ("globally unique
-clone").
-
-_Multistate resource_ : la ressource peut avoir plusieurs instances actives, avec
-un état particulier _promoted_ (ou master sur les anciennes versions ) sur un
-nœud ou plus.
-
-:::
-
------
-
-## mécanique des _RA_ (OCF)
-
-* dix opérations définies dans l'API
-* toutes ne sont pas obligatoires
-* le code retour de l'agent informe le cluster sur le statut de la ressource manipulée
-* `action` et `operation` sont deux termes synonymes
+* nécessite:
+  * un identifiant
+  * le type/fournisseur/_RA_ à utiliser
+* et éventuellement:
+  * les paramètres propres à l'agent
+  * le paramétrage de [méta-attributs][Méta-attributs des ressources]
+  * une configuration propre à chaque opérations
+* détails sur les timeouts
 
 ::: notes
 
-Dans les spécifications OCF, un agent a le choix parmi dix codes retours
-différents pour définir l'état de sa ressource:
+Chaque ressource créée au sein du cluster doit avoir un identifiant unique à
+de votre choix.
 
-* `OCF_SUCCESS` (0)
-* `OCF_ERR_GENERIC` (1)
-* `OCF_ERR_ARGS` (2)
-* `OCF_ERR_UNIMPLEMENTED` (3)
-* `OCF_ERR_PERM` (4)
-* `OCF_ERR_INSTALLED` (5)
-* `OCF_ERR_CONFIGURED` (6)
-* `OCF_NOT_RUNNING` (7)
-* `OCF_RUNNING_MASTER` (8)
-* `OCF_FAILED_MASTER` (9)
+Vous devez ensuite indiquer le _resource agent_ adapté à la ressource que vous
+souhaitez intégrer dans votre cluster. Ce dernier est indiqué dans le format
+`type:nom` ou `type:fournisseur:nom`, par exemple: `systemd:pgbouncer`
+ou `ocf:heartbeat:Dummy`. La liste complète est disponible grâce à la commande
+`pcs resource list`.
 
-Voici les opérations disponibles aux RA implémentant la spec OCF:
+Voici un exemple simple de création d'une ressource avec `pcs`:
 
-* `start`: démarre la ressource
-* `stop`: arrête la ressource
-* `monitor`: vérifie l'état de la ressource
-* `validate-all`: valide la configuration de la ressource
-* `meta-data`: présente les capacités de l'agent au cluster
-* `promote`: promote la ressource slave en master
-* `demote`: démote la ressource master en slave
-* `migrate_to`: actions à réaliser pour déplacer une ressource vers un autre nœud
-* `migrate_from`: actions à réaliser pour déplacer une ressource vers le nœud local
-* `notify`: action à exécuter lorsque le cluster notifie l'agent des actions
-  le concernant au sein du cluster
+~~~console
+# pcs resource create identifiant_resource type:fournisseur:nom
+~~~
 
-En terme de configuration, chaque opération peut avoir son propre délais
-d'exécution (`timeout`), avoir une éventuelle récurrence d'exécution
-(`interval`), etc.
+Ensuite Chaque _resource agent_ peut avoir des paramètres de configuration
+propre à sa ressource, un nom d'utilisateur par exemple. Avec `pcs`, ces
+paramètres sont à préciser librement à la suite de la commande de base, par
+exemple:
 
-:::
+~~~console
+# pcs resource create identifiant_resource type:fournisseur:nom \
+    user=nom_user_resource
+~~~
 
------
+Pour rappel, la liste des paramètres supportés par un _resource agent_ est
+disponible grâce à la commande suivante:
 
-## Timeout des actions d'une ressource
+~~~console
+# pcs resource describe <agent>
+~~~
 
-* timeout par défaut des actions de 20 secondes
-* cette valeur par défaut peut être modifiée
-* peut être surchargé action par action à la création de la ressource
-* les valeurs par défaut exposées par les _resource agents_ sont des valeurs
-  recommandées, elles ne sont pas appliquées automatiquement
-* le _local executor_ s'assure du respect des timeout. Ils ne doivent
-  __pas__ être gérés par le _RA_ 
+Comme détaillé dans le chapitre [Méta-attributs des ressources][], les
+ressources ont en commun un certain nombre de méta-attributs qui peuvent être
+modifiés pour chaque ressource. La commande `pcs` utilise le mot clé `meta`
+pour les distinguer sur la ligne de commande des autres paramètres. Par
+exemple, nous pouvons positionner `migration-threshold=1` sur une ressource
+afin qu'elle soit migrée sur un autre nœud dès la première erreur:
 
-::: notes
+~~~console
+# pcs resource create identifiant_resource type:fournisseur:nom \
+    user=nom_user_resource                                      \
+    meta migration-threshold=1
+~~~
 
-Chaque action (opérations `start`, `stop`, `monitor`, etc) demandée par le
-_controller_ et exécutée par le _local executor_ possède un timeout imposé. Par
-défaut, ce dernier est de 20 secondes.
+Enfin, un certain nombre de paramètres peuvent être modifiés pour chaque
+opération supportée par le _RA_. Les plus fréquents sont `timeout`et
+`interval`. Vous trouverez la liste complète à l'adresse suivante:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_resource_operations.html#idm47160757240816>
 
-Cette valeur par défaut peut être modifiée dans la section `op_defaults` de
-la CIB, avec l'une ou l'autre de ces commandes:
+Concernant le timeout par exemple, ce dernier est de 20 secondes par défaut
+pour toutes les opérations. Cette valeur par défaut peut être modifiée dans la
+section `op_defaults` de la CIB, avec l'une ou l'autre de ces commandes:
 
 ~~~
 crm_attribute --type op_defaults --name timeout --update 20s
 pcs resource op defaults timeout=20s
 ~~~
 
-Il est possible de préciser le timeout pour chaque action définie pour chaque
-ressource de votre cluster, ce dernier surcharge alors la valeur par défaut.
-Préciser les timeouts de chaque action lors de la définition d'une ressource
-est recommandé même s'ils sont identiques à la valeur par défaut. Cette
-pratique aide à la compréhension rapide de la configuration d'un cluster.
+Avec la commande `pcs` nous utilisons le mot clé `op <action>` pour définir
+le paramétrage des différentes opérations. Le paramétrage pour ces actions
+surcharge alors les valeurs par défaut. Voici un exemple:
 
-La création d'une ressource et de son paramétrage est abordé en TP.
+~~~
+# pcs resource create identifiant_resource type:fournisseur:nom \
+    user=nom_user_resource                                      \
+    meta migration-threshold=1                                  \
+    op start timeout=60s
+    op monitor timeout=10s interval=10s
+~~~
+
+__ATTENTION__: les valeurs par défaut exposées par les _RA_ sont des valeurs
+__recommandées__. Elles ne sont pas appliquées automatiquement. Préciser les
+timeouts de chaque action lors de la définition d'une ressource est recommandé
+même s'ils sont identiques à la valeur par défaut. Cette pratique aide à la
+compréhension rapide de la configuration d'un cluster.
 
 Les _resource agent_ n'ont pas à se préoccuper des timeout de leurs actions.
 Tout au plus, ces agents peuvent indiquer des timeout par défaut à titre de
 recommandation seulement. Il reste à la charge de l'administrateur de définir
 les différents timeout en tenant compte de cette recommandation.
 
-Enfin, si une action ne se termine dans le temps imparti par son timeout,
-
-Le daemon `execd`, qui exécute l'action, se charge d'interrompre une action
-dès que son timeout est atteint. Habituellement, le cluster planifie des
+Le daemon `execd`, qui exécute l'action, se charge d'interrompre une action dès
+que son timeout est atteint. Habituellement, le cluster planifie alors des
 actions palliatives à cette erreur (eg. _recovery_ ou _failover_).
 
 :::
 
 -----
 
-### TP: création des RA (dummy1) dans le cluster
+### TP: création d'une ressource dans le cluster
 
 Création d'une première ressource "Dummy" en HA.
 
@@ -2237,7 +2263,9 @@ Créer une ressource `dummy1` utilisant le _RA_ Dummy:
 * forte préférence pour le nœud 1 (100 par exemple)
 
 Note: il est important d'utiliser un fichier xml pour appliquer les contraintes
-de localisation avant de démarrer la ressource
+de localisation avant de démarrer la ressource. Il est possible de travailler
+sur un fichier XML offline en précisant l'argument `-f /chemin/vers/xml` à la
+commande `pcs`.
 
 Créer le sous-répertoire `/tmp/sub` sur les 3 nœuds.
 
@@ -2278,6 +2306,7 @@ Observer les changements opérés par le _scheduler_.
 ## Contraintes de colocation
 
 * définit un lien entre plusieurs ressources
+* la force du lien est définie par un score qui s'ajoute aux scores existant
 * peut être un lien de colocalisation ou d'exclusion
   * Par exemple une VIP là où la ressource doit être démarrée
 * attention à l'ordre de déclaration !
