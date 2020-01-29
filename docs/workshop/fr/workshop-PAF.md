@@ -2385,15 +2385,69 @@ meta migration-threshold=3 failure-timeout=4h resource-stickiness=100
   * `start`
   * `promote`
   * `demote`
-* requis ou optionnel
+* ordre obligatoire, optionnel ou sérialisé
 * symétrique ou asymétrique
 
 ::: notes
 
-Ce type de contrainte peut être nécessaire pour spécifier l'ordre de déclenchement des action. Par exemple, le
-déplacement d'une IP virtuelle une fois que le service a été déplacé sur un autre nœud.
+Ce type de contrainte peut être nécessaire pour spécifier l'ordre de
+déclenchement des actions. Par exemple, le déplacement d'une IP virtuelle une
+fois que le service a été déplacé sur un autre nœud.
+
+Il existe trois type différents, précisé par l'attribut `kind` :
+
+* `Mandatory`: la seconde action n'est pas exécutée tant que la première
+  action n'a pas réussi
+* `Optional`: les deux actions peuvent être exécutées indépendamment, mais
+respecterons l'ordre imposé si elles doivent l'être dans la même transition
+* `Serialize`: les actions ne doivent pas être exécutées en même temps par
+  le cluster. L'ordre importe peu ici.
+
+Si une contrainte d'ordre est symétrique (attribut `symmetrical`), elle
+s'applique aussi pour les actions opposées, mais dans l'ordre inverse.
 
 :::
+
+
+-----
+
+### TP: Contrainte d'ordre
+
+* créer une contrainte d'ordre non symétrique entre le démarrage de la
+  ressource `dummy1` et `dummy2`
+* arrêter la ressource `dummy1`, quel est l'influence sur `dummy2` ?
+* arrêter la ressource `dummy2`, puis démarrer `dummy2`
+* vérifiez dans les log __du DC__ l'ordre des actions
+
+::: notes
+
+~~~console
+# pcs constraint order start dummy1 then start dummy2 symmetrical=false kind=Mandatory
+Adding dummy1 dummy2 (kind: Mandatory) (Options: first-action=start then-action=start symmetrical=false)
+
+# pcs resource disable dummy1
+
+# pcs resource disable dummy2
+# pcs resource enable dummy2
+# pcs resource enable dummy1
+~~~
+
+Sur le DC:
+
+~~~console
+# grep 'dummy._start.*confirmed' /var/log/cluster/corosync.log
+Jan 29 16:30:28 [4836] srv3       crmd:     info: match_graph_event:	Action dummy1_start_0 (48) confirmed on srv2 (rc=0)
+Jan 29 16:30:28 [4836] srv3       crmd:     info: match_graph_event:	Action dummy2_start_0 (50) confirmed on srv2 (rc=0)
+~~~
+
+L'ordre des action est précisé par leur ID, ici 48 et 50. Il est possible
+d'aller plus loin avec `crm_simulate` et ses options `-S`, `-G` et `-x` en
+indiquant la transition produite par `pengine` dans le répertoire
+`/var/lib/pacemaker/pengine`. Cette commande et analyse et laissée à
+l'exercice du lecteur.
+
+:::
+
 
 -----
 
@@ -2424,7 +2478,7 @@ master et la VIP.
 
 -----
 
-### TP
+### TP: groupe de ressource
 
 * créer un ressource dummy3 en spécifiant un interval de monitoring, ainsi que les paramètres migration-threshold failure-timeout et resource-stickiness
 * créer un group dummygroup qui regroupe les ressources dummy3 et dummy2 dans cet ordre
