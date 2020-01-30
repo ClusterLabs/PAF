@@ -1304,11 +1304,14 @@ Voici les actions disponibles de l'API des FA:
 
 * `off`: implémentation obligatoire. Permet d'isoler la ressource ou le serveur
 * `on`: libère la ressource ou démarre le serveur
-* `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon exécute les actions off et on.
-* `status`: permet de vérifier la disponibilité de l'agent de fencing et le statu du dispositif concerné: on ou off
+* `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon
+  exécute les actions off et on.
+* `status`: permet de vérifier la disponibilité de l'agent de fencing et le
+  statut du dispositif concerné: on ou off
 * `monitor`: permet de vérifier la disponibilité de l'agent de fencing
-* `list`: permet de vérifier la disponibilité de l'agent de fencing et de lister l'ensemble des dispositifs que l'agent
-  est capable d'isoler (cas d'un hyperviseur, d'un PDU, etc)
+* `list`: permet de vérifier la disponibilité de l'agent de fencing et de
+  lister l'ensemble des dispositifs que l'agent est capable d'isoler (cas d'un
+  hyperviseur, d'un PDU, etc)
 * `list-status`: comme l'action `list`, mais ajoute le statut de chaque dispositif
 * `validate-all`: valide la configuration de la ressource
 * `meta-data`: présente les capacités de l'agent au cluster
@@ -1352,7 +1355,8 @@ FIXME diagram
 
 * daemon `lrmd`
 * interface entre le `CRMd` et les _resource agents_ (_RA_)
-* capable d'exécuter les différents types de _RA_ supportés (OCF, systemd, LSF, etc) et d'en comprendre la réponse
+* capable d'exécuter les différents types de _RA_ supportés (OCF, systemd,
+  LSF, etc) et d'en comprendre la réponse
 * reçoit des commandes du `CRMd` et les passe aux _RA_
 * renvoie le résultat de l'action au `CRMd` de façon homogène, quelque
   soit le type de _RA_ utilisé
@@ -1381,10 +1385,10 @@ reviendra vers le `CRMd` que si le code retour de l'action varie.
 
 ### _Ressource Agent_ (_RA_)
 
-* applique les instructions du `LRMd` une ressource sous-jacente
+* applique les instructions du `LRMd` sur la ressource qu'il gère
 * renvoie des codes retours stricts reflétant le statut de sa ressource
 * plusieurs types/API de _ressource agent_ supportés
-* la spécification "OCF" la plus complète
+* la spécification "OCF" est la plus complète
 * l'API OCF présente au `CRMd` les actions supportées par l'agent
 * `action` et `operation` sont deux termes synonymes
 * chaque opérations a un timeout propre et éventuellement une récurrence
@@ -1403,16 +1407,25 @@ Vous trouverez la liste des types supportés à l'adresse suivante:
 Dans les spécifications du type OCF, un agent a le choix parmi dix codes retours
 différents pour communiquer l'état de son opération à `LRMd`:
 
-* `OCF_SUCCESS` (0)
-* `OCF_ERR_GENERIC` (1)
-* `OCF_ERR_ARGS` (2)
-* `OCF_ERR_UNIMPLEMENTED` (3)
-* `OCF_ERR_PERM` (4)
-* `OCF_ERR_INSTALLED` (5)
-* `OCF_ERR_CONFIGURED` (6)
+* `OCF_SUCCESS` (0, soft)
+* `OCF_ERR_GENERIC` (1, soft)
+* `OCF_ERR_ARGS` (2, hard)
+* `OCF_ERR_UNIMPLEMENTED` (3, hard)
+* `OCF_ERR_PERM` (4, hard)
+* `OCF_ERR_INSTALLED` (5, hard)
+* `OCF_ERR_CONFIGURED` (6, fatal)
 * `OCF_NOT_RUNNING` (7)
-* `OCF_RUNNING_MASTER` (8)
-* `OCF_FAILED_MASTER` (9)
+* `OCF_RUNNING_MASTER` (8, soft)
+* `OCF_FAILED_MASTER` (9, soft)
+
+Chaque code retour est associé à un niveau de criticité s'il ne correspond
+à celui attendu par le cluster:
+
+* `soft`: le cluster tente une action corrective sur le même nœud ou déplace
+  la ressource ailleurs
+* `hard`: la ressource doit être déplacée et ne pas revenir sur l'ancien nœud
+  sans intervention humaine
+* `fatal`: le cluster ne peut gérer la ressource sur aucun nœud
 
 Voici les opérations disponibles aux agents implémentant la specification OCF:
 
@@ -1431,11 +1444,11 @@ Voici les opérations disponibles aux agents implémentant la specification OCF:
 L'opération `meta-data` permet à l'agent de documenter ses paramètres et
 d'exposer ses capacités au cluster qui adapte donc ses décisions en fonction
 des actions possibles. Par exemple, si les actions `migrate_*` ne sont pas
-disponibles, le cluster utilisera les action `stop` et `start` pour déplacer
+disponibles, le cluster utilise les actions `stop` et `start` pour déplacer
 une ressource.
 
 Les agents systemd ou sysV sont limités aux seules actions `start`, `stop`,
-`monitor`. Dans ces deux cas, les codes retours sont interprété par `LRMd`
+`monitor`. Dans ces deux cas, les codes retours sont interprétés par `LRMd`
 comme étant ceux définis par la spécification LSB:
 <http://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html>
 
@@ -1984,7 +1997,7 @@ lrmd:    debug: log_execute:        executing - rsc:fence_vm_hanode1 action:moni
 lrmd:    debug: log_finished:       finished - rsc:fence_vm_hanode1 action:monitor call_id:36  exit-code:0 exec-time:1248ms queue-time:0ms
 ~~~
 
-Maintenant que les _FA_ ont été créés, observer où ils sont _démarré_:
+Maintenant que les _FA_ ont été créés, observer où ils sont _démarrés_:
 
 ~~~
 pcs status
@@ -2066,7 +2079,7 @@ déterminer le nœud "idéal". Ce paramètre peut être défini globalement ou p
 ressource.
 
 Les scores de localisation sont aussi utilisés pour positionner les ressources
-de fencing. Vous pouvez les empêcher d'être exécutée depuis un nœud en
+de fencing. Vous pouvez les empêcher d'être exécutées depuis un nœud en
 utilisant un score d'exclusion de `-INFINITY`. Cette ressource ne sera alors ni
 supervisée, ni exécutée depuis ce nœud. Une telle configuration est souvent
 utilisée pour empêcher une ressource de fencing d'être priorisée ou déclenchée
@@ -2113,7 +2126,7 @@ changements de placement et de score par rapport à l'état précédent.
 # pcs constraint location fence_vm_hanode3 avoids hanode3=100
 ~~~
 
-Notez que les deux syntaxes proposées sont équivalentes du poitn de vue du
+Notez que les deux syntaxes proposées sont équivalentes du point de vue du
 résultat dans la CIB.
 
 ~~~
@@ -2443,7 +2456,7 @@ Jan 29 16:30:28 [4836] srv3       crmd:     info: match_graph_event:	Action dumm
 L'ordre des action est précisé par leur ID, ici 48 et 50. Il est possible
 d'aller plus loin avec `crm_simulate` et ses options `-S`, `-G` et `-x` en
 indiquant la transition produite par `pengine` dans le répertoire
-`/var/lib/pacemaker/pengine`. Cette commande et analyse et laissée à
+`/var/lib/pacemaker/pengine`. Cette commande et analyse est laissée à
 l'exercice du lecteur.
 
 :::
