@@ -6,7 +6,7 @@ use warnings;
 use Config;
 use Module::Build;
 
-my $VERSION = 'v2.3_rc1';
+my $VERSION = 'v2.3_rc2';
 
 my $build = Module::Build->current;
 my %ocf_dirs = %{ $build->notes('ocf_dirs') };

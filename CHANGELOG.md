@@ -1,3 +1,16 @@
+# PAF v2.3 rc2
+
+Release date: 2020-02-11
+
+__WARNING__: This version is only compatible with at least
+Pacemaker 1.1.13 using a corosync 2.x stack.
+
+Changelog since 2.3 rc1:
+
+* fix: application_name's check, gh #156 reported by ZeroOne
+* fix: wrong exit reason, gh #156 reported by dud225
+
+
 # PAF v2.3 rc1
 
 Release date: 2019-11-28
