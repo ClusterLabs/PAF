@@ -1,0 +1,126 @@
+require 'ipaddr'
+require 'yaml'
+
+#ENV['VAGRANT_NO_PARALLEL'] = 'yes' # uncomment to forbid parallel execution
+ENV["LANG"]           = "C"
+ENV["LC_ALL"]         = "C"
+
+boxname   = 'centos/7'     # vagrant box to use
+pgver     = '11'     # pg version to use
+hapass    = 'hapass' # password for sys user hacluster
+ssh_login = 'root' # ssh login to connect to the host when fencing a VM.
+                     # put "./provision/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
+master_ip = '10.20.30.105' # vIP assigned to master
+pg_nodes  = 'srv1', 'srv2' # first will be primary
+qd_node   = 'qd'       # name of the node receiving logs
+log_node  = 'log-sink' # name of the node receiving logs
+vm_prefix = 'paf_2nqd' # VM prefix in libvrit
+rhel_user = ''         # RHEL user account
+rhel_pass = ''         # RHEL user account password
+
+if File.file?('vagrant.yml') and ( custom = YAML.load_file('vagrant.yml') )
+    boxname   = custom['boxname']   if custom.has_key?('boxname')
+    pgver     = custom['pgver']     if custom.has_key?('pgver')
+    hapass    = custom['hapass']    if custom.has_key?('hapass')
+    ssh_login = custom['ssh_login'] if custom.has_key?('ssh_login')
+    master_ip = custom['master_ip'] if custom.has_key?('master_ip')
+    pg_nodes  = custom['pg_nodes']  if custom.has_key?('pg_nodes')
+    log_node  = custom['log_node']  if custom.has_key?('log_node')
+    vm_prefix = custom['vm_prefix'] if custom.has_key?('vm_prefix')
+    rhel_user = custom['rhel_user'] if custom.has_key?('rhel_user')
+    rhel_pass = custom['rhel_pass'] if custom.has_key?('rhel_pass')
+end
+
+Vagrant.configure(2) do |config|
+
+    pgdata     = "/var/lib/pgsql/#{pgver}/data"
+    next_ip    = IPAddr.new(master_ip).succ
+    host_ip    = (IPAddr.new(master_ip) & "255.255.255.0").succ.to_s
+    nodes_ips  = {}
+
+    ( pg_nodes + [ qd_node, log_node ] ).each do |node|
+        nodes_ips[node] = next_ip.to_s
+        next_ip = next_ip.succ
+    end
+
+    # don't mind about insecure ssh key
+    config.ssh.insert_key = false
+
+    # https://vagrantcloud.com/search.
+    config.vm.box = boxname
+
+    # hardware and host settings
+    config.vm.provider 'libvirt' do |lv|
+        lv.cpus = 1
+        lv.memory = 512
+        lv.watchdog model: 'i6300esb'
+        lv.default_prefix = vm_prefix
+        lv.qemu_use_session = false
+    end
+
+    # disable default share
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+
+    config.vm.synced_folder "../../..", "/vagrant", type: "rsync",
+        rsync__exclude: [ ".git/" ]
+
+    # system setup for all nodes
+    (pg_nodes + [qd_node, log_node]).each do |node|
+        config.vm.define node do |conf|
+            conf.vm.network 'private_network', ip: nodes_ips[node]
+            conf.vm.provision 'system-setup', type: 'shell', path: 'provision/system.bash',
+                args: [ node, rhel_user, rhel_pass ] + nodes_ips.keys.map {|n| "#{n}=#{nodes_ips[n]}"},
+                preserve_order: true
+        end
+    end
+
+    # setup rsyslog to collect logs from other node on log-sink
+    config.vm.define log_node do |conf|
+        conf.vm.provision 'rsyslog-setup', type: 'shell', path: 'provision/log_sink.bash'
+    end
+
+    # common postgresql+pacemaker installation and setup
+    pg_nodes.each do |node|
+        config.vm.define node do |conf|
+            conf.vm.provision 'cluster-common', type: 'shell', path: 'provision/cluster-common.bash',
+                args: [ pgver, hapass, master_ip ],
+                preserve_order: true
+        end
+    end
+
+    # build primary pgsql instance
+    config.vm.define pg_nodes.first, primary:true do |conf|
+        conf.vm.provision 'pgsql-primary', type: 'shell',
+            path: 'provision/pgsql-primary.bash',
+            args: [ pgver, pgdata, master_ip, pg_nodes.first ],
+            run: 'never'
+    end
+
+    # replicas setup. Use "vagrant up --provision-with=pgsql-replicas"
+    pg_nodes[1..-1].each do |node|
+        config.vm.define node do |conf|
+            conf.vm.provision 'pgsql-replicas', type: 'shell', path: 'provision/pgsql-replicas.bash',
+                args: [ pgver, pgdata, master_ip, node ], run: 'never'
+        end
+    end
+
+    # cluster setup. Use "vagrant up --provision-with=qdevice"
+    config.vm.define qd_node do |conf|
+        conf.vm.provision 'qdevice', type: 'shell', path:'provision/qdevice.bash',
+            args: [ hapass ],
+            run: 'never'
+    end
+
+    # cluster setup. Use "vagrant up --provision-with=pacemaker"
+    pg_nodes.each do |node|
+        config.vm.define node do |conf|
+            conf.vm.provision 'pacemaker', type: 'shell', path:'provision/pacemaker.bash',
+                args: [ pgver, hapass, master_ip, ssh_login,
+                        vm_prefix, host_ip, pgdata, qd_node ] + pg_nodes,
+                run: 'never'
+        end
+    end
+
+    # cluster test suite setup. Use "vagrant up --provision-with=cts"
+    config.vm.provision 'cts', type: 'shell', path: 'provision/cts.bash', run: 'never'
+end

@@ -6,14 +6,14 @@ This `Vagrantfile` is bootstrapping a fresh cluster with:
 * pgsql primary is on `srv1` and the two standby are on `srv2` and `srv3`
 * server `log-sink` where all logs from `srv1`, `srv2` and `srv3` are collected under `/var/log/<server>`
 * pacemaker stack is setup on `srv1`, `srv2` and `srv3`
-* fencing using fence_virsh
+* fencing using `fence_virsh`
 * watchdog enabled
 
 Note that NTP is enabled by default (using chrony) in the vagrant box used (`centos/7`).
 No need to set it up ourselves.
 
 This README takes `3nodes-vip` as example. Replace with the cluster name you
-want.
+want: `3nodes-vip`, `3nodes-haproxy` or `2nodes-qdevice-vip`.
 
 ## Prerequisites
 
