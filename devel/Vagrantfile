@@ -4,17 +4,6 @@ ENV['LC_ALL']         = 'C'
 
 Vagrant.configure(2) do |config|
 
-    # enable package local caching to speed up "vagrant up"
-#    if Vagrant.has_plugin?("vagrant-sshfs") 
-        config.cache.synced_folder_opts = {
-            type: :sshfs
-        }
-#    end
-
-    if Vagrant.has_plugin?("vagrant-cachier")
-        config.cache.scope = :box
-    end
-
     # don't mind about insecure ssh key
     config.ssh.insert_key = false
 
@@ -25,11 +14,10 @@ Vagrant.configure(2) do |config|
         lv.default_prefix = 'paf_pkg'
     end
 
-    config.vm.synced_folder '.', '/vagrant', type: 'rsync', disable: true
+    config.vm.synced_folder '..', '/vagrant', type: 'rsync'
 
     config.vm.define 'deb' do |debvm|
         debvm.vm.box = 'debian/stretch64'
-        debvm.vm.synced_folder '..', '/vagrant', type: 'rsync'
         debvm.vm.provision 'DEB builder', type: 'shell', path:'deb-builder.bash'
         debvm.vm.post_up_message = <<-HEREDOC
           If no error appeared, you can get the package using the following command:
