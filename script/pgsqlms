@@ -36,7 +36,7 @@ use OCF_ReturnCodes;
 use OCF_Directories;
 use OCF_Functions;
 
-our $VERSION = 'v2.3_rc2';
+our $VERSION = 'v2.3.0';
 our $PROGRAM = 'pgsqlms';
 
 # OCF environment

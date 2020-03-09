@@ -1,3 +1,9 @@
+resource-agents-paf (2.3.0-1) unstable; urgency=low
+
+  * 2.3.0 major release
+
+ -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Mon, 09 Mar 2020 23:30:00 +0100
+
 resource-agents-paf (2.3~rc2-1) unstable; urgency=low
 
   * 2.3_rc2 release candidate
