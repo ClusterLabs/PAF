@@ -1,5 +1,5 @@
 %global _tag 2.3_rc2
-%global _ocfroot /usr/lib/ocf
+%global _ocfroot %{_exec_prefix}/lib/ocf
 Name: resource-agents-paf
 Version: 2.3~rc2
 Release: 1
@@ -12,7 +12,6 @@ Source0: https://github.com/ClusterLabs/PAF/archive/v%{_tag}.tar.gz
 BuildArch: noarch
 BuildRequires: resource-agents perl perl-Module-Build
 Requires: perl, resource-agents, pacemaker >= 1.1.13, corosync >= 2.0.0
-Provides: resource-agents-paf = %{version}
 
 %description
 PostgreSQL resource agent for Pacemaker
@@ -21,14 +20,14 @@ PostgreSQL resource agent for Pacemaker
 %define debug_package %{nil}
 
 %prep
-%setup -n PAF-%{_tag}
+%setup -q -n PAF-%{_tag}
 
 %build
-perl Build.PL --destdir "%{buildroot}" --install_path bindoc=%{_mandir}/man1 --install_path libdoc=%{_mandir}/man3
+perl Build.PL --install_path bindoc=%{_mandir}/man1 --install_path libdoc=%{_mandir}/man3
 perl Build
 
 %install
-./Build install
+./Build install --destdir "%{buildroot}"
 find "%{buildroot}" -type f -name .packlist -delete
 
 %files
@@ -38,17 +37,17 @@ find "%{buildroot}" -type f -name .packlist -delete
 %license LICENSE
 %{_mandir}/man3/*.3*
 %{_mandir}/man7/*.7*
-%{_ocfroot}/resource.d/heartbeat/pgsqlms
-%{_ocfroot}/lib/heartbeat/OCF_ReturnCodes.pm
-%{_ocfroot}/lib/heartbeat/OCF_Directories.pm
-%{_ocfroot}/lib/heartbeat/OCF_Functions.pm
+%attr(755, -, -) %{_ocfroot}/resource.d/heartbeat/pgsqlms
+%attr(644, -, -) %{_ocfroot}/lib/heartbeat/OCF_ReturnCodes.pm
+%attr(644, -, -) %{_ocfroot}/lib/heartbeat/OCF_Directories.pm
+%attr(644, -, -) %{_ocfroot}/lib/heartbeat/OCF_Functions.pm
 %{_datadir}/resource-agents/ocft/configs/pgsqlms
 
 %changelog
-* Tue Feb 11 2020 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.3rc2-1
+* Tue Feb 11 2020 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.3~rc2-1
 - 2.3_rc2 release candidate
 
-* Thu Nov 28 2019 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.3rc1-1
+* Thu Nov 28 2019 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.3~rc1-1
 - 2.3_rc1 release candidate
 
 * Thu Jan 31 2019 Jehan-Guillaume de Rorthais <jgdr@dalibo.com> - 2.2.1-1
