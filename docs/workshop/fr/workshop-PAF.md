@@ -8,6 +8,19 @@ revision: 0.2
 url : http://clusterlabs.github.io/PAF/
 
 #
+# PDF options
+#
+
+colorlinks: true
+toc: true
+geometry:
+- top=20mm
+- left=20mm
+- right=20mm
+- bottom=15mm
+papersize: a4
+
+#
 # Reveal Options
 #
 
@@ -67,7 +80,7 @@ précédente instance primaire et la nouvelle.
 
 Ensuite, ce synchronisme est important pour assurer une cohérence dans
 l'horodatage des journaux applicatifs entre les serveurs. La compréhension
-rapide et efficace d'un incident dépend directement de ce point. Ànoter qu'il
+rapide et efficace d'un incident dépend directement de ce point. À noter qu'il
 est aussi possible de centraliser les log sur une architecture dédiée à part
 (attention aux SPoF ici aussi).
 
@@ -408,7 +421,18 @@ destinés à des utilisations très pointues, de debug ou aux agents eux-même.
 
 Les outils d'administration `pcs` et `crm` reposent fortement sur l'ensemble de
 ces binaires et permettent d'utiliser une interface unifiée et commune à
-ceux-ci.
+ceux-ci. Bien que l'administration du cluster peut se faire entièrement sans
+ces outils, ils sont très pratiques au quotidien et facilitent grandement la
+gestion du cluster. De plus, ils intègrent toutes les bonnes pratiques
+relatives aux commandes supportées.
+
+Tout au long de cette formation, nous utilisons le couple `pcs` afin de
+simplifier le déploiement et l'administration du cluster Pacemaker. Il est
+disponible sur la plupart des distributions Linux et se comportent de la même
+façon, notamment sur Debian et EL et leurs dérivés.
+
+Ce paquet installe le CLI `pcs` et le daemon `pcsd`. Ce dernier s'occupe
+seulement de propager les configurations et commandes sur tous les nœuds.
 
 :::
 
@@ -418,15 +442,54 @@ ceux-ci.
 
 ::: notes
 
-Installer les paquets nécessaires et suffisants et vérifiez les dépendances
-installées (eg. `corosync`, `resource-agents`):
+1. installer les paquets nécessaires et suffisants
+2. vérifier les dépendances installées
+
+:::
+
+-----
+
+### Correction: Installation de Pacemaker
+
+::: notes
+
+1. Installer les paquets nécessaires et suffisants
 
 ~~~console
 # yum install -y pacemaker
 ~~~
 
+2. vérifier les dépendances installées
+
+À la fin de la commande précédente:
+
+~~~
+Dependency Installed:
+[...]
+  corosync.x86_64 0:2.4.3-6.el7_7.1
+  pacemaker-cli.x86_64 0:1.1.20-5.el7_7.2
+  resource-agents.x86_64 0:4.1.1-30.el7_7.4
+~~~
+
+Les paquets `corosync`, `resource-agents` et `pacemaker-cli` ont été installés en tant que
+dépendance de `pacemaker`.
+
 Tous les outils nécessaires et suffisants à l'administration d'un cluster
-Pacemaker sont désormais présents. 
+Pacemaker sont présents. Notamment:
+
+~~~console
+# ls /sbin/crm* /sbin/corosync*
+
+/sbin/corosync            /sbin/corosync-cfgtool /sbin/corosync-cmapctl
+/sbin/corosync-cpgtool    /sbin/corosync-keygen  /sbin/corosync-notifyd
+/sbin/corosync-quorumtool
+
+/sbin/crmadmin            /sbin/crm_attribute    /sbin/crm_diff
+/sbin/crm_error           /sbin/crm_failcount    /sbin/crm_master
+/sbin/crm_mon             /sbin/crm_node         /sbin/crm_report
+/sbin/crm_resource        /sbin/crm_shadow       /sbin/crm_simulate
+/sbin/crm_standby         /sbin/crm_ticket       /sbin/crm_verify
+~~~
 
 :::
 
@@ -436,22 +499,34 @@ Pacemaker sont désormais présents.
 
 ::: notes
 
-Pour les besoins de ce workshop, nous installons aussi le paquet `pcs`.
-Même si l'administration du cluster peut se faire entièrement sans
-l'utilisation du couple `pcs`/`pcsd`, ces outils sont très pratiques au
-quotidien et facilitent grandement la gestion du cluster. De plus, ils
-intègrent toutes les bonnes pratiques relatives aux commandes supportées.
+1. installer le paquet `pcs`
+2. activer le daemon `pcsd` au démarrage de l'instance et le démarrer
+
+
+:::
+-----
+
+### Correction: Installation de `pcs`
+
+::: notes
+
+1. installer le paquet `pcs`
 
 ~~~console
 # yum install -y pcs
 ~~~
 
-Le daemon `pcsd` s'occupe seulement de propager les configurations et commandes
-sur tous les nœuds. Ce dernier peut être démarré et lancé automatiquement
-au démarrage :
+2. activer `pcsd` au démarrage de l'instance et le démarrer
 
 ~~~console
 # systemctl enable --now pcsd
+~~~
+
+ou 
+
+~~~console
+# systemctl enable pcsd
+# systemctl start pcsd
 ~~~
 
 :::
@@ -463,6 +538,7 @@ au démarrage :
 * authentification des daemons `pcsd` entre eux
 * création du cluster à l'aide de `pcs`
   - crée la configuration corosync sur tous les serveurs
+* configuration de Pacemaker des _processus_ de Pacemaker
 
 ::: notes
 
@@ -478,6 +554,14 @@ commande `pcs cluster auth [...]`.
 Il est ensuite aisé de créer le cluster grâce à la commande `pcs cluster
 setup [...]`.
 
+Le fichier de configuration de Pacemaker ne concerne que le comportement des
+processus, pas la gestion du cluster. Notamment, où sont les journaux
+applicatifs et leur contenu. Pour la famille des distributions EL, son
+emplacement est `/etc/sysconfig/pacemaker`. Pour la famille des distributions
+Debian, il sont emplacement est `/etc/default/pacemaker`. Ce fichier en
+concerne QUE l'instance locale de Pacemaker. Chaque instance peut avoir un
+paramétrage différent, mais cela est bien entendu déconseillé.
+
 :::
 
 -----
@@ -486,24 +570,38 @@ setup [...]`.
 
 ::: notes
 
+1. positionner un mot de passe pour l'utilisateur `hacluster` sur chaque nœud
+
 L'outil `pcs` se sert de l'utilisateur système `hacluster` pour s'authentifier
 auprès de `pcsd`. Puisque les commandes de gestion du cluster peuvent être
 exécutées depuis n'importe quel membre du cluster, il est recommandé de
 configurer le même mot de passe pour cet utilisateur sur tous les nœuds pour
 éviter les confusions.
 
+2. authentifier les membres du cluster entre eux
+
+Remarque: à partir de Pacemaker 2, cette commande doit être exécutée sur chaque
+nœud du cluster.
+
+:::
+
+-----
+
+### Correction: Authentification de pcs
+
+::: notes
+
+1. positionner un mot de passe pour l'utilisateur `hacluster` sur chaque nœud
+
 ~~~console
 # passwd hacluster
 ~~~
 
-Nous pouvons désormais authentifier les membres du cluster (FIXME: pcmk 2):
+2. authentifier les membres du cluster entre eux
 
 ~~~console
 # pcs cluster auth hanode1 hanode2 hanode3 -u hacluster
 ~~~
-
-Remarque : les commandes `pcs` peuvent être exécutées depuis n'importe quel
-nœud.
 
 :::
 
@@ -513,28 +611,63 @@ nœud.
 
 ::: notes
 
-Ci-après la commande permettant de créer le cluster sur tous les nœuds. Elle
-ne doit être exécutée que sur un seul d'entre eux.
+Les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+
+1. créer un cluster nommé `cluster_tp` incluant les trois nœuds `hanode1`,
+   `hanode2` et `hanode3`
+2. trouver le fichier de configuration de corosync sur les trois nœuds
+3. vérifier que le fichier de configuration de corosync est identique partout
+4. activer le mode debug de Pacemaker pour les sous processus `crmd`,
+`pengine`, `attrd` et `lrmd`
+
+Afin de pouvoir mieux étudier Pacemaker, nous activons le mode debug de des
+sous processus `crmd`, `pengine`, `attrd` et `lrmd` que nous aborderons dans la suite de
+cette formation.
+
+:::
+
+-----
+
+### Correction: Création du cluster avec pcs
+
+::: notes
+
+Les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+
+1. créer un cluster nommé `cluster_tp` incluant les trois nœuds `hanode1`,
+   `hanode2` et `hanode3`
 
 ~~~console
 # pcs cluster setup --name cluster_tp hanode1 hanode2 hanode3
 ~~~
 
-Cette commande permet de créer un cluster nommé "cluster_tp", composé des
-trois nœuds `hanode1`, `hanode2` et `hanode3`. Le fichier de configuration de
-Corosync `/etc/corosync/corosync.conf` est créé et propagé automatiquement sur
-tous ces nœuds par `pcsd`.
+2. trouver le fichier de configuration de corosync sur les trois nœuds
 
-Afin de pouvoir mieux étudier Pacemaker, nous activons le mode debug de
-certains daemons sur chaque serveur. Pour ce faire, éditer la variable
-`PCMK_debug` dans le fichier d'environnement '`/etc/sysconfig/pacemaker`:
+Le fichier de configuration de Corosync se situe à l'emplacement
+`/etc/corosync/corosync.conf`.
+
+3. vérifier que le fichier de configuration de corosync est identique partout
 
 ~~~console
-PCMK_debug=crmd,pengine,lrmd
+root@hanode1# md5sum /etc/corosync/corosync.conf
+564b9964bc03baecf42e5fa8a344e489  /etc/corosync/corosync.conf
+
+root@hanode2# md5sum /etc/corosync/corosync.conf
+564b9964bc03baecf42e5fa8a344e489  /etc/corosync/corosync.conf
+
+root@hanode3# md5sum /etc/corosync/corosync.conf
+564b9964bc03baecf42e5fa8a344e489  /etc/corosync/corosync.conf
 ~~~
 
-Ce paramètre permet d'obtenir les messages de debug des sous processus `crmd`,
-`pengine` et `lrmd` que nous aborderons dans la suite de ce workshop.
+4. activer le mode debug de Pacemaker pour les sous processus `crmd`, `pengine`
+   et `lrmd`
+
+Éditer la variable `PCMK_debug` dans le fichier de configuration
+`/etc/sysconfig/pacemaker` :
+
+~~~console
+PCMK_debug=crmd,pengine,lrmd,attrd
+~~~
 
 Pour obtenir l'ensemble des messages de debug de tous les processus,
 positionner ce paramètre à `yes`.
@@ -546,7 +679,7 @@ positionner ce paramètre à `yes`.
 ## Démarrage du cluster
 
 * cluster créé mais pas démarré
-* ne pas activer Pacemaker au démarrage des serveurs
+* désactiver Pacemaker au démarrage des serveurs
 * utilisation de `pcs` pour démarrer le cluster
 
 ::: notes
@@ -576,25 +709,54 @@ de sous traiter cette tâche aux daemons `pcsd` avec une unique commande `pcs`.
 
 ::: notes
 
-Désactiver Pacemaker et Corosync au démarrage du serveur et vérifier l'état des
-services :
+1. désactiver Pacemaker et Corosync au démarrage du serveur
+2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
+3. vérifier l'état de Pacemaker et Corosync
+
+:::
+
+-----
+
+### Correction: Démarrage du cluster
+
+::: notes
+
+1. désactiver Pacemaker et Corosync au démarrage du serveur
+
+Sur tous les serveurs:
 
 ~~~console
 # systemctl disable corosync pacemaker
-# systemctl status pacemaker corosync
 ~~~
 
-Démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`:
+Ou, depuis un seul des serveurs:
+
+~~~console
+# pcs cluster disable --all
+~~~
+
+2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
 
 ~~~console
 # pcs cluster start --all
 ~~~
 
-Cette commande propage l'ordre de démarrage à tous les daemons `pcsd` qui
-s'occupent alors de démarrer les services localement. Sans l'argument `--all`,
-seuls les services locaux sont démarrés.
+3. vérifier l'état de Pacemaker et Corosync
 
-Vérifier à nouveau l'état de Pacemaker et Corosync.
+Sur chaque serveur, exécuter:
+
+~~~
+# systemctl status pacemaker corosync
+~~~
+
+Ou:
+
+~~~
+# pcs status
+~~~
+
+Nous observons que les deux services sont désactivés au démarrage des
+serveurs et actuellement démarrés.
 
 :::
 
@@ -604,7 +766,7 @@ Vérifier à nouveau l'état de Pacemaker et Corosync.
 
 Pour visualiser l'état du cluster :
 
-* `crm_mon`
+* `crm_mon`: commande livrée avec Pacemaker
 * `pcs`
 
 ::: notes
@@ -829,70 +991,82 @@ sur un préfix ou directement sur un clé.
 
 ## TP: utilisation de Corosync
 
-* gestion de la configuration
-* utilisation des 4 commandes `corosync-*`
+::: notes
+
+1. afficher le statut du ring local avec `corosync-cfgtool`
+2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
+3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
+4. afficher la configuration des nœuds dans la base CMAP avec
+   `corosync-cmapctl` (clé `nodelist`)
+5. afficher l'état du quorum avec `corosync-quorumtool`
+
+:::
+
+-----
+
+## Correction: utilisation de Corosync
 
 ::: notes
 
-**`corosync-cfgtool`**
-
-Voir l'état, recharger la configuration, tuer un nœud, etc.
+1. afficher le statut du ring local avec `corosync-cfgtool`
 
 ~~~console
 # corosync-cfgtool -s
 Printing ring status.
 Local node ID 1
 RING ID 0
-  id  = 192.168.122.101
+  id  = 10.20.30.6
   status  = ring 0 active with no faults
-
-# corosync-cfgtool -a 1
-192.168.122.101
-
-# corosync-cfgtool -a 2
-192.168.122.102
-
-# corosync-cfgtool -a 3
-192.168.122.103
 ~~~
 
-**`corosync-cpgtool`**
+2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
 
-Affiche les groups cpg (groupe de communication inter processus géré au sein
-de corosync) et leurs membres.
+~~~console
+# corosync-cfgtool -a 1
+10.20.30.6
+
+# corosync-cfgtool -a 2
+10.20.30.7
+
+# corosync-cfgtool -a 3
+10.20.30.8
+~~~
+
+3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
 
 ~~~console
 # corosync-cpgtool -e
-Group Name         PID     Node ID
+Group Name	       PID	   Node ID
 crmd
-          4335           1 (192.168.122.101)
-          2411           2 (192.168.122.102)
-          2101           3 (192.168.122.103)
+		      6912	         1 (10.20.30.6)
+		      6647	         3 (10.20.30.8)
+		      6727	         2 (10.20.30.7)
 attrd
-          4333           1 (192.168.122.101)
-          2409           2 (192.168.122.102)
-          2099           3 (192.168.122.103)
+		      6910	         1 (10.20.30.6)
+		      6645	         3 (10.20.30.8)
+		      6725	         2 (10.20.30.7)
 stonith-ng
-          4331           1 (192.168.122.101)
-          2407           2 (192.168.122.102)
-          2097           3 (192.168.122.103)
+		      6908	         1 (10.20.30.6)
+		      6643	         3 (10.20.30.8)
+		      6723	         2 (10.20.30.7)
 cib
-          4330           1 (192.168.122.101)
-          2406           2 (192.168.122.102)
-          2096           3 (192.168.122.103)
+		      6907	         1 (10.20.30.6)
+		      6642	         3 (10.20.30.8)
+		      6722	         2 (10.20.30.7)
 pacemakerd
-          4329           1 (192.168.122.101)
-          2405           2 (192.168.122.102)
-          2095           3 (192.168.122.103)
+		      6906	         1 (10.20.30.6)
+		      6641	         3 (10.20.30.8)
+		      6721	         2 (10.20.30.7)
 ~~~
 
-**`corosync-cmapctl`**
+Chaque sous-processus de pacemaker est associé à un groupe de communication
+avec leur équivalents sur les autres nœuds du cluster.
 
-Visualiser et positionner les clés / valeurs dans la base CMAP (Configuration
-Map) locale de corosync:
+4. afficher la configuration des nœuds dans la base CMAP avec
+   `corosync-cmapctl` (clé `nodelist`)
 
 ~~~console
-# corosync-cmapctl | grep ^nodelist
+# corosync-cmapctl -b nodelist
 nodelist.local_node_pos (u32) = 0
 nodelist.node.0.nodeid (u32) = 1
 nodelist.node.0.ring0_addr (str) = hanode1
@@ -902,9 +1076,7 @@ nodelist.node.2.nodeid (u32) = 3
 nodelist.node.2.ring0_addr (str) = hanode3
 ~~~
 
-**`corosync-quorumtool`**
-
-Visualiser l'état du quorum et modifier sa configuration.
+5. afficher l'état du quorum avec `corosync-quorumtool`
 
 ~~~console
 # corosync-quorumtool
@@ -940,7 +1112,7 @@ Membership information
 
 # Composants du cluster
 
-![Diagramme complet](medias/pcmk_diag1.png)
+![Diagramme complet](medias/pcmk-archi-all.png)
 
 ::: notes
 
@@ -972,6 +1144,7 @@ Pacemaker:
 [Schémas des différentes configuration de nœuds possibles avec Pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
 
 :::
+
 
 -----
 
@@ -1044,19 +1217,45 @@ l'outil `cibadmin`.
 
 ::: notes
 
-La CIB est synchronisée et versionnée entre tous les nœuds du cluster.
+1. consulter le contenu de ce répertoire où est stockée la CIB
+2. identifier la dernière version de la CIB
+3. comparer avec `cibadmin --query` et `pcs cluster cib`
 
-Les fichiers sont stockés dans `/var/lib/pacemaker/cib`.
+:::
 
-* consulter le contenu de ce répertoire
-* identifier la dernière version de la CIB
-* comparer avec `cibadmin --query` et `pcs cluster cib`
+-----
 
-Vous devriez observer une section "\<status\>" supplémentaire dans le document
+### Correction: CIB
+
+::: notes
+
+1. consulter le contenu de ce répertoire où est stockée la CIB
+
+~~~
+# ls /var/lib/pacemaker/cib
+~~~
+
+2. identifier la dernière version de la CIB
+
+La version courante de la CIB est stockée dans
+`/var/lib/pacemaker/cib/cib.xml`. Sa version est stockée dans
+`/var/lib/pacemaker/cib/cib.last`.
+
+3. comparer avec `cibadmin --query` et `pcs cluster cib`
+
+Vous observez une section `<status\>` supplémentaire dans le document
 XML présenté par `cibadmin`. Cette section contient l'état du cluster et est
 uniquement conservée en mémoire.
 
 :::
+
+-----
+
+### Designated Controler (DC) - Diagramme global
+
+FIXME diagram
+
+![Diagramme DC](medias/pcmk-archi-dc.png)
 
 -----
 
@@ -1088,11 +1287,11 @@ C'est le DC qui maintient l'état primaire de la CIB ("master copy").
 
 -----
 
-### Designated Controler (DC) - Diagramme global
+### PEngine - Diagramme global
 
 FIXME diagram
 
-![Diagramme DC](medias/pcmk_diag1-dc.png)
+![Diagramme PEngine](medias/pcmk-archi-pengine.png)
 
 -----
 
@@ -1104,7 +1303,7 @@ FIXME diagram
 * renommé `Scheduler` depuis la version 2.0
 * peut être consulté grâce à la commande `crm_simulate`
 
-![Diagramme Scheduler - calcul graphe de transition](medias/pcmk_pengine.png)
+![Diagramme Scheduler - calcul graphe de transition](medias/pcmk-archi-transition.png)
 
 ::: notes
 
@@ -1173,24 +1372,69 @@ pour en extraire des informations disponibles nulles par ailleurs, comme les
 
 -----
 
-### PEngine - Diagramme global
-
-FIXME diagram
-
-![Diagramme PEngine](medias/pcmk_diag1-pengine.png)
-
------
-
 ### TP: PEngine
 
 ::: notes
 
-* sur quels nœuds est lancé le processus `pengine` ?
-* où se trouvent les logs ?
-* quelles différences observer entre les différents nœuds (identifier le DC) ?
-* quelle est la vision de PEngine sur le cluster ? `crm_simulate -L`
+1. identifier sur quels nœuds est lancé le processus `pengine`
+2. identifier où se trouvent les logs de `pengine`
+3. identifier le DC
+4. observer la différence de contenu des log de `pengine` entre nœuds
+5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
 
 :::
+
+-----
+
+### Correction: PEngine
+
+::: notes
+
+1. identifier sur quels nœuds est lancé le processus `pengine`
+
+Sur tous les nœuds.
+
+2. identifier où se trouvent les logs de `pengine`
+
+Les messages de `pengine` se situent dans `/var/log/cluster/corosync.log`,
+mélangés avec ceux des autres sous processus.
+
+Il est aussi possible de les retrouver dans `/var/log/messages` ou ailleurs en
+fonction de la configuration de corosync, syslog, etc.
+
+3. identifier le DC
+
+Utiliser `crm_mon`, `pcs status` ou `crmadmin`:
+
+~~~console
+# crmadmin -D
+Designated Controller is: hanode3
+~~~
+
+4. observer la différence de contenu des log de `pengine` entre nœuds
+
+Seuls le DC possède les messages relatifs au calcul de transitions effectués
+par le sous-processus `pengine`.
+
+5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+
+~~~console
+# crm_simulate --live-check
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+~~~
+
+:::
+
+-----
+
+### Cluster Resource Manager (CRM) - Diagramme global
+
+FIXME diagram
+
+![Diagramme CRM](medias/pcmk-archi-crmd.png)
 
 -----
 
@@ -1227,28 +1471,38 @@ transition en cours. Il demande alors une nouvelle transition au `PEngine`.
 
 -----
 
-### Cluster Resource Manager (CRM) - Diagramme global
+### TP: Cluster Resource Manager
 
-FIXME diagram
+::: notes
 
-![Diagramme CRM](medias/pcmk_diag1-crmd.png)
+1. trouver comment sont désignés les messages du `CRMd` dans les log
+2. identifier dans les log qui est le DC
+
+:::
 
 -----
 
-### TP: Cluster Resource Manager
+### Correction: Cluster Resource Manager
 
 Étude du daemon `CRMd`.
 
 ::: notes
 
-* comment sont désignés les messages du `CRMd` dans les log ?
-* qui est le DC dans votre cluster ?
+1. trouver comment sont désignés les messages du `CRMd` dans les log
 
-Solutions possibles:
+Les messages de ce sous-processus sont identifiés par `crmd:`.
 
-* `crm_mon`
-* `pcs status`
-* log : "Set DC to "
+2. identifier dans les log qui est le DC
+
+~~~
+crmd:     info: update_dc:    Set DC to hanode1 (3.0.14)
+~~~
+
+À noter que le retrait d'un DC est aussi visible:
+
+~~~
+crmd:     info: update_dc:    Unset DC. Was hanode2
+~~~
 
 :::
 
@@ -1258,7 +1512,7 @@ Solutions possibles:
 
 FIXME diagram
 
-![Diagramme Fencing](medias/pcmk_diag1-fencing.png)
+![Diagramme Fencing](medias/pcmk-archi-fencing.png)
 
 -----
 
@@ -1269,13 +1523,21 @@ FIXME diagram
 * utilise l'API des fencing agent pour exécuter les actions demandées
 * reçoit des commandes du `CRMd` et les passe aux _FA_
 * renvoie le code de retour de l'action au `CRMd`
-* capable de gérer plusieurs niveau de fencing avec ordre de priorité
+* support de plusieurs niveau de fencing avec ordre de priorité
+* outil `stonith-admin`
 * renommé `fenced` depuis la version 2.0
 
 ::: notes
 
 Le daemon `STONITHd` joue sensiblement un rôle identique à celui du `LRMd` vis-à-vis des
 agents de fencing (_FA_).
+
+L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
+
+* `stonith_admin -V --list-registered` : liste les agents configurés
+* `stonith_admin -V --list-installed` : liste tous les agents disponibles
+* `stonith_admin -V -l <nœud>` : liste les agents contrôlant le nœud spécifié.
+* `stonith_admin -V -Q <nœud>` : contrôle l'état d'un nœud.
 
 :::
 
@@ -1323,8 +1585,6 @@ Voici les actions disponibles de l'API des FA:
 
 ### TP: Fencing
 
-Découverte et installation du fencing
-
 ::: notes
 
 Au cours de workshop, nous utilisons l'agent de fencing `fence_virsh`. Il ne
@@ -1332,12 +1592,40 @@ fait pas parti des agents de fencing distribués par défaut et s'installe via l
 paquet `fence-agents-virsh`. Cet agent de fencing est basé sur SSH et la
 commande `virsh`.
 
-Installer les _FA_ : `yum install -y fence-agents-all fence-agents-virsh`
-
-Lister les FA à l'aide de la commande `pcs resource agents stonith` ou
-`stonith_admin -V -I`.
+1. installer tous les _FA_ ainsi que `fence_virsh`
+2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
 
 Nous abordons la création d'une ressource de fencing plus loin dans le workshop.
+
+:::
+
+-----
+
+### Correction: Fencing
+
+::: notes
+
+1. installer tous les _FA_ ainsi que `fence_virsh`
+
+~~~console
+# yum install -y fence-agents-all fence-agents-virsh
+~~~
+
+2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+
+~~~
+# pcs resource agents stonith
+fence_amt_ws
+fence_apc
+fence_apc_snmp
+[...]
+
+# stonith_admin --list-installed
+ fence_xvm
+ fence_wti
+ fence_vmware_soap
+[...]
+~~~
 
 :::
 
@@ -1347,7 +1635,7 @@ Nous abordons la création d'une ressource de fencing plus loin dans le workshop
 
 FIXME diagram
 
-![Diagramme LRM et ressources](medias/pcmk_diag1-resource.png)
+![Diagramme LRM et ressources](medias/pcmk-archi-resource.png)
 
 -----
 
@@ -1453,17 +1741,17 @@ comme étant ceux définis par la spécification LSB:
 <http://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html>
 
 Un ressource peut gérer un service seul (eg. une vIP) au sein du cluster, un
-ensemble de service cloné (eg. Nginx) ou un ensemble de clone "multistate"
+ensemble de service cloné (eg. Nginx) ou un ensemble de clone _multi-state_
 pour lesquels un statut `master` et `slave` est géré par le cluster et le _RA_.
 
-Les _RA_ qui pilotent des ressources "multistate" implémentent obligatoirement
+Les _RA_ qui pilotent des ressources _multi-state_ implémentent obligatoirement
 les actions `promote` et `demote` : une ressource est clonée sur autant de
 nœuds que demandé, démarrée en tant que slave, puis le cluster promeut un ou
 plusieurs `master` parmi les `slave`.
 
 Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
 `migrate_to` et `migrate_from` qui ne sont disponibles qu'aux _RA_ non
-"multistate" (non implémenté dans Pacemaker pour les ressources multistate).
+_multi-state_ (non implémenté dans Pacemaker pour les ressources multistate).
 
 :::
 
@@ -1471,25 +1759,51 @@ Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
 
 ### TP: _Resource Agents_
 
-* installer les _resource agents_
-* lister les RA installés à l'aide de `pcs`
-* afficher les information relatives à l'agent `dummy`
-* afficher les information relatives à l'agent `pgsql`
+::: notes
+
+1. installer les _resource agents_
+2. lister les RA installés à l'aide de `pcs`
+3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
+4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+
+:::
+
+-----
+
+### TP: _Resource Agents_
 
 ::: notes
 
-Installer le paquet `resource-agents` qui installe un grand nombre de RA par défaut: `yum
-install -y resource-agents`.
+1. installer les _resource agents_
 
-Il est possible de lister les RA installés avec la commande suivante: `pcs resource
-agents`.
+Il est normalement déjà installé comme dépendance de pacemaker.
 
-Chaque agent embarque sa propre documentation qui est accessible à l'aide de la commande
-`pcs resource describe <resource agent>`.
+~~~
+yum install -y resource-agents
+~~~
+
+2. lister les RA installés à l'aide de `pcs`
+
+~~~
+pcs resource agents
+~~~
+
+3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
+
+Chaque agent embarque sa propre documentation.
+
+~~~
+pcs resource describe dummy
+~~~
+
+4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
 
 Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de PAF. Vous
-pouvez lister l'ensemble de ses options grâce à la commande `pcs resource describe
-pgsql`.
+pouvez lister l'ensemble de ses options grâce à la commande:
+
+~~~
+pcs resource describe pgsql
+~~~
 
 :::
 
@@ -1511,7 +1825,7 @@ qui permet au cluster d'administrer pleinement une instance PostgreSQL locale.
 Un chapitre entier est dédié à son installation, son fonctionnement et sa
 configuration plus loin dans ce workshop.
 
-![Schema](medias/pcmk_diag2.png)
+![Schema](medias/pcmk-archi-paf-overview.png)
 
 :::
 
@@ -1618,7 +1932,7 @@ La notion de contraintes de localisation est définie dans le chapitre
 
 ## Mode maintenance
 
-Paramètre `maintenance_mode`:
+Paramètre `maintenance-mode`:
 
 * désactive tout contrôle du cluster
 * plus aucun opération n'est exécutée
@@ -1674,7 +1988,28 @@ Pour la liste complète des paramètres globaux du cluster, voir:
 
 ::: notes
 
-Afficher les valeurs par défaut des paramètres abordés :
+1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+
+  * `no-quorum-policy`
+  * `stonith-enabled`
+  * `symmetric-cluster`
+  * `maintenance-mode`
+
+:::
+
+-----
+
+## Correction: paramètres du cluster
+
+::: notes
+
+1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+
+  * `no-quorum-policy`
+  * `stonith-enabled`
+  * `symmetric-cluster`
+  * `maintenance-mode`
+
 
 ~~~console
 # pcs property list --defaults|grep -E "(no-quorum-policy|stonith-enabled|symmetric-cluster|maintenance-mode)"
@@ -1693,9 +2028,9 @@ Afficher les valeurs par défaut des paramètres abordés :
 ## Généralité sur les attributs d'un nœud
 
 * attributs propres à chaque nœud
-* peut être persistant ou non
-* peut stocker n'importe quelle valeur sous n'importe quel nom, eg. `kernel`
-  avec la version du noyau système
+* peut être persistant après reboot ou non
+* peut stocker n'importe quelle valeur sous n'importe quel nom
+* eg. `kernel=4.19.0-8-amd64`
 
 ::: notes
 
@@ -1705,10 +2040,10 @@ La persistance de vos attributs se contrôle avec l'argument `--lifetime`:
 
 * valeur réinitialisée au redémarrage (non persistant) : `--lifetime reboot`
   * note : `--type status` est également accepté. Mentionné dans la
-    documentation mais pas dans le man de la commande 
+    documentation mais pas dans le manuel de la commande 
 * valeur conservée au redémarrage (persistant) : `--lifetime forever`
   * note : `--type nodes` est également accepté. Mentionnée dans la
-    documentation mais pas dans le `man` de la commande 
+    documentation mais pas dans le manuel de la commande 
 
 Exemple pour stocker dans un attribut du nœud nommé `kernel` la version du
 noyau système :
@@ -1720,11 +2055,12 @@ crm_attribute -l forever --node hanode1 --name kernel --update $(uname -r)
 Exemple de l'utilisation d'une rule basée sur un attribut de ce type:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_using_rules_to_determine_resource_location.html#_location_rules_based_on_other_node_properties>
 
-Le _RA_ PAF utilise également les attributs non persistants. À l'annonce d'une
-promotion, chaque esclave renseigne son LSN dans un attribut transient. Lors de
-la promotion, le nœud "élu" compare son LSN avec celui des autres nœuds en
-consultant leur attribut `lsn_location` pour s'assurer qu'il est bien le plus
-avancé.
+Le _RA_ PAF utilise également les attributs non persistants et très
+transitoires. À l'annonce d'une promotion, chaque esclave renseigne son LSN
+dans un attribut transient. Lors de la promotion, le nœud "élu" compare son LSN
+avec celui des autres nœuds en consultant leur attribut `lsn_location` pour
+s'assurer qu'il est bien le plus avancé. Ces attributs sont détruits une fois
+l'élection terminée.
 
 :::
 
@@ -1760,8 +2096,8 @@ l'adresse suivante:
 
 Quelques autres attributs particuliers:
 
-* `fail-count-*`: mode maintenance au niveau du nœud
-* `master-*`: migrer toutes les ressources hors du nœud
+* `fail-count-*`: nombre d'incident par ressource sur le nœud
+* `master-*`: _master score_ de la ressource sur le nœud
 
 ::: notes
 
@@ -1770,7 +2106,7 @@ mémoriser le nombre d'erreur de chaque ressources sur chaque nœud. Préférez
 utiliser `crm_failcount` ou `pcs resource failcount` pour accéder à ces
 informations.
 
-Enfin, il existe des _master score_ pour les ressources de type multistate
+Enfin, il existe des _master score_ pour les ressources de type _multi-state_
 (primaire/secondaire), permettant d'indiquer où l'instance primaire peut ou
 doit se trouver dans le cluster. Il sont préfixé par `master-*`. PAF positionne
 ces scores comme attributs persistants des nœuds. La position de l'instance
@@ -1841,27 +2177,11 @@ cette adresse:
 
 ::: notes
 
-Quelle est la valeur par défaut du paramètre `migration-threshold` ?
- 
-Positionner sa valeur à trois:
-
-~~~console
-# pcs resource defaults
-No defaults set
-# pcs resource defaults migration-threshold=3
-# pcs resource defaults
-migration-threshold: 3
-~~~
-
-Pour supprimer une valeur par defaut:
-
-~~~console
-# pcs resource defaults is-managed=
-Warning: Defaults do not apply to resources which override them with their own defined values
-~~~
-
-Contrôler que les modifications ont bien été prise en compte avec
-`pcs config show`. Consulter les logs pour voir les changements dans la CIB.
+1. trouver la valeur par défaut du paramètre `migration-threshold`
+2. positionner sa valeur à dix
+3. supprimer la valeur par défaut du paramètre `is-managed`
+4. contrôler que les modifications sont prise en compte avec `pcs config show`
+5. observer les modifications de la CIB dans les logs
 
 Remarque: il existe une propriété du cluster `default-resource-stickiness`.
 Cette propriété est dépréciée, il faut utiliser les valeurs par defaut des
@@ -1870,6 +2190,63 @@ ressources à la place.
 ~~~
 pcs property list --defaults |grep -E "resource-stickiness"
  default-resource-stickiness: 0
+~~~
+
+:::
+
+-----
+
+### Correction: paramétrage par défaut des ressources
+
+::: notes
+
+1. trouver la valeur par défaut du paramètre `migration-threshold`
+
+La valeur par défaut est `INFINITY`. Voir:
+
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-options.html#_resource_meta_attributes>
+
+2. positionner sa valeur à dix
+
+~~~console
+# pcs resource defaults migration-threshold=10
+# pcs resource defaults
+migration-threshold: 10
+~~~
+
+3. supprimer la valeur par défaut du paramètre `is-managed`
+
+~~~console
+# pcs resource defaults is-managed=
+Warning: Defaults do not apply to resources which override them with their own defined values
+~~~
+
+4. contrôler que les modifications sont prise en compte avec `pcs config show`
+
+~~~
+# pcs config show
+[...]
+Resources Defaults:
+ migration-threshold=3
+[...]
+~~~
+
+5. observer les modifications de la CIB dans les logs
+
+NB: les log ont ici été remis en forme.
+
+~~~
+cib: info: Forwarding cib_apply_diff operation for section 'all' to all
+cib: info: Diff: --- 0.5.5 2
+cib: info: Diff: +++ 0.6.0 2edcd42b63c34c8c39f2ab281d0c09b8
+cib: info: +  /cib:  @epoch=6, @num_updates=0
+cib: info: ++ /cib/configuration:
+cib: info: ++ <rsc_defaults/>
+cib: info: ++   <meta_attributes id="rsc_defaults-options">
+cib: info: ++     <nvpair id="..." name="migration-threshold" value="3"/>
+cib: info: ++   </meta_attributes>
+cib: info: ++ </rsc_defaults>
+cib: info: Completed cib_apply_diff operation for section 'all': OK
 ~~~
 
 :::
@@ -1927,7 +2304,46 @@ exécuter la commande.
 
 ### TP: Fencing Agent
 
-Nous créons dans ce TP les ressources de fencing au sein de notre cluster.
+::: notes
+
+Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
+fencing configuré.
+
+~~~console
+# crm_verify --verbose --live-check
+~~~
+
+1. afficher la description de l'agent de fencing `fence_virsh`
+
+Nous allons utiliser les paramètres suivants:
+
+* `ipaddr`: adresse de l'hyperviseur sur lequel se connecter en SSH
+* `login`: utilisateur SSH pour se connecter à l'hyperviseur
+* `identity_file`: chemin vers la clé privée SSH à utiliser pour l'authentification
+* `login_timeout`: timeout du login SSH
+* `port`: nom de la VM à isoler dans libvirtd
+
+Les autres paramètres sont décrits dans le slide précédent.
+
+Bien s'assurer que chaque nœud peut se connecter en SSH sans mot de passe à
+l'hyperviseur.
+
+2. créer une ressource de fencing pour chaque nœud du cluster
+
+Les agents de fencing sont des ressources en HA prises en charge par le
+cluster. Dans le cadre de ce TP, nous créons une ressource par nœud,
+chacune responsable d'isoler un nœud.
+
+3. vérifier que le cluster ne présente plus d'erreur
+4. vérifier que ces ressources ont bien été créées et démarrées
+5. afficher la configuration des agents de fencing
+6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+
+:::
+
+-----
+
+### Correction: Fencing Agent
 
 ::: notes
 
@@ -1935,83 +2351,93 @@ Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA 
 fencing configuré.
 
 ~~~console
-# crm_verify -VL
+# crm_verify --verbose --live-check
+   error: unpack_resources:	Resource start-up disabled since no STONITH resources have been defined
+   error: unpack_resources:	Either configure some or disable STONITH with the stonith-enabled option
+   error: unpack_resources:	NOTE: Clusters with shared data need STONITH to ensure data integrity
+Errors found during check: config not valid
 ~~~
 
-Afficher la description de l'agent de fencing fence_virsh :
+
+1. afficher la description de l'agent de fencing `fence_virsh`
 
 ~~~
-pcs resource describe stonith:fence_virsh
+# pcs resource describe stonith:fence_virsh
 ~~~
 
-* Certaines propriétés sont spécifiques à l'agent
-* D'autres globales à pacemaker : "pcmk_\*"
+2. créer une ressource de fencing pour chaque nœud du cluster
 
-Les agents de fencing sont des ressources en HA prises en charge par le
-cluster. Dans le cadre de ce TP, nous créons une ressource par nœud,
-chacune responsable d'isoler un nœud.
-
-Concernant la configuration de l'agent:
-
-* `ipaddr`: adresse de l'hyperviseur sur lequel se connecter en SSH
-* `login`: utilisateur SSH pour se connecter à l'hyperviseur
-* `identity_file`: chemin vers la clé privée SSH à utiliser pour l'authentification
-* `login_timeout`: timeout du login SSH
-* `port`: nom de la VM à isoler dans libvirtd
-* les autres paramètres sont décrits dans le slide précédent
-* bien s'assurer que chaque nœud peut se connecter en SSH sans mot de passe à
-  l'hyperviseur
+Adapter `pcmk_host_list`, `ipaddr`, `login` et `port` à votre environnement.
 
 ~~~console
 # pcs stonith create fence_vm_hanode1 fence_virsh pcmk_host_check="static-list" \
-pcmk_host_list="hanode1" ipaddr="192.168.122.1" login="user"                    \
+pcmk_host_list="hanode1" ipaddr="10.20.30.1" login="user"                       \
 port="centos7_hanode1" pcmk_reboot_action="reboot"                              \
 identity_file="/root/.ssh/id_rsa" login_timeout=15
 
 # pcs stonith create fence_vm_hanode2 fence_virsh pcmk_host_check="static-list" \
-pcmk_host_list="hanode2" ipaddr="192.168.122.1" login="user"                    \
+pcmk_host_list="hanode2" ipaddr="10.20.30.1" login="user"                       \
 port="centos7_hanode2" pcmk_reboot_action="reboot"                              \
 identity_file="/root/.ssh/id_rsa" login_timeout=15
 
 # pcs stonith create fence_vm_hanode3 fence_virsh pcmk_host_check="static-list" \
-pcmk_host_list="hanode3" ipaddr="192.168.122.1" login="user"                    \
+pcmk_host_list="hanode3" ipaddr="10.20.30.1" login="user"                       \
 port="centos7_hanode3" pcmk_reboot_action="reboot"                              \
 identity_file="/root/.ssh/id_rsa" login_timeout=15
+~~~
 
+3. vérifier que le cluster ne présente plus d'erreur
+
+~~~console
 # crm_verify -VL
+# echo $?
+0
+~~~
+
+4. vérifier que ces ressources ont bien été créées et démarrées
+
+~~~console
 # pcs status
+[...]
+3 nodes configured
+3 resources configured
+
+Online: [ hanode1 hanode2 hanode3 ]
+
+Full list of resources:
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode3
+[...]
 ~~~
 
-L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
-
-* `stonith_admin -V --list-registered` : liste les agents configurés
-* `stonith_admin -V --list-installed` : liste tous les agents disponibles
-* `stonith_admin -V -l <nœud>` : liste les agents contrôlant le nœud spécifié.
-* `stonith_admin -V -Q <nœud>` : contrôle l'état d'un nœud.
-
-Une fois les agents configuré, le debug dans log présente régulièrement
-l'activité de surveillance de ceux-ci. Par exemple:
+5. afficher la configuration des agents de fencing
 
 ~~~
-lrmd:    debug: log_execute:        executing - rsc:fence_vm_hanode1 action:monitor call_id:36
-lrmd:    debug: log_finished:       finished - rsc:fence_vm_hanode1 action:monitor call_id:36  exit-code:0 exec-time:1248ms queue-time:0ms
+# pcs stonith show --full
+ Resource: fence_vm_hanode1 (class=stonith type=fence_virsh)
+  Attributes: identity_file=/root/.ssh/id_rsa ipaddr=10.20.30.1 login=ioguix login_timeout=15 pcmk_host_check=static-list pcmk_host_list=hanode1 pcmk_reboot_action=reboot port=paf_3n-vip_hanode1
+  Operations: monitor interval=60s (fence_vm_hanode1-monitor-interval-60s)
+ Resource: fence_vm_hanode2 (class=stonith type=fence_virsh)
+  Attributes: identity_file=/root/.ssh/id_rsa ipaddr=10.20.30.1 login=ioguix login_timeout=15 pcmk_host_check=static-list pcmk_host_list=hanode2 pcmk_reboot_action=reboot port=paf_3n-vip_hanode2
+  Operations: monitor interval=60s (fence_vm_hanode2-monitor-interval-60s)
+ Resource: fence_vm_hanode3 (class=stonith type=fence_virsh)
+  Attributes: identity_file=/root/.ssh/id_rsa ipaddr=10.20.30.1 login=ioguix login_timeout=15 pcmk_host_check=static-list pcmk_host_list=hanode3 pcmk_reboot_action=reboot port=paf_3n-vip_hanode3
+  Operations: monitor interval=60s (fence_vm_hanode3-monitor-interval-60s)
 ~~~
 
-Maintenant que les _FA_ ont été créés, observer où ils sont _démarrés_:
+6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+
+Les log ont été remis en forme.
 
 ~~~
-pcs status
-~~~
-
-Afficher la configuration des agents de fencing ?
-
-~~~
-pcs stonith show --full
+lrmd: debug: executing - rsc:fence_vm_hanode1 action:monitor call_id:7
+lrmd: debug: finished - rsc:fence_vm_hanode1 action:monitor call_id:7  exit-code:0
+crmd:  info: Result of monitor operation for fence_vm_hanode1 on hanode1: 0 (ok) 
 ~~~
 
 :::
-
------
 
 -----
 
@@ -2095,30 +2521,87 @@ Enfin, les scores sont consultables grâce à l'outil `crm_simulate`.
 
 ### TP: création des contraintes de localisation
 
-Définition des contraintes sur les ressources de fencing
+::: notes
+
+1. afficher les scores au sein du cluster
+
+Noter quel nœud est responsable de chaque ressource de fencing
+
+2. positionner les stickiness de toutes les ressources à `1`
+3. comparer l'évolution des scores
+4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
+   évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
+   contraintes.
+5. observer les changements de placement et de score par rapport à l'état
+   précédent
+6. afficher les contraintes existantes à l'aide de `pcs`
+
+:::
+
+-----
+
+### Correction: création des contraintes de localisation
 
 ::: notes
 
-Afficher la configuration et noter quel nœud est responsable de chaque
-ressource de fencing.
-
-Quels sont les scores au sein du cluster?
+1. afficher les scores au sein du cluster
 
 ~~~console
-# crm_simulate -sL
+# crm_simulate --show-scores --live-check
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode3
+
+Allocation scores:
+native_color: fence_vm_hanode1 allocation score on hanode1: 0
+native_color: fence_vm_hanode1 allocation score on hanode2: 0
+native_color: fence_vm_hanode1 allocation score on hanode3: 0
+native_color: fence_vm_hanode2 allocation score on hanode1: 0
+native_color: fence_vm_hanode2 allocation score on hanode2: 0
+native_color: fence_vm_hanode2 allocation score on hanode3: 0
+native_color: fence_vm_hanode3 allocation score on hanode1: 0
+native_color: fence_vm_hanode3 allocation score on hanode2: 0
+native_color: fence_vm_hanode3 allocation score on hanode3: 0
+
+Transition Summary:
 ~~~
 
-Ajouter une valeur de `1` au stickiness de toutes les ressources:
+Ici, `fence_vm_hanode1` est surveillé depuis `hanode1`, `fence_vm_hanode2`
+depuis `hanode2` et `fence_vm_hanode3` depuis `hanode3`.
+
+2. positionner les stickiness de toutes les ressources à `1`
 
 ~~~console
 # pcs resource defaults resource-stickiness=1
 ~~~
 
-Comparer l'évolution des scores.
+3. comparer l'évolution des scores
 
-Ajouter des contraintes d'exclusion pour que chaque stonith évite le nœud dont
-il est responsable. Utiliser un poids de 100 pour ces contraintes. Observer les
-changements de placement et de score par rapport à l'état précédent.
+~~~console
+# crm_simulate -sL
+[...]
+Allocation scores:
+native_color: fence_vm_hanode1 allocation score on hanode1: 1
+native_color: fence_vm_hanode1 allocation score on hanode2: 0
+native_color: fence_vm_hanode1 allocation score on hanode3: 0
+native_color: fence_vm_hanode2 allocation score on hanode1: 0
+native_color: fence_vm_hanode2 allocation score on hanode2: 1
+native_color: fence_vm_hanode2 allocation score on hanode3: 0
+native_color: fence_vm_hanode3 allocation score on hanode1: 0
+native_color: fence_vm_hanode3 allocation score on hanode2: 0
+native_color: fence_vm_hanode3 allocation score on hanode3: 1
+~~~
+
+Le score de chaque ressource a augmenté de `1` pour le nœud sur lequel 
+elle est "démarrée".
+
+4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
+   évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
+   contraintes.
 
 ~~~console
 # pcs constraint location fence_vm_hanode1 avoids hanode1=100
@@ -2130,18 +2613,70 @@ Notez que les deux syntaxes proposées sont équivalentes du point de vue du
 résultat dans la CIB.
 
 ~~~
-cibadmin -Q --xpath='//rsc_location'
+# cibadmin -Q --xpath='//rsc_location'
 ~~~
 
-Vérifier l'état du cluster et les nouveaux scores:
+5. observer les changements de placement et de score par rapport à l'état
+   précédent
 
 ~~~console
-# crm_verify -VL
 # crm_simulate -sL
-# pcs status
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+
+Allocation scores:
+native_color: fence_vm_hanode1 allocation score on hanode1: -100
+native_color: fence_vm_hanode1 allocation score on hanode2: 1
+native_color: fence_vm_hanode1 allocation score on hanode3: 0
+native_color: fence_vm_hanode2 allocation score on hanode1: 1
+native_color: fence_vm_hanode2 allocation score on hanode2: -100
+native_color: fence_vm_hanode2 allocation score on hanode3: 0
+native_color: fence_vm_hanode3 allocation score on hanode1: 1
+native_color: fence_vm_hanode3 allocation score on hanode2: 0
+native_color: fence_vm_hanode3 allocation score on hanode3: -100
+
+Transition Summary:
+~~~
+
+Chaque ressource a changé de nœud afin de ne plus résider sur celui qu'elle
+doit éventuellement isoler.
+
+Un score négatif de `-100` correspondant à la contrainte créée est positionné
+pour chaque ressource sur le nœud qu'elle doit éventuellement isoler.
+
+6. afficher les contraintes existantes à l'aide de `pcs`
+
+~~~console
 # pcs constraint location show
+Location Constraints:
+  Resource: fence_vm_hanode1
+    Disabled on: hanode1 (score:-100)
+  Resource: fence_vm_hanode2
+    Disabled on: hanode2 (score:-100)
+  Resource: fence_vm_hanode3
+    Disabled on: hanode3 (score:-100)
+
 # pcs constraint location show nodes
+Location Constraints:
+  Node: hanode1
+    Not allowed to run:
+      Resource: fence_vm_hanode1 (location-fence_vm_hanode1-hanode1--100) Score: -100
+  Node: hanode2
+    Not allowed to run:
+      Resource: fence_vm_hanode2 (location-fence_vm_hanode2-hanode2--100) Score: -100
+  Node: hanode3
+    Not allowed to run:
+      Resource: fence_vm_hanode3 (location-fence_vm_hanode3-hanode3--100) Score: -100
+
 # pcs constraint location show resources fence_vm_hanode1
+Location Constraints:
+  Resource: fence_vm_hanode1
+    Disabled on: hanode1 (score:-100)
 ~~~
 
 :::
@@ -2253,64 +2788,176 @@ actions palliatives à cette erreur (eg. _recovery_ ou _failover_).
 
 ### TP: création d'une ressource dans le cluster
 
-Création d'une première ressource "Dummy" en HA.
+::: notes
 
-Ce _resource agent_ existe seulement à titre de démonstration et
-d'expérimentation.
+Création d'une première ressource "Dummy". Ce _resource agent_ existe
+seulement à titre de démonstration et d'expérimentation.
+
+1. afficher les détails de l'agent Dummy
+2. créer le sous-répertoire `/opt/sub` sur les 3 nœuds.
+3. créer une ressource `dummy1` utilisant le _RA_ Dummy
+
+Il est possible de travailler sur un fichier XML offline en précisant
+l'argument `-f /chemin/vers/xml` à la commande `pcs`. Utiliser un fichier
+`dummy1.xml` pour créer la ressource et ses contraintes en une seule
+transition.
+
+* positionner le paramètre `state` à la valeur `/opt/sub/dummy1.state`
+* vérifier son état toutes les 10 secondes
+* positionner son attribut `migration-threshold` à `3`
+* positionner son attribut `failure-timeout` à `4h`
+* positionner un `stickiness` faible de `1`
+* ajouter une forte préférence de `100` pour le nœud hanode1
+
+Tout ce paramétrage doit être en surcharge des éventuelles valeurs par
+défaut du cluster.
+
+4. contrôler le contenu du fichier `dummy1.xml` et simuler son application
+   avec `crm_simulate`
+5. publier les modifications dans le cluster
+6. consulter les logs du DC
+7. observer les changements opérés
+
+:::
+
+-----
+
+### Correction: création d'une ressource dans le cluster
 
 ::: notes
 
-Détails de l'agent Dummy
+
+1. afficher les détails de l'agent Dummy
 
 ~~~console
 # pcs resource describe ocf:pacemaker:Dummy
 ~~~
 
-Créer une ressource `dummy1` utilisant le _RA_ Dummy:
+2. créer le sous-répertoire `/opt/sub` sur les 3 nœuds.
 
-* modifier le paramètre `state` avec la valeur `/tmp/sub/dummy1.state`
-* vérifier son état toutes les 10 secondes
-* positionner son attribut `migration-threshold` (surcharge la valeur par défaut du cluster)
-* positionner son attribut `failure-timeout` à 4h
-* lui positionner un `stickiness` faible (1 par exemple, surcharge la valeur par défaut du cluster)
-* forte préférence pour le nœud 1 (100 par exemple)
+Sur chaque nœud:
 
-Note: il est important d'utiliser un fichier xml pour appliquer les contraintes
-de localisation avant de démarrer la ressource. Il est possible de travailler
-sur un fichier XML offline en précisant l'argument `-f /chemin/vers/xml` à la
-commande `pcs`.
+~~~console
+# mkdir -p /opt/sub
+~~~
 
-Créer le sous-répertoire `/tmp/sub` sur les 3 nœuds.
+3. créer une ressource `dummy1` utilisant le _RA_ Dummy
 
 ~~~console
 # pcs cluster cib dummy1.xml
 
-# pcs -f dummy1.xml resource create dummy1 ocf:pacemaker:Dummy       \
-state=/tmp/sub/dummy1.state                                          \
-op monitor interval=10s                                              \
-meta migration-threshold=3 failure-timeout=4h resource-stickiness=1
+# pcs -f dummy1.xml resource create dummy1 ocf:pacemaker:Dummy \
+    state=/opt/sub/dummy1.state                                \
+    op monitor interval=10s                                    \
+    meta migration-threshold=3                                 \
+    meta failure-timeout=4h                                    \
+    meta resource-stickiness=1
 
 # pcs -f dummy1.xml constraint location dummy1 prefers hanode1=100
 ~~~
 
-Contrôler le contenu du fichier `dummy1.xml` avant de pousser la configuration:
+4. contrôler le contenu du fichier `dummy1.xml` et simuler son application
+avec `crm_simulate`
 
-~~~ console
-# pcs cluster verify -V dummy1.xml  # controle la syntaxe
-# crm_simulate -S -x dummy1.xml     # simule l'effet de la commande sur le cluster
+Contrôle de la syntaxe:
 
+~~~console
+# crm_verify -V --xml-file dummy1.xml
+# pcs cluster verify -V dummy1.xml  # alternative avec pcs
+~~~
+
+Simuler ces modifications:
+
+~~~
+# crm_simulate --simulate --xml-file dummy1.xml
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ dummy1	(ocf::pacemaker:Dummy):	Stopped
+
+Transition Summary:
+ * Start      dummy1     ( hanode1 )  
+
+Executing cluster transition:
+ * Resource action: dummy1          monitor on hanode3
+ * Resource action: dummy1          monitor on hanode2
+ * Resource action: dummy1          monitor on hanode1
+ * Resource action: dummy1          start on hanode1
+ * Resource action: dummy1          monitor=10000 on hanode1
+
+Revised cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ dummy1	(ocf::pacemaker:Dummy):	Started hanode1
+~~~
+
+Nous observons dans cette sortie:
+
+* l'état du cluster avant la transition (`Current cluster status`)
+* les actions à réaliser (`Transition Summary` et `Executing cluster transition`)
+* l'état attendu du cluster après transition (`Revised cluster status`)
+
+5. publier les modifications dans le cluster
+
+~~~
 # pcs cluster cib-push dummy1.xml
 ~~~
 
-Consulter les logs du DC.
+6. consulter les logs du DC
+
+Les log ont été remis en forme.
+
+Actions prévues par `pengine`:
+
+~~~
+pengine:     info: RecurringOp:  Start recurring monitor (10s) for dummy1 on hanode1
+pengine:     info: LogActions:   Leave   fence_vm_hanode1        (Started hanode2)
+pengine:     info: LogActions:   Leave   fence_vm_hanode2        (Started hanode1)
+pengine:     info: LogActions:   Leave   fence_vm_hanode3        (Started hanode1)
+pengine:   notice: LogAction:  * Start      dummy1               (        hanode1)  
+pengine:   notice: Calculated transition 21, saving in /.../pengine/pe-input-11.bz2
+~~~
+
+Actions initiées par `crmd`:
+
+~~~
+crmd:   info: Processing graph 21 derived from /var/.../pengine/pe-input-11.bz2
+crmd: notice: Initiating monitor operation dummy1_monitor_0 on hanode3 | action 6
+crmd: notice: Initiating monitor operation dummy1_monitor_0 on hanode2 | action 5
+crmd: notice: Initiating monitor operation dummy1_monitor_0 locally on hanode1 | action 4
+crmd:   info: Action dummy1_monitor_0 (5) confirmed on hanode2 (rc=7)
+crmd:   info: Action dummy1_monitor_0 (6) confirmed on hanode3 (rc=7)
+crmd:   info: Action dummy1_monitor_0 (4) confirmed on hanode1 (rc=7)
+crmd: notice: Result of probe operation for dummy1 on hanode1: 7 (not running)
+
+crmd: notice: Initiating start operation dummy1_start_0 locally on hanode1
+lrmd:   info: executing - rsc:dummy1 action:start call_id:26
+lrmd:   info: finished - rsc:dummy1 action:start call_id:26 exit-code:0
+crmd: notice: Result of start operation for dummy1 on hanode1: 0 (ok)
+
+crmd: notice: Initiating monitor operation dummy1_monitor_10000 locally on hanode1
+lrmd:  debug: executing - rsc:dummy1 action:monitor call_id:27
+~~~
+
+Les actions `dummy1_monitor_0` vérifient que la ressource n'est démarrée pas
+démarrée sur le nœud concerné. Ensuite, la ressource est démarrée sur
+`hanode1` avec l'opération `dummy1_start_0`. Puis l'action de surveillance
+`dummy1_monitor_10000` récurrente toutes les 10 secondes (`10000`ms) est
+démarrée.
+
+7. observer les changements
 
 ~~~console
 # pcs status
-
 # pcs config show
 ~~~
-
-Observer les changements opérés par le _scheduler_.
 
 :::
 
@@ -2347,42 +2994,102 @@ soit montée sur le même nœud que le master.
 
 ### TP: création des _RA_ (dummy2) dans le cluster
 
-Ajout d'un second service Dummy et de contraintes de localisation.
 
 ::: notes
 
-Ajouter une ressource dummy2:
+1. ajouter une ressource `dummy2`
 
-* ne doit jamais démarrer sur le même nœud que `dummy1` (contrainte de localisation)
-* modifier le paramètre `state` avec la valeur `/tmp/sub/dummy2.state`
+Utiliser un fichier `dummy2.xml` pour préparer les actions.
+
+* positionner le paramètre `state` à la valeur `/opt/sub/dummy2.state`
 * vérifier son état toutes les 10 secondes
-* positionner son attribut `migration-threshold`
-* positionner son attribut `failure-timeout` à 4h
-* lui positionner un `stickiness` élevé (100 par exemple)
-* préférence faible pour le nœud 2 (10 par exemple)
+* positionner son attribut `migration-threshold` à `3`
+* positionner son attribut `failure-timeout` à `4h`
+* positionner un `stickiness` élevé de `100`
+* interdire la ressource de démarrer sur le même nœud que `dummy1`
+* ajouter une faible préférence de `10` pour le nœud hanode2
 
 Note : il est important d'utiliser un fichier xml pour appliquer les contraintes de localisation avant de démarrer la
 ressource
 
+4. contrôler le contenu du fichier `dummy2.xml` et simuler son application
+5. publier les modifications dans le cluster
+6. observer les changements
+
+:::
+
+-----
+
+### Correction: création des _RA_ (dummy2) dans le cluster
+
+::: notes
+
+
+1. ajouter une ressource `dummy2`
+
 ~~~console
 # pcs cluster cib dummy2.xml
 
-# pcs -f dummy2.xml resource create dummy2 ocf:pacemaker:Dummy       \
-state=/tmp/sub/dummy2.state                                          \
-op monitor interval=10s                                              \
-meta migration-threshold=3 failure-timeout=4h resource-stickiness=100
+# pcs -f dummy2.xml resource create dummy2 ocf:pacemaker:Dummy \
+    state=/opt/sub/dummy2.state                                \
+    op monitor interval=10s                                    \
+    meta migration-threshold=3                                 \
+    meta failure-timeout=4h                                    \
+    meta resource-stickiness=100
 
-# pcs -f dummy2.xml constraint location dummy2 prefers hanode1=10
+# pcs -f dummy2.xml constraint location dummy2 prefers hanode2=10
 
 # pcs -f dummy2.xml constraint colocation add dummy2 with dummy1 -INFINITY
+~~~
 
-# pcs cluster verify -V dummy3.xml
-# crm_simulate -S -x dummy3.xml
+4. contrôler le contenu du fichier `dummy2.xml` et simuler son application
 
+~~~console
+# pcs cluster verify -V dummy2.xml
+# crm_simulate -S -x dummy2.xml
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ dummy1	(ocf::pacemaker:Dummy):	Started hanode1
+ dummy2	(ocf::pacemaker:Dummy):	Stopped
+
+Transition Summary:
+ * Start      dummy2     ( hanode3 )  
+
+Executing cluster transition:
+ * Resource action: dummy2          monitor on hanode3
+ * Resource action: dummy2          monitor on hanode2
+ * Resource action: dummy2          monitor on hanode1
+ * Resource action: dummy2          start on hanode3
+ * Resource action: dummy2          monitor=10000 on hanode3
+
+Revised cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ dummy1	(ocf::pacemaker:Dummy):	Started hanode1
+ dummy2	(ocf::pacemaker:Dummy):	Started hanode3
+~~~
+
+Ici, `pengine` a prévu de démarrer `dummy2` sur `hanode3`.
+
+5. publier les modifications dans le cluster
+
+~~~console
 # pcs cluster cib-push dummy2.xml
+~~~
 
+6. observer les changements opérés
+
+~~~console
+# crm_mon -Dn
 # pcs status
-
 # pcs config show
 ~~~
 
@@ -2426,31 +3133,72 @@ s'applique aussi pour les actions opposées, mais dans l'ordre inverse.
 
 ### TP: Contrainte d'ordre
 
-* créer une contrainte d'ordre non symétrique entre le démarrage de la
-  ressource `dummy1` et `dummy2`
-* arrêter la ressource `dummy1`, quel est l'influence sur `dummy2` ?
-* arrêter la ressource `dummy2`, puis démarrer `dummy2`
-* vérifiez dans les log __du DC__ l'ordre des actions
+::: notes
+
+Il est recommandé de conserver un terminal avec un `crm_mon` actif tout au long
+de ce TP.
+
+1. créer une contrainte d'ordre non symétrique qui force le démarrage de
+`dummy1` avant celui de `dummy2`
+2. arrêter la ressource `dummy1` et observer l'influence sur `dummy2`
+3. arrêter la ressource `dummy2`, puis démarrer `dummy2`
+4. démarrer `dummy1`
+5. vérifiez dans les log __du DC__ l'ordre des actions
+
+:::
+
+-----
+
+### Correction: Contrainte d'ordre
 
 ::: notes
+
+Il est recommandé de conserver un terminal avec un `crm_mon` actif tout au long
+de ce TP.
+
+1. créer une contrainte d'ordre non symétrique qui force le démarrage de
+   `dummy1` avant celui de `dummy2`
 
 ~~~console
 # pcs constraint order start dummy1 then start dummy2 symmetrical=false kind=Mandatory
 Adding dummy1 dummy2 (kind: Mandatory) (Options: first-action=start then-action=start symmetrical=false)
+~~~
 
+2. arrêter la ressource `dummy1` et observer l'influence sur `dummy2`
+
+~~~console
 # pcs resource disable dummy1
+~~~
 
-# pcs resource disable dummy2
+La ressource `dummy2` ne s'arrête pas. La contrainte ne concerne que le
+démarrage des deux ressources.
+
+3. arrêter la ressource `dummy2`, puis démarrer `dummy2`
+
+~~~console
+# pcs resource disable --wait dummy2
 # pcs resource enable dummy2
+~~~
+
+La ressource `dummy2` ne démarre pas. Cette dernière ne peut démarrer
+qu'après le démarrage de `dummy1`, mais cette dernière est arrêtée.
+
+4. démarrer `dummy1`
+
+~~~console
 # pcs resource enable dummy1
 ~~~
 
-Sur le DC:
+Les deux ressources démarrent.
+
+5. vérifiez dans les log __du DC__ l'ordre des actions
+
+Les log ont été remis en forme.
 
 ~~~console
 # grep 'dummy._start.*confirmed' /var/log/cluster/corosync.log
-Jan 29 16:30:28 [4836] srv3       crmd:     info: match_graph_event:	Action dummy1_start_0 (48) confirmed on srv2 (rc=0)
-Jan 29 16:30:28 [4836] srv3       crmd:     info: match_graph_event:	Action dummy2_start_0 (50) confirmed on srv2 (rc=0)
+crmd:  info:  Action dummy1_start_0 (48) confirmed on hanode1 (rc=0)
+crmd:  info:  Action dummy2_start_0 (50) confirmed on hanode3 (rc=0)
 ~~~
 
 L'ordre des action est précisé par leur ID, ici 48 et 50. Il est possible
@@ -2493,29 +3241,97 @@ master et la VIP.
 
 ### TP: groupe de ressource
 
-* créer un ressource dummy3 en spécifiant un interval de monitoring, ainsi que les paramètres migration-threshold failure-timeout et resource-stickiness
-* créer un group dummygroup qui regroupe les ressources dummy3 et dummy2 dans cet ordre
-* créer une contrainte d'ordre entre le démarrage de la ressource dummy1 et dummy3
-* redémarrer le cluster et se connecter sur le DC
-* observer l'ordre choisi par pengine pour le démarrage de l'ensemble des ressources
+::: notes
+
+1. créer une ressource `dummy3`
+
+Utiliser un fichier `dummy3.xml` pour préparer les actions.
+
+* positionner le paramètre `state` à la valeur `/opt/sub/dummy3.state`
+* vérifier son état toutes les 10 secondes
+* positionner son attribut `migration-threshold` à `3`
+* positionner son attribut `failure-timeout` à `4h`
+* positionner un `stickiness` élevé de `100`
+
+2. créer un group `dummygroup` qui regroupe les ressources `dummy3` et
+   `dummy2` dans cet ordre
+3. créer une contrainte d'ordre qui impose de démarrer `dummy1` avant `dummy3`
+4. créer une contrainte d'exclusion entre `dummygroup` et `dummy1` d'un score
+   de `-1000`
+5. appliquer les modifications au cluster
+6. désactiver les ressources `dummy1`, `dummy2` et `dummy3`, puis les
+   réactiver en même temps
+7. observer l'ordre choisi par pengine pour le démarrage de l'ensemble des ressources
+
+:::
+
+-----
+
+### Correction: groupe de ressource
 
 ::: notes
 
+1. créer une ressource `dummy3`
+
 ~~~console
-# pcs cluster cib > dummy3.xml
+# pcs cluster cib dummy3.xml
 
-# pcs -f dummy3.xml ressource create dummy3 ocf:pacemaker:Dummy state=/tmp/sub/dummy3.state op monitor interval=10s meta migration-threshold=3 failure-timeout=4h resource-stickiness=100
+# pcs -f dummy3.xml resource create dummy3 ocf:pacemaker:Dummy \
+    state=/opt/sub/dummy3.state                                \
+    op monitor interval=10s                                    \
+    meta migration-threshold=3                                 \
+    meta failure-timeout=4h                                    \
+    meta resource-stickiness=100
+~~~
 
+2. créer un group `dummygroup` qui regroupe les ressources `dummy3` et `dummy2` dans cet ordre
+
+~~~console
 # pcs -f dummy3.xml resource group add dummygroup dummy3 dummy2
+~~~
 
+3. créer une contrainte d'ordre qui impose de démarrer `dummy1` avant `dummy3`
+
+~~~console
 # pcs -f dummy3.xml constraint order start dummy1 then start dummy3 symmetrical=false kind=Mandatory
 Adding dummy1 dummy3 (kind: Mandatory) (Options: first-action=start then-action=start symmetrical=false)
+~~~
 
+4. créer une contrainte d'exclusion entre `dummygroup` et `dummy1` d'un score
+   de `-1000`
+
+~~~console
+# pcs -f dummy3.xml constraint colocation add dummygroup with dummy1 -1000
+~~~
+
+5. appliquer les modifications au cluster
+
+~~~console
 # pcs cluster verify -V dummy3.xml
 # crm_simulate -S -x dummy3.xml
 
 # pcs cluster cib-push dummy3.xml
 CIB updated
+~~~
+
+6. désactiver les ressources `dummy1`, `dummy2` et `dummy3`, puis les
+   réactiver en même temps
+
+~~~
+# pcs resource disable --wait dummy1 dummy2 dummy3
+# pcs resource enable dummy1 dummy2 dummy3
+~~~
+
+7. observer l'ordre choisi par pengine pour le démarrage de l'ensemble des ressources
+
+Les ressources sont démarrés dans l'ordre suivant: `dummy1`, `dummy3` puis
+`dummy2`. Les log ont été remis en forme.
+
+~~~
+# grep 'dummy._start.*confirmed' /var/log/cluster/corosync.log
+crmd:  info: Action dummy1_start_0 (10) confirmed on hanode1 (rc=0)
+crmd:  info: Action dummy3_start_0 (12) confirmed on hanode3 (rc=0)
+crmd:  info: Action dummy2_start_0 (14) confirmed on hanode3 (rc=0)
 ~~~
 
 :::
@@ -2526,22 +3342,50 @@ CIB updated
 
 ::: notes
 
-* provoquer une défaillance de `dummy1` et observer la réaction du cluster
+Nous provoquons dans ce TP une défaillance pour travailler dessus.
+
+1. renommer `/opt/sub` en `/opt/sub2` sur le nœud hébergeant `dummy1`
+
+Attendre que le cluster réagisse à la défaillance.
+
+2. observer le failcount de `dummy1` avec `crm_failcount` ou `pcs`
+3. chercher dans les log les causes de cette valeur
+4. réparer le problème sur `hanode1` et réinitialiser le failcount avec `pcs`
+5. expliquer le comportement de `dummy1`
+
+Conseil: observer les scores.
+
+:::
+
+-----
+
+### Correction: failcounts
+
+::: notes
+
+1. renommer `/opt/sub` en `/opt/sub2` sur le nœud hébergeant `dummy1`
+
+Observer le cluster et ses réactions dans un terminal à l'aide de `crm_mon`:
 
 ~~~console
-# mv /tmp/sub /tmp/sub2
-# crm_mon -nf
+# crm_mon -Dnf
 ~~~
 
-`dummy1` a migré vers `hanode2` des que le `failcount` dépasse le `migration-threshold`.
+Renommer le répertoire pour provoquer une défaillance:
 
-Regarder le failcount :
+~~~console
+# mv /opt/sub /opt/sub2
+~~~
+
+Attendre que le cluster réagisse à la défaillance.
+
+2. observer le failcount de `dummy1` avec `crm_failcount` ou `pcs`
 
 ~~~console
 # crm_failcount -r dummy1 -N hanode1 -G
 scope=status  name=fail-count-dummy1 value=INFINITY
 
-# crm_failcount -r dummy1 -N hanode2 -G
+# crm_failcount -r dummy1 -N hanode3 -G
 scope=status  name=fail-count-dummy1 value=0
 
 # pcs resource failcount show dummy1
@@ -2549,18 +3393,541 @@ Failcounts for dummy1
 hanode1: INFINITY
 ~~~
 
-En observant les traces, on s'aperçoit que le failcount a augmenté de 1 lors de l'erreur de monitoring, puis est
-passé à `INFINITY` lors de l'erreur sur start.
+3. chercher dans les log les causes de cette valeur
 
-Réparer le problème et réinitialiser le failcount :
+Rechercher dans les log du DC les mots clé `failcount` et `dummy1` pour
+identifier les messages relatifs à cette activité. Ci-après une explication
+des log remis en forme.
 
-~~~console
-# mv /tmp/sub2 /tmp/sub
-# pcs resource cleanup dummy1
-# crm_mon -nf
+Détection de l'erreur lors d'une opération `monitor` et incrément du
+failcount pour la ressource sur le nœud où elle se situe:
+
+~~~
+crmd:  info: Updating failcount for dummy1 on hanode1 after failed monitor: rc=7 (update=value++)
+attrd: info: Expanded fail-count-dummy1#monitor_10000=value++ to 1
+attrd: info: Setting fail-count-dummy1#monitor_10000[hanode1]: (null) -> 1
 ~~~
 
-La ressource `dummy1` revient à sa position d'origine. Expliquer pourquoi? (score de préférence, stickiness...)
+Calcul d'une transition afin de rétablir un état stable du cluster. Le
+sous-processus `pengine` prévoit de redémarrer `dummy1` sur son nœud courant:
+
+~~~
+pengine:   info:   Start recurring monitor (10s) for dummy1 on hanode1
+pengine: notice: * Recover  dummy1  (        hanode1)  
+pengine:   info:   Leave    dummy3  (Started hanode2)
+pengine:   info:   Leave    dummy2  (Started hanode2)
+~~~
+
+Ce choix dépend de la propriété `on-fail` de l'opération, à `restart` par
+défaut. Pour plus de détail, voir:
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_resource_operations.html#s-operation-properties>
+
+L'action `recovery` consiste a arrêter et démarrer la ressource concernée.
+Une fois l'opération `stop` réalisée, nous observons que le `start` échoue. 
+
+~~~
+crmd:  notice: te_rsc_command:    Initiating stop operation dummy1_stop_0 on hanode1
+crmd:    info: match_graph_event: Action dummy1_stop_0 (6) confirmed on hanode1 (rc=0)
+crmd:  notice: te_rsc_command:    Initiating start operation dummy1_start_0 on hanode1
+crmd: warning: status_from_rc:    Action 14 (dummy1_start_0) on hanode1 failed (target: 0 vs. rc: 1): Error
+crmd:  notice: abort_transition_graph:    Transition aborted by operation dummy1_start_0 'modify' on hanode1: Event failed
+crmd:    info: update_failcount:  Updating failcount for dummy1 on hanode1 after failed start: rc=1 (update=INFINITY)
+attrd:   info: attrd_peer_update: Setting fail-count-dummy1#start_0[hanode1]: (null) -> INFINITY 
+~~~
+
+Si une opération `start` échoue, la décision du cluster dépend de deux
+paramètres: `on-fail` que nous avons vu précédemment et  le paramètre du
+cluster `start-failure-is-fatal`, positionné à `true` par défaut.
+
+Ici, l'opération `start` ayant échoué, le cluster décide donc de
+positionner un failcount à INFINITY à cause de `start-failure-is-fatal`.
+
+La ressource `dummy1` ayant un failcount infini sur `hanode1`, `pengine`
+décide de déplacer la ressource sur `hanode3`:
+
+~~~
+pengine:   info:   Start recurring monitor (10s) for dummy1 on hanode3
+pengine: notice: * Recover dummy1  (hanode1 -> hanode3)
+pengine:   info:   Leave   dummy3  (Started hanode2)
+pengine:   info:   Leave   dummy2  (Started hanode2)
+~~~
+
+Les opérations sont réalisées sans erreurs:
+
+~~~
+crmd:  debug: Unpacked transition 22: 3 actions in 3 synapses
+[...]
+crmd: notice: Initiating stop operation dummy1_stop_0 on hanode1
+crmd:   info: Action dummy1_stop_0 confirmed on hanode1 (rc=0)
+[...]
+crmd: notice: Initiating start operation dummy1_start_0 on hanode3
+crmd:   info: Action dummy1_start_0 confirmed on hanode3 (rc=0)
+[...]
+crmd: notice: Initiating monitor operation dummy1_monitor_10000 on hanode3
+crmd:   info: Action dummy1_monitor_10000 confirmed on hanode3 (rc=0)
+[...]
+crmd:  debug: Transition 22 is now complete
+~~~
+
+4. réparer le problème sur `hanode1` et réinitialiser le failcount avec `pcs`
+
+~~~console
+# mv /opt/sub2 /opt/sub
+# pcs resource failcount reset dummy1 hanode1
+~~~
+
+5. expliquer le comportement de `dummy1`
+
+La ressource `dummy1` retourne sur le nœud `hanode1` dès que nous y
+supprimons son ancien failcount.
+
+Effectivement, `dummy1` a été créé avec un `stickiness` à `1` et une
+contrainte de location sur `hanode1` de `100`.
+
+~~~
+# pcs constraint location show dummy1
+Location Constraints:
+  Resource: dummy1
+    Enabled on: hanode1 (score:100)
+[...]
+
+# pcs resource show dummy1
+ Resource: dummy1 (class=ocf provider=pacemaker type=Dummy)
+  Attributes: state=/opt/sub/dummy1.state
+  Meta Attrs: failure-timeout=4h migration-threshold=3 resource-stickiness=1
+[...]
+~~~
+
+Avant de retirer son failcount sur `hanode1`, ses scores étaient les suivants:
+
+~~~
+native_color: dummy1 allocation score on hanode1: -INFINITY
+native_color: dummy1 allocation score on hanode2: -220
+native_color: dummy1 allocation score on hanode3: 1
+~~~
+
+Sur `hanode1`, `dummy1` cumulait le score de location de `100` et le failcount de
+`-INFINITY`, soit un total de `-INFINITY`. Le score de `1` correspondant au
+stickiness sur `hanode3`.
+
+Après la suppression du failcount de -INFINITY, les scores sont donc devenus:
+
+* `100` pour `dummy1` sur `hanode1` (score de location)
+* `1` pour `dummy1` sur `hanode3` (score de stickiness)
+
+Par conséquent `pengine` décide de déplacer `dummy1` sur le nœud où il a
+le plus gros score: `hanode1`. Après migration, les scores deviennent alors:
+
+~~~
+native_color: dummy1 allocation score on hanode1: 101
+native_color: dummy1 allocation score on hanode2: -220
+native_color: dummy1 allocation score on hanode3: 0
+~~~
+
+:::
+
+-----
+
+## Édition des ressources
+
+* la modification d'un paramètre provoque une réaction du cluster
+* soit le redémarrage de la ressource
+* soit son rechargement à chaud
+* dépend de la ressource et du paramètre
+
+::: notes
+
+La configuration des ressources peut être faite avec `pcs resource update` ou
+avec l'outil `crm_resource` et l'option `-s / --set-parameter` ou `-d /
+--delete-parameter`.
+
+On distingue les paramètres de :
+
+* configuration propre à la ressource, les paramètres propres à chaque RA
+* configuration du RA, les paramètres communs à tous les RA (modifiable avec l'option --meta)
+* configuration des opérations.
+
+Un paramètre propre à la ressource est modifiable à chaud si:
+
+* l'agent supporte l'action `reload`
+* ce paramètre n'est pas marqué comme étant `unique`
+
+:::
+
+-----
+
+### TP: modification paramètre avec reload ou restart
+
+::: notes
+
+1. afficher la description du RA `ocf:pacemaker:Dummy`
+2. identifier dans la description le paramètre `fake`
+3. afficher la valeur actuelle du paramètre `fake`
+4. modifier la valeur de `fake` avec `test`
+5. vérifier le comportement dans les traces
+
+Notes: utilisez `crm_resource` ou `pcs resource`
+
+:::
+
+-----
+
+### Correction: modification paramètre avec reload ou restart
+
+::: notes
+
+1. afficher la description du RA `ocf:pacemaker:Dummy`
+
+~~~console
+# pcs resource describe ocf:pacemaker:Dummy
+~~~
+
+2. identifier dans la description le paramètre `fake`
+
+~~~
+[...]
+  fake: Fake attribute that can be changed to cause a reload
+[...]
+~~~
+
+3. afficher la valeur actuelle du paramètre `fake`
+
+~~~console
+# crm_resource -r dummy1 -g fake
+Attribute 'fake' not found for 'dummy1'
+~~~
+
+4. modifier la valeur de `fake` avec `test`
+
+~~~console
+# crm_resource -r dummy1 -p fake -v test
+~~~
+
+ou
+
+~~~console
+# pcs resource update dummy1 fake=test
+~~~
+
+5. vérifier le comportement dans les traces
+
+Log du DC remis en forme:
+
+~~~
+pengine:   info: Start recurring monitor (10s) for dummy1 on hanode1
+pengine: notice: * Reload  dummy1  (hanode1)
+[...]
+crmd:     debug: Unpacked transition 34: 2 actions in 2 synapses
+[...]
+crmd:    notice: Initiating reload operation dummy1_reload_0 on hanode1
+crmd:      info: Action dummy1_start_0  confirmed on hanode1
+[...]
+crmd:    notice: Initiating monitor operation dummy1_monitor_10000 on hanode1
+crmd:      info: Action dummy1_monitor_10000 confirmed on hanode1
+[...]
+crmd:    notice: Transition 34 (Complete=2): Complete
+~~~
+
+Log de `hanode1`:
+
+~~~
+crmd:    debug: Cancelling op 55 for dummy1
+lrmd:     info: Cancelling ocf operation dummy1_monitor_10000
+lrmd:    debug: finished - rsc:dummy1 action:monitor call_id:55  exit-code:0
+crmd:    debug: Op 55 for dummy1 (dummy1:55): cancelled
+[...]
+crmd:     info: Performing key=7:34:0:cc37b9f1-860c-4a1f-bbac-db48f7cd080a op=dummy1_reload_0
+lrmd:     info: executing - rsc:dummy1 action:reload call_id:57
+lrmd:     info: finished - rsc:dummy1 action:reload call_id:57 pid:13714 exit-code:0 exec-time:69ms queue-time:0ms
+crmd:   notice: Result of reload operation for dummy1 on hanode1: 0 (ok)
+[...]
+crmd:     info: Performing key=3:34:0:cc37b9f1-860c-4a1f-bbac-db48f7cd080a op=dummy1_monitor_10000
+lrmd:    debug: executing - rsc:dummy1 action:monitor call_id:58
+lrmd:    debug: finished - rsc:dummy1 action:monitor call_id:58 pid:13722 exit-code:0 exec-time:30ms queue-time
+crmd:     info: Result of monitor operation for dummy1 on hanode1: 0 (ok)
+~~~
+
+:::
+
+
+-----
+
+## Ressources _Multi-State_
+
+* les ressource multi-state sont des clones avec des rôles différents
+* nécessite de configurer un `monitor` distinct par rôle
+* une ressource supplémentaire dédiée à la gestion des clones et leurs rôles
+* nombre de clones modifiable
+* les clones démarrent toujours d'abord en `Slave`
+* les master score permettent de désigner le ou les clones à promouvoir
+
+::: notes
+
+Comme expliqué dans le chapitre [_Ressource Agent_ (_RA_)] il existe
+plusieurs type de ressources, dont les ressources clones ou les ressources
+_multi-state_. Ces derniers héritent de toutes les propriétés des ressources
+clones et ajoute une notion supplémentaire de rôle primaire et secondaire
+appelés respectivement `Master` et `Slave`.
+
+Une ressource _multi-state_ se crée en deux étapes:
+
+* création d'une ressource type utilisant le RA voulu
+* création d'une ressource _multi-state_ qui administre la ressource précédemment
+  créée, la clone en fonction de sa configuration et gère les rôles parmi
+  ces clones.
+
+Particularité des ressources géré en _muti-state_, ces dernières doivent
+comporter une opération `monitor` différente pour les rôles `Slave` et
+`Master`, chacune avec une récurrence différente. Ce dernier point est lié à un
+détail d'implémentation de Pacemaker qui identifie les opérations par un
+identifiant composé: du nom de la ressource, de l'opération, de sa récurrence.
+Ainsi, `pgsqld_monitor_15000` désigne l'opération `monitor` sur la ressource
+`pgsqld` exécutée toute les 15 secondes. Voir:
+
+<https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/_monitoring_multi_state_resources.html>
+
+Les différents paramètres utiles à une ressource _multi-state_ sont définis dans
+la documentation de Pacemaker à ces pages:
+
+* liés aux clones: <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/_clone_options.html>
+* liés aux _multi-state_: <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/_multi_state_options.html>
+
+Les paramètres intéressants dans le cadre de cette formation sont:
+
+* `clone-max`: nombre de clones dans tous le cluster, par défaut le nombre de
+  nœud du cluster
+* `clone-node-max`: nombre de clone maximum sur chaque nœud, par défaut à `1`
+* `master-max`: nombre maximum de clone promu au sein du cluster, par défaut
+  à `1`
+* `master-node-max`: nombre maximum de clone promu sur chaque nœud, par
+  défaut à `1`
+* `notify`: activer les opérations `notify` si le RA le supporte, par défaut
+  à `false`
+
+Nous constatons que la plupart des valeurs par défaut sont correcte pour PAF.
+Seule le paramètre `notify` doit être __obligatoire__ activé dans le cadre
+de PAF.
+
+Enfin, tous les clones d'une ressource multi-state sont __toujours__ démarrés
+avec le rôle `Slave`. Ensuite, les clones avec les _master scores_ les plus
+élevés sont sélectionnés pour être promus en `Master` (voir aussi à ce propos
+[Attributs de nœuds particuliers] ).
+
+![Diagramme démarrage ressource multi-state](medias/paf-ms-roles.png)
+
+Ces master scores sont positionnés le plus souvent par le RA, mais peuvent
+aussi être manipulés par l'administrateur si besoin.
+
+:::
+
+-----
+
+::: notes
+
+### TP: création d'une ressource _multi-state_
+
+Utiliser un fichier `dummy-ms.xml` pour effectuer vos modifications.
+
+1. créer une ressource `Dummyd` avec le RA `ocf:pacemaker:Stateful`
+
+* surveiller le rôle `Master` toutes les 5 secondes
+* surveiller le rôle `slave` toutes les 6 secondes
+
+2. créer la ressource multi-state `Dummyd-clone` clonant `Dummyd`
+
+* activer les notifications
+* dix clones autorisés
+* deux rôles `Master` autorisés
+
+3. appliquer vos modifications sur le cluster
+4. expliquer le nombre de clone de `Dummyd` démarrés
+5. observer combien de clone ont été promu en `Master`
+
+:::
+
+-----
+
+### Correction: création d'une ressource _multi-state_
+
+::: notes
+
+Utiliser un fichier `dummy-ms.xml` pour effectuer vos modifications.
+
+~~~console
+# pcs cluster cib dummy-ms.xml
+~~~
+
+1. créer une ressource `Dummyd` avec le RA `ocf:pacemaker:Stateful`
+
+~~~console
+# pcs -f dummy-ms.xml resource create Dummyd ocf:pacemaker:Stateful \
+    op monitor interval=5s role="Master"                            \
+    op monitor interval=6s role="Slave"
+~~~
+
+2. créer la ressource multi-state `Dummyd-clone` clonant `Dummyd`
+
+* activer les notifications
+* dix clones autorisés
+* deux rôles `Master` autorisés
+
+Ou, en tenant compte des valeurs par défaut:
+
+~~~console
+# pcs -f dummy-ms.xml resource master Dummyd-clone Dummyd \
+    notify=true clone-max=10 master-max=2
+~~~
+
+3. appliquer vos modifications sur le cluster
+
+~~~console
+# pcs cluster verify -V dummy-ms.xml
+# crm_simulate -S -x dummy-ms.xml
+# pcs cluster cib-push dummy-ms.xml
+~~~
+
+4. expliquer le nombre de clone de `Dummyd` démarrés
+
+Trois clones ont été démarrés dans le cluster. Malgré la valeur de
+`clone-max=10`, le paramètre `clone-node-max` par défaut à `1` empêche d'en
+démarrer plus d'un par nœud.
+
+~~~
+pengine: debug: Allocating up to 10 Dummyd-clone instances to a possible 3 nodes (at most 1 per host, 3 optimal)
+pengine: debug: Assigning hanode3 to Dummyd:0
+pengine: debug: Assigning hanode2 to Dummyd:1
+pengine: debug: Assigning hanode1 to Dummyd:2
+pengine: debug: All nodes for resource Dummyd:3 are unavailable, unclean or shutting down
+pengine: debug: Could not allocate a node for Dummyd:3
+pengine:  info: Resource Dummyd:3 cannot run anywhere
+[...]
+pengine: debug: All nodes for resource Dummyd:9 are unavailable, unclean or shutting down
+pengine: debug: Could not allocate a node for Dummyd:9
+pengine:  info: Resource Dummyd:9 cannot run anywhere
+pengine: debug: Allocated 3 Dummyd-clone instances of a possible 10
+~~~
+
+5. observer combien de clone ont été promu en `Master`
+
+Deux clones ont été promus.
+
+Lors du démarrage des instances `Dummyd`, l'agent positionne le master score
+de sa ressource à `5`. Voir la fonction `stateful_start` dans le code source
+de l'agent à l'emplacement `/usr/lib/ocf/resource.d/pacemaker/Stateful`.
+
+Le paramètre `master-max` étant positionné à `2`, le cluster choisi deux
+clones à promouvoir parmis les trois disponibles.
+
+:::
+
+-----
+
+## Suppression des ressources
+
+* `pcs resource delete` supprime une ressource ou un groupe
+* deux étapes :
+  * stopper la ressource
+  * supprimer la ressource
+
+::: notes
+
+La supression de ressource peut être réalisée par `pcs resource delete
+<resource_name>`.
+
+La supression d'un groupe supprime non seulement ce groupe mais aussi les
+ressources qu'il contient.
+
+:::
+
+-----
+
+### TP: supprimer les dummy
+
+::: notes
+
+1. lister les ressources du cluster
+2. supprimer les ressources `dummy1` et `dummy2`
+3. afficher l'état du cluster
+4. supprimer le groupe `dummygroup`
+5. afficher l'état du cluster
+6. supprimer la ressource `Dummyd-clone`
+7. afficher l'état du cluster
+
+:::
+
+-----
+
+### TP: supprimer les dummy
+
+::: notes
+
+1. lister les ressources du cluster
+
+~~~console
+# pcs resource show
+ Master/Slave Set: Dummyd-clone [Dummyd]
+     Masters: [ hanode1 hanode2 ]
+     Slaves: [ hanode3 ]
+ dummy1	(ocf::pacemaker:Dummy):	Started hanode1
+ Resource Group: dummygroup
+     dummy3	(ocf::pacemaker:Dummy):	Started hanode2
+     dummy2	(ocf::pacemaker:Dummy):	Started hanode2
+
+
+~~~
+
+2. supprimer les ressources `dummy1` et `dummy2`
+
+~~~console
+# pcs resource delete dummy1
+Attempting to stop: dummy1... Stopped
+# pcs resource delete dummy2
+Attempting to stop: dummy2... Stopped
+~~~
+
+3. afficher l'état du cluster
+
+~~~console
+# pcs resource show
+ Master/Slave Set: Dummyd-clone [Dummyd]
+     Masters: [ hanode1 hanode2 ]
+     Slaves: [ hanode3 ]
+ Resource Group: dummygroup
+     dummy3	(ocf::pacemaker:Dummy):	Started hanode2
+
+~~~
+
+4. supprimer le groupe dummygroup
+
+~~~console
+# pcs resource delete dummygroup
+Removing group: dummygroup (and all resources within group)
+Stopping all resources in group: dummygroup...
+Deleting Resource (and group) - dummy3
+~~~
+
+5. afficher l'état du cluster
+
+~~~console
+# pcs resource show
+ Master/Slave Set: Dummyd-clone [Dummyd]
+     Masters: [ hanode1 hanode2 ]
+     Slaves: [ hanode3 ]
+~~~
+
+6. supprimer la ressource `Dummyd-clone`
+
+~~~console
+# pcs resource delete Dummyd-clone
+Attempting to stop: Dummyd... Stopped
+~~~
+
+7. afficher l'état du cluster
+
+~~~console
+# pcs resource show
+NO resources configured
+~~~
 
 :::
 
@@ -2591,6 +3958,8 @@ déclenchement d'une modification de configuration lié à une règle temporelle
 Il faut donc configurer le paramètre `cluster-recheck-interval` a une valeur adaptée
 pour s'assurer que les règles basées sur le temps soient exécutées.
 
+FIXME: évolution des dernières versions de pacemaker à ce propos.
+
 Les règles peuvent être utilisées pour favoriser l'utilisation d'un nœud plus
 puissant en fonction de la périodes de la journée ou du nombre de CPU.
 
@@ -2599,164 +3968,12 @@ pas transparente et que la [simplicité][KISS] doit rester de mise.
 
 :::
 
------
-
-## Édition des ressources
-
-Modification de la configuration d'une ressource
-
-::: notes
-
-La configuration des ressources peut être faite avec l'outil `crm_resource` et
-l'option `-s / --set-parameter` ou `-d / --delete-parameter`.
-
-On distingue les paramètres de :
-
-* configuration de la ressource (modifiable avec l'option --meta)
-* configuration du ressource agent.
-
-Les outils pcs et crmsh peuvent également être utilisés.
-
-:::
-
------
-
-### TP: modification paramètre avec reload ou restart
-
-::: notes
-
-L'outil `crm_resource` est utilisé par la plupart des sous-commandes de `pcs resource`.
-
-lister les ressources existantes
-
-~~~
-crm_resource -l
-~~~
-
-visualiser la valeur du paramètre "fake" de la ressource `dummy1`
-
-~~~
-crm_resource -r dummy1 -g fake
-~~~
-
-changer la valeur d'un paramètre "updatable" pour forcer un reload
-
-~~~
-crm_resource -r dummy1 -p fake -v test
-~~~
-
-Remarque: cette commande est équivalente à `pcs resource update dummy1 fake=test`
-
-vérifier le comportement dans les traces
-
-~~~
-hanode1       crmd:     info: do_lrm_rsc_op: Performing key=9:13:0:1d3257aa-4ec8-41c1-a54d-a625162c38b6 op=dummy1_reload_0
-hanode1       lrmd:     info: log_execute: executing - rsc:dummy1 action:reload call_id:70
-hanode1       lrmd:     info: log_finished:  finished - rsc:dummy1 action:reload call_id:70 pid:22839 exit-code:0 exec-time:59ms queue-time:1ms
-hanode1       crmd:   notice: process_lrm_event: Result of reload operation for dummy1 on hanode1: 0 (ok) | call=70 key=dummy1_reload_0 confirmed=true cib-update=150
-~~~
-
-Sur le DC :
-
-~~~
-pengine:     info: LogActions: Leave   fence_vm_paf1   (Started hanode2)
-pengine:     info: LogActions: Leave   fence_vm_paf2   (Started hanode1)
-pengine:     info: LogActions: Leave   fence_vm_paf3   (Started hanode1)
-pengine:   notice: LogAction:   * Reload     dummy1            (          hanode1 )
-pengine:     info: LogActions: Leave   dummy2  (Started hanode3)
-~~~
-
-:::
-
------
-
-## Suppression des ressources
-
-* `pcs resource delete <resource_name> supprimer la ressource ou le groupe
-* deux étapes :
-  * stopper le ressource
-  * supprimer la ressource
-
-::: notes
-
-La supression de ressource peut être réalisée par `pcs resource delete
-<resource_name>`.
-
-La supression d'un groupe supprime non seulement ce groupe mais aussi les
-ressources qu'il contient.
-
-:::
-
------
-
-### TP: supprimer les dummy
-
-::: notes
-
-Lister les ressources du cluster :
-
-~~~console
-# pcs resource show
- dummy1 (ocf::pacemaker:Dummy): Started hanode1
- dummy2 (ocf::pacemaker:Dummy): Started hanode3
-~~~
-
-Utiliser `pcs resource delete <rsc_name>` pour supprimer les ressources :
-
-~~~console
-# pcs resource delete dummy1
-Attempting to stop: dummy1... Stopped
-
-# pcs resource delete dummy2
-Attempting to stop: dummy2... Stopped
-~~~
-
-Créer deux ressources dummy dans un groupe :
-
-~~~console
-# pcs resource create dummy1 ocf:pacemaker:Dummy
-# pcs resource create dummy2 ocf:pacemaker:Dummy
-# pcs resource group add dummyGroup dummy1 dummy2
-~~~
-
-Afficher le groupe:
-
-~~~console
-# pcs resource show dummyGroup dummy1
- Group: dummyGroup
- Resource: dummy1 (class=ocf provider=pacemaker type=Dummy)
-  Operations: migrate_from interval=0s timeout=20 (dummy1-migrate_from-interval-0s)
-              migrate_to interval=0s timeout=20 (dummy1-migrate_to-interval-0s)
-              monitor interval=10 timeout=20 (dummy1-monitor-interval-10)
-              reload interval=0s timeout=20 (dummy1-reload-interval-0s)
-              start interval=0s timeout=20 (dummy1-start-interval-0s)
-              stop interval=0s timeout=20 (dummy1-stop-interval-0s)
-  Resource: dummy2 (class=ocf provider=pacemaker type=Dummy)
-   Operations: migrate_from interval=0s timeout=20 (dummy2-migrate_from-interval-0s)
-               migrate_to interval=0s timeout=20 (dummy2-migrate_to-interval-0s)
-               monitor interval=10 timeout=20 (dummy2-monitor-interval-10)
-               reload interval=0s timeout=20 (dummy2-reload-interval-0s)
-               start interval=0s timeout=20 (dummy2-start-interval-0s)
-               stop interval=0s timeout=20 (dummy2-stop-interval-0s)
-~~~
-
-Supprimer le groupe :
-
-~~~console
-# pcs resource delete dummyGroup
-Removing group: dummyGroup (and all resources within group)
-Stopping all resources in group: dummyGroup...
-Deleting Resource - dummy1
-Deleting Resource (and group) - dummy2
-~~~
-
-:::
 
 -----
 
 # PAF
 
-Présentation de PAF
+Configuration et Mécanique de PAF
 
 -----
 
@@ -2765,60 +3982,137 @@ Présentation de PAF
 * agent officiel `pgsql` fastidieux et vieillissant
 * premier agent stateless `pgsql-resource-agent`
 * PAF est la seconde génération en mode stateful
-* développé en bash, puis porté en perl (plus bas niveau, plus lisible, plus fonctionnel)
+* développé en bash, puis porté en perl
 
------
+::: notes
 
-Il existe déjà un agent `pgsql` distribué par le projet `resource-agents`. Cependant, cet agent accumule plusieurs
-défauts:
+Il existe déjà un agent `pgsql` distribué par le projet `resource-agents`.
+Cependant, cet agent accumule plusieurs défauts:
 
 * très fastidieux à mettre en œuvre
-* cours plusieurs lapins: supporte les architectures shared disk ou shared nothing
+* plusieurs objectifs: supporte les architectures _shared disk_ ou _shared nothing_
 * difficile à maintenir: code complexe, en bash
-* procédures lourdes: pas de switchover, aucune souplesse, fichier de lock, etc
-* configuration lourde: 31 paramètres disponibles
+* procédures lourdes: pas de switchover, procédures lourdes, fichier de lock, etc
+* configuration complexe: 31 paramètres disponibles
 * détails d'implémentation visibles dans le paramétrage
 * ne supporte pas le `demote` officieusement
 
+Pour les besoins d'un projet où cet agent était peu adapté à l'environnement,
+un premier agent stateless nommé `pgsqlsr` a été développé. C'est le projet
+`pgsql-resource-agent`, toujours disponible aujourd'hui mais plus maintenu. Ce
+projet avait l'avantage d'être très simple. Cependant, il imposait des limites
+importantes: un seul secondaire possible, un seul failover automatique
+autorisé, pas de switchover.
 
-Pour les besoins d'un projet où cet agent était peu adapté à l'environnement, un premier agent stateless nommé
-`pgsqlsr` a été développé. C'est le projet `pgsql-resource-agent`, toujours disponible aujourd'hui mais plus
-maintenu. Ce projet avait l'avantage d'être très simple. Cependant, il imposait des limites importantes: un seul
-secondaire possible, un seul failover automatique autorisé, pas de switchover.
-
-suite à cette expérience, les auteurs ont lancé le projet PAF, un nouvel agent multistate exploitant au maximum les
-fonctionnalités de Pacemaker. Il a d'abord été développé en bash, puis porté en perl, langage plus bas niveau, plus
+Suite à cette expérience, les auteurs ont créés le projet PAF, un nouvel agent
+_multi-state_ exploitant au maximum les fonctionnalités de Pacemaker. Il a d'abord
+été développé en bash, puis porté en perl, langage plus bas niveau, plus
 lisible, plus efficace, plus fonctionnel.
+
+:::
+
+-----
+
+## Limitations
+
+* version de PostgreSQL supportée 9.3+
+* le demote de l'instance primaire nécessite un arrêt
+* trop strict sur l'arrêt brutal d'une instance
+* pas de reconstruction automatique de l'ancien primaire après failover
+* pas de gestion des slots de réplication
+
+::: notes
+
+Une incohérence entre l'état de l'instance et le controldata provoque une
+erreur fatale ! Ne __jamais__ utiliser `pg_ctl -m immediate stop` !
+
+Limitations levées:
+
+* ne gère pas plusieurs instances PostgreSQL sur un seul nœud. Corrigé dans le commit 1a7d375.
+* n'exclut pas une instance secondaire quel que soit son retard. Ajout du parametre maxlag dans le commit a3bbfa3.
+
+Fonctionnalités manquantes dans PostgreSQL pour améliorer la situation:
+
+* valider sur l'esclave ce qu'il a reçu du maître (cas du switchover)
+* demote «à chaud»
+
+:::
+
+-----
 
 ## Installation PAF
 
 * disponible directement depuis les dépôts PGDG RPM ou DEB
+* paquets disponibles depuis github
 * possibilité de l'installer à la main
+
+::: notes
+
+PAF peut être installé manuellement ou via les paquets mis à disposition sur
+les dépôts communautaires PGDG ou encore ceux de Debian.
+
+Les paquets sont aussi mis à disposition depuis le dépôt github du projet:
+<https://github.com/ClusterLabs/PAF/releases/latest>
+
+:::
 
 -----
 
 ### TP: installation de PAF
 
-Installation de PostreSQL et de PAF via le dépôt PGDG RPM.
+::: notes
+
+1. installer le dépôt PGDG pour CentOS 7 sur tous les nœuds
+2. installer PostgreSQL 12 sur sur tous les nœuds
+3. chercher puis installer le paquet de PAF sur tous les nœuds
+
+:::
+
+-----
+
+### Correction: installation de PAF
 
 ::: notes
 
-Sur chaque nœud :
+1. installer le dépôt PGDG pour CentOS 7 sur tous les nœuds
 
 ~~~console
-# yum install -y https://download.postgresql.org/pub/repos/yum/10/redhat/rhel-7-x86_64/pgdg-centos10-10-2.noarch.rpm
-# yum install -y postgresql10 postgresql10-contrib postgresql10-server
+# yum install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+~~~
+
+2. installer PostgreSQL 12 sur sur tous les nœuds
+
+~~~console
+# yum install -y postgresql12 postgresql12-contrib postgresql12-server
+~~~
+
+3. chercher puis installer le paquet de PAF sur tous les nœuds
+
+~~~console
+# yum search paf
+Loaded plugins: fastestmirror
+Loading mirror speeds from cached hostfile
+ * base: centos.mirrors.proxad.net
+ * extras: centos.mirror.fr.planethoster.net
+ * updates: centos.crazyfrogs.org
+=============================== N/S matched: paf ===============================
+resource-agents-paf.noarch : PostgreSQL resource agent for Pacemaker
+
+  Name and summary matches only, use "search all" for everything.
+
 # yum install -y resource-agents-paf
 ~~~
+
+:::
 
 -----
 
 ## Pré-requis de PAF
 
 * supporte PostgreSQL à partir de la version 9.3 et supérieure
-* "hot standby" actif: doit pouvoir se connecter aux secondaires
-* réplication streaming active entre les nœuds :
-  * configurée avec :
+* _hot standby_ actif: doit pouvoir se connecter aux secondaires
+* réplication streaming active entre les nœuds
+  * nécessite:
     * `application_name` égal au nom du nœud
     * `recovery_target_timeline = 'latest'`
   * configurée dans :
@@ -2826,10 +4120,7 @@ Sur chaque nœud :
     * pg12 et après : fichier de configuration de PostgreSQL
 * le cluster PostgreSQL doit être prêt avant le premier démarrage
 * PostgreSQL doit être désactivé au démarrage du serveur
-
-Astuce:
-
-* empêcher le wal receiver de se connecter sur sa propre instance
+* empêcher le _wal receiver_ de se connecter sur sa propre instance
   * eg. ajout d'une règle `reject` dans `pg_hba.conf`
 
 ::: notes
@@ -2839,7 +4130,7 @@ L'agent PAF a peu de pré-requis.
 Il supporte toutes les version de PostgreSQL supérieure ou égale à la version
 9.3.
 
-Le `recovery.conf` a disparut avec la version 12 de PostgreSQL, les paramètres
+Le `recovery.conf` a disparu avec la version 12 de PostgreSQL, les paramètres
 qu'il contenait sont désormais renseignés dans le fichier de configuration de
 l'instance.
 
@@ -2848,18 +4139,17 @@ primaire ou secondaire. Ainsi, l'action `monitor` est exécutée à intervalle
 régulier autant sur le primaire que sur les secondaires. Il est donc essentiel
 que le paramètre `hot standby` soit activé sur toutes les instances, même sur
 un primaire qui démarre toujours en secondaire d'abord ou qui peut être
-repositionné en secondaire par un demote sur décision du cluster ou sur
-commande.
+repositionné en secondaire sur décision du cluster ou sur commande.
 
 Au tout premier démarrage du cluster, PAF recherche parmi les instances
 configurées quel est l'instance principale. Il est donc essentiel d'avoir créé
-sont cluster PostgreSQL avant la création de la ressource dans Pacemaker et
+le cluster PostgreSQL avant la création de la ressource dans Pacemaker et
 que ce dernier soit fonctionnel dès son démarrage.
 
 Afin de permettre à PAF de faire le lien entre des connexions de réplication
-et le noms des nœuds du cluster, il faut donner le nom du nœud ou se trouve
+et le nom des nœuds du cluster, il faut donner le nom du nœud où se trouve
 l'instance dans la chaine de connexion (`primary_conninfo`) en utilisant le
-paramètre`application_name`.
+paramètre `application_name`.
 
 Lors de la création de la ressource, Pacemaker s'attend à la trouver éteinte.
 Il n'est pas vital que les instances soient éteintes, mais cela reste
@@ -2877,9 +4167,9 @@ encore convergé.
 
 La _timeline_ à l'intérieur des journaux de transaction est mise à jour par le
 serveur primaire suite à une promotion de l'instance. Pour que les instances
-secondaires se raccrochent à la primaire, il faut leurs dire d'utiliser la
+secondaires se raccrochent à la primaire, il faut leur indiquer d'utiliser la
 dernière _timeline_ des journaux de transactions. C'est le rôle du
-paramètre `recovery_target_timeline` que l'on doit valoriser à `latest`.
+paramètre `recovery_target_timeline` que l'on doit positionner à `latest`.
 
 :::
 
@@ -2887,162 +4177,250 @@ paramètre `recovery_target_timeline` que l'on doit valoriser à `latest`.
 
 ### TP: création du cluster PostgreSQL
 
-La configuration de PostgreSQL réalisée ci-dessous est une version simple et rapide. Elle convient au cadre de ce TP
-dont le sujet principal est Pacemaker et PAF, mais ne convient pas pour une utilisation en production.
+::: notes
 
-Dans ce cluster, l'adresse IP virtuelle `192.168.122.110` est associée au serveur hébergeant l'instance principale.
+Ce TP a pour but de créer les instances PostgreSQL. Il ne comporte pas de
+question, seulement des étapes à suivre.
 
-Créer l'instance sur le serveur maître :
+La configuration de PostgreSQL réalisée ci-dessous est une version simple et
+rapide. Elle convient au cadre de ce TP dont le sujet principal est Pacemaker
+et PAF, mais ne convient pas pour une utilisation en production.
+
+Dans ce cluster, l'adresse IP virtuelle `10.20.30.5` est associée au
+serveur hébergeant l'instance principale.
+
+Créer l'instance primaire sur le nœuds `hanode1` :
 
 ~~~console
-root# /usr/pgsql-10/bin/postgresql-10-setup initdb
+# /usr/pgsql-12/bin/postgresql-12-setup initdb
+Initializing database ... OK
 ~~~
 
 Configuration de l'instance:
 
-~~~console
-root# su - postgres
-postgres$ echo "listen_addresses = '*'" >> ~postgres/10/data/postgresql.conf
-~~~
-Note: avec postgres 10, la mise en place de la réplication a été facilitée par de nouvelles valeurs par défaut pour
-wal_level, hot_standby, max_wal_sender, max_replication_slots
-
-Création du modèle de configuration `recovery.conf.pcmk` nécessaire à PAF:
+FIXME: positionner le 01-standby.conf et pg_hba.conf ailleurs
 
 ~~~console
-postgres$ cat <<EOF > ~postgres/recovery.conf.pcmk
-standby_mode = on
-primary_conninfo = 'host=192.168.122.110 application_name=$(hostname -s)'
-recovery_target_timeline = 'latest'
+# su - postgres
+$ mkdir -p ~postgres/12/data/conf.d
+
+$ cat <<EOF >> ~postgres/12/data/postgresql.conf
+include_dir = 'conf.d'
+EOF
+
+$ cat <<EOF > ~postgres/12/data/conf.d/00-custom.conf
+listen_addresses = '*'
+wal_keep_segments = 32
+EOF
+
+$ cat <<EOF > ~postgres/12/data/conf.d/01-standby.conf
+primary_conninfo = 'host=10.20.30.5 application_name=$(hostname -s)'
 EOF
 ~~~
 
-Notez que chaque fichier est différent sur chaque nœud grâce à l'utilisation du hostname local pour l'attribut
-`application_name`. Ce point fait parti de pré-requis, est essentiel et doit toujours être vérifié. 
+NB: depuis postgres 10, la mise en place de la réplication a été facilitée par
+de nouvelles valeurs par défaut pour `wal_level`, `hot_standby`, `max_wal_sender`,
+et `max_replication_slots`
 
-Enfin, nous empêchons chaque instance de pouvoir entrer en réplication avec elle même dans le fichier `pg_hba.conf`.
-La dernière règle autorise toute autre connexion de réplication entrante:
+NB: avant la version 12, ces paramètres étaient à placer dans un modèle de
+configuration (eg. `recovery.conf.pcmk`) nécessaire à PAF.
+
+NB: avant la version 12, il est nécessaire de positionner
+`recovery_target_timeline = 'latest'`
+
+Notez que chaque fichier est différent sur chaque nœud grâce à l'utilisation du
+hostname local pour l'attribut `application_name`. Ce point fait parti de
+pré-requis, est essentiel et doit toujours être vérifié.
+
+Enfin, nous empêchons chaque instance de pouvoir entrer en réplication avec
+elle même dans le fichier `pg_hba.conf`. La dernière règle autorise toute autre
+connexion de réplication entrante:
 
 ~~~console
-postgres$ cat <<EOF >> ~postgres/10/data/pg_hba.conf
+$ cat <<EOF >> ~postgres/12/data/pg_hba.conf
 # forbid self-replication from vIP
-host replication postgres 192.168.122.110/32 reject
+host  replication postgres 10.20.30.5/32  reject
 # forbid self-replication its own IP
-host replication postgres $(hostname -s) reject
+host  replication all      $(hostname -s) reject
+local replication all                     reject
+host  replication all      127.0.0.0/8    reject
+host  replication all      ::1/128        reject
+
 # allow any standby connection
 host replication postgres 0.0.0.0/0 trust
 EOF
-postgres$ exit
+
+$ exit
 ~~~
 
-Suite à cette configuration, nous pouvons démarrer l'instance principale et y associer l'adresse IP virtuelle choisie:
+Suite à cette configuration, nous pouvons démarrer l'instance principale et y
+associer l'adresse IP virtuelle choisie pour le primaire:
 
 ~~~console
-root# systemctl start postgresql-10
-root# ip addr add 192.168.122.110/24 dev eth0
-root# echo "192.168.122.110 ha-vip" >> /etc/hosts
+# systemctl start postgresql-12
+# ip addr add 10.20.30.5/24 dev eth0
 ~~~
 
-Cloner l'instance sur les serveurs secondaires :
+Cloner l'instance sur les serveurs secondaires `hanode2` et `hanode3`:
 
 ~~~console
-root# su - postgres
-postgres$ pg_basebackup -h ha-vip -D ~postgres/10/data/ -P
+# su - postgres
+$ /usr/pgsql-12/bin/pg_basebackup -h 10.20.30.5 -D ~postgres/12/data/ -P
 ~~~
 
-Créer le modèle de `recovery.conf` nécessaire à PAF:
+Corriger le paramètre `primary_conninfo` sur chaque nœud:
 
 ~~~console
-postgres$ cat <<EOF > ~postgres/recovery.conf.pcmk
-standby_mode = on
-primary_conninfo = 'host=192.168.122.110 application_name=$(hostname -s)'
-recovery_target_timeline = 'latest'
+$ cat <<EOF > ~postgres/12/data/conf.d/01-standby.conf
+primary_conninfo = 'host=10.20.30.5 application_name=$(hostname -s)'
 EOF
 ~~~
 
-Adapter les règles de rejet de la réplication avec soit même dans le fichier de configuration `pg_hba.conf`:
+Adapter les règles de rejet de la réplication du nœud avec lui même dans `pg_hba.conf`:
 
 ~~~console
-postgres$ cd ~postgres/10/data/
-postgres$ sed -ri s/hanode[0-9]+/$(hostname -s)/ pg_hba.conf
+$ sed -ri "s/hanode[0-9]+/$(hostname -s)/" ~postgres/12/data/pg_hba.conf
 ~~~
 
-Démarrer l'instance secondaire:
+Démarrer les instances secondaires:
 
 ~~~console
-postgres$ cp ~postgres/recovery.conf.pcmk recovery.conf
-postgres$ exit
-root# systemctl start postgresql-10
+$ touch ~postgres/12/data/standby.signal
+$ exit
+# systemctl start postgresql-12
 ~~~
 
-Vérifier le statut de la réplication depuis le serveur maître :
+NB: avant la version 12 de PostgreSQL, il faut copier le modèle template de
+`recovery.conf` (eg. `recovery.conf.pcmk`) dans le `PGDATA` au lieu de créer
+le fichier `standby.signal`.
+
+Vérifier le statut de la réplication depuis le serveur primaire :
 
 ~~~console
-postgres=# SELECT * FROM pg_stat_replication;
+postgres=# TABLE pg_stat_replication;
 ~~~
 
-Enfin, éteindre tous les services PostgreSQL et les désactiver, comme indiqué dans les pré-requis.
+Enfin, éteindre tous les services PostgreSQL et les désactiver, comme indiqué
+dans les pré-requis. Commencer par le primaire.
 
 ~~~console
-# systemctl stop postgresql-10
-# systemctl disable postgresql-10
+# systemctl disable --now postgresql-12
 ~~~
 
-Supprimer également l'adresse ip virtuelle ajoutée précédemment, celle-ci est contrôlée par Pacemaker également
-par la suite :
+Supprimer également l'adresse ip virtuelle ajoutée précédemment, celle-ci est
+également contrôlée par Pacemaker par la suite :
 
 ~~~console
-# ip addr del 192.168.122.110/24 dev eth0
+# ip addr del 10.20.30.5/24 dev eth0
 ~~~
-
------
-## Configuration de PAF
-
-* Obligatoire: PGDATA
-* Paramétrage dépendant de la version : recovery_template (pre PG12)
-* Rappel : PAF ne touche pas à la configurtion de PostgreSQL
-
-::: notes
-
-La configuration de la ressource PostgreSQL est faite avec les paramètres :
-
-* bindir : localisation des binaires de PostgreSQL (defaut: /usr/bin)
-* pgdata : localisation du PGDATA de l'instance (defaut: /var/lib/pgsql/data)
-* datadir : chemin du répertoire data_directory si il est différent de PGDATA
-
-* pghost : le répertoire de socket ou l'adresse IP pour se connecter à l'instance
-  locale (defaut: /tmp ou /var/run/postgresql pour DEBIAN)
-* pgport : le port de l'instance locale (default: 5432)
-
-* recovery_template : un template local pour le fichier PGDATA/recovery.conf
-(defaut: $PGDATA/recovery.conf.pcmk)
-  * avant PG12 : Ce fichier doit exister sur tous les nœuds ;
-  * à partir de PG12 : Ce fichier ne doit exister sur aucun nœuds.
-
-* start_opts : Argument supplémentaire à donner au processus PostgreSQL au démarrage
-  de PostgreSQL. (defaut : '') C'est utile notamment si le fichier de configuration
-  de PostgreSQL n'est pas placé dans PGDATA.
-* system_user : l'utilisateur système du propriétaire d l'instance (defaut: postgres)
-
-* maxlag : lag maximal autorisé pour une standby avant d'y placer un score négatif.
-  La différence est calculée entre la position actuelle dans le journal de transaction
-  sur le master et la postion écrite sur la standby (defaut : 0, désactive la
-  fonction)
 
 :::
 
 -----
 
-### TP: ressource PAF
+## Configuration de PAF
 
-La ressource `pgsqld` défini les propriétés des instances PostgreSQL :
+* Obligatoire: `PGDATA`
+* Paramétrage avant la version 12 : `recovery_template`
+* nécessite l'activation des opération `notify`
+* Rappel : préciser tous les timeout des opérations
+* Rappel : configurer deux opérations `monitor`
+
+::: notes
+
+La configuration de la ressource PostgreSQL est faite avec les paramètres :
+
+* `bindir` : localisation des binaires de PostgreSQL (défaut: `/usr/bin`)
+* `pgdata` : localisation du PGDATA de l'instance (défaut: `/var/lib/pgsql/data`)
+* `datadir` : chemin du répertoire data_directory si il est différent de `PGDATA`
+* `pghost` : le répertoire de socket ou l'adresse IP pour se connecter à l'instance
+  locale (défaut: `/tmp` ou `/var/run/postgresql` pour Debian et dérivés)
+* `pgport` : le port de l'instance locale (défaut: `5432`)
+* `recovery_template` : un template local pour le fichier `PGDATA/recovery.conf`
+(défaut: `$PGDATA/recovery.conf.pcmk`)
+  * avant PG12 : Ce fichier __doit__ exister sur tous les nœuds ;
+  * à partir de PG12 : Ce fichier ne doit exister sur aucun nœuds.
+* `start_opts` : Argument supplémentaire à donner au processus PostgreSQL au démarrage
+  de PostgreSQL (vide pas défaut).
+* `system_user` : l'utilisateur système du propriétaire de l'instance (défaut: `postgres`)
+* `maxlag` : lag maximal autorisé pour une standby avant d'y placer un score négatif.
+  La différence est calculée entre la position actuelle dans le journal de transaction
+  sur le master et la postion écrite sur la standby (défaut: `0`, désactive la
+  fonction)
+
+Concernant la configuration des opérations, il est important de rappeler que
+les timeout des opérations sont pas défaut de 20 secondes. Voir à ce propos le
+chapitre [Création d'une ressource]. Les timeouts précisés dans la description
+de l'agent `pgsqlms` ne sont __que__ des valeurs recommandées. Il __faut__
+préciser ce timeout en s'inspirant des valeurs conseillées pour __chaque__
+opération.
+
+Comme expliqué dans le chapitre [Ressources _Multi-State_], il faut
+configurer deux opérations `monitor` distinctes: une pour le rôle `Slave`,
+l'autre pour le rôle `Master`. Rappelez-vous que ces opérations doivent avoir
+des périodes d'exécution différentes.
+
+Concernant la ressource multi-state prenant en charge les clones, il est
+essentiel d'activer les opérations `notify` qui sont désactivées par défaut.
+Effectivement, l'agent `pgsqlms` utilise intensément cette opération pour
+détecter les cas de _switchover_, de _recovery_, gérer l'élection du
+secondaire à promouvoir, etc.
+
+Les différentes opérations pour passer d'un état à l'autre sont deviennent
+alors les suivantes:
+
+![Diagramme opérations multi-state avec notify](medias/paf-ms-roles-notify.png)
+
+:::
+
+-----
+
+### TP: création ressource PAF
+
+::: notes
+
+Effectuer les modifications dans un fichier `pgsqld.xml` avant de les appliquer
+au cluster.
+
+1. créer une ressource `pgsqld` en précisant:
+
+* les paramètres `bindir` et `pgdata`
+* les timeout de toutes les actions. Utiliser les timeout recommandé par
+  l'agent
+* surveiller le rôle `Master` toutes les 15 secondes
+* surveiller le rôle `Slave` toutes les 16 secondes
+
+2. créer la ressource `pgsql-clone` responsable des clones de `pgsqld`
+3. créer la ressource `pgsql-master-ip` gérant l'adresse `10.20.30.5`
+4. ajouter une colocation obligatoire entre l'instance primaire de `pgsql-clone`
+   et `pgsql-master-ip`
+5. ajouter une contrainte asymétrique pour promouvoir `pgsql-clone` avant de
+   démarrer `pgsql-master-ip`
+6. ajouter une contrainte asymétrique pour rétrograder `pgsql-clone` avant
+   d'arrêter `pgsql-master-ip`
+7. vérifier la configuration créée puis appliquer la au cluster
+8. observer le score `master-pgsqld` des clones `pgsqld`
+
+:::
+
+-----
+
+### Correction: ressource PAF
+
+::: notes
+
+Effectuer les modifications dans un fichier `pgsqld.xml` avant de les appliquer
+au cluster.
 
 ~~~console
 # pcs cluster cib pgsqld.xml
+~~~
 
+1. créer une ressource `pgsqld`
+
+~~~console
 # pcs -f pgsqld.xml resource create pgsqld ocf:heartbeat:pgsqlms \
-    bindir=/usr/pgsql-10/bin pgdata=/var/lib/pgsql/10/data       \
-    recovery_template=/var/lib/pgsql/recovery.conf.pcmk          \
+    bindir=/usr/pgsql-12/bin pgdata=/var/lib/pgsql/12/data       \
     op start timeout=60s                                         \
     op stop timeout=60s                                          \
     op promote timeout=30s                                       \
@@ -3052,236 +4430,2204 @@ La ressource `pgsqld` défini les propriétés des instances PostgreSQL :
     op notify timeout=60s
 ~~~
 
-La ressource `pgsql-ha` clone et contrôle toutes les instances PostgreSQL
-`pgsqld` du cluster, décide où le primaire est promu et où sont démarrés les
-standbys.
+2. créer la ressource `pgsql-clone` responsable des clones de `pgsqld`
 
 ~~~console
-# pcs -f pgsqld.xml resource master pgsql-ha pgsqld notify=true
+# pcs -f pgsqld.xml resource master pgsql-clone pgsqld notify=true
 ~~~
 
 Nous ne précisons ici la seule option `notify` qui est __essentielle__ à PAF
 et qui est par défaut à `false`. Elle permet d'activer les action `notify`
-avant et après chaque action sur la ressource.
+avant et après chaque action sur la ressource. Nous laissons les autres
+options à leur valeur par défaut.
 
-Nous laissons les autres options à leur valeur par défaut, notamment:
-
-* `clone-max`: nombre de clone dans tous le cluster, par défaut le nombre de
-  nœud du cluster
-* `clone-node-max`: nombre de clone maximum sur chaque nœud, par défaut à `1`
-* `master-max`: nombre maximum de clone promu au sein du cluster, par défaut
-  à `1`
-* `master-node-max`: nombre maximum de clone promu sur chaque nœud, par
-  défaut à `1`
-
-La ressource `pgsql-master-ip` gère l'adresse IP virtuelle ha-vip. Elle sera
-démarrée sur le nœud hébergeant la ressource PostgreSQL maître.
+3. créer la ressource `pgsql-master-ip` gérant l'adresse `10.20.30.5`
 
 ~~~console
 # pcs -f pgsqld.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
-    ip=192.168.122.110 cidr_netmask=24 op monitor interval=10s
-
-# pcs -f pgsqld.xml constraint colocation add pgsql-master-ip with master pgsql-ha INFINITY
-
-# pcs -f pgsqld.xml constraint order promote pgsql-ha then start pgsql-master-ip symmetrical=false kind=Mandatory
-
-# pcs -f pgsqld.xml constraint order demote pgsql-ha then stop pgsql-master-ip symmetrical=false kind=Mandatory
+    ip=10.20.30.5 cidr_netmask=24                                         \
+    op monitor interval=10s
 ~~~
 
-Contrôler la transition avant de pousser la configuration
-avec la commande `crm_simulate -S -x  pgsqld.xml`
-
-Enfin, pousser la configuration vers la cib :
+4. ajouter une colocation obligatoire entre l'instance primaire de `pgsql-clone`
+   et `pgsql-master-ip`
 
 ~~~console
+# pcs -f pgsqld.xml constraint \
+    colocation add pgsql-master-ip with master pgsql-clone INFINITY
+~~~
+
+5. ajouter une contrainte asymétrique pour promouvoir `pgsql-clone` avant de
+   démarrer `pgsql-master-ip`
+
+~~~console
+# pcs -f pgsqld.xml constraint order promote pgsql-clone \
+    then start pgsql-master-ip symmetrical=false kind=Mandatory
+~~~
+
+6. ajouter une contrainte asymétrique pour rétrograder `pgsql-clone`
+   avant d'arrêter `pgsql-master-ip`
+
+~~~console
+# pcs -f pgsqld.xml constraint order demote pgsql-clone \
+    then stop pgsql-master-ip symmetrical=false kind=Mandatory
+~~~
+
+7. vérifier la configuration créée puis appliquer la au cluster
+
+~~~console
+# pcs cluster verify -V pgsqld.xml
+
+# crm_simulate -S -x pgsqld.xml
+
 # pcs cluster cib-push pgsqld.xml
 ~~~
 
-Observer l'état du cluster avec `pcs status`.
+:::
 
-Observer le score des ressources `master-pgsqld` dans le cluster, tel que
-positionné par PAF:
+-----
+
+## Master scores de PAF
+
+* mécanique des master scores de PAF
+* `1001` pour le primaire
+* `1000 - 10 x n` pour les secondaires
+* score négatif en cas de décrochage ou retard
+* cas du premier démarrage
+
+::: notes
+
+PAF positionne des _master scores_ permanents, qui sont conservés entre les
+redémarrage du cluster. Le dernier emplacement du primaire est donc toujours
+maintenu au sein du cluster. Il n'est pas recommandé de manipuler soit même
+ces scores, nous étudions plus loin les commandes d'administration permettant
+d'agir sur l'emplacement du primaire.
+
+Lors du démarrage d'une instance arrêtée alors qu'elle était primaire, l'agent
+positionnera son master score à `1` si aucun autre master score n'est connu au
+sein du cluster. Les master scores n'étant jamais supprimés par le cluster,
+cette mécanique est principalement utile lors du tout premier démarrage.
+
+Une fois la promotion effectuée, le score positionné par l'agent pour assurer
+son statu d'instance primaire est de `1001`.
+
+Le score des instances secondaires est mis à jour lors de l'opération `monitor`
+sur le primaire. Il peut donc être nécessaire d'attendre un cycle de cette
+opération avant que les scores ne soient mis à jour, par exemple, suite à une
+bascule. Voici les scores attribués:
+
+* positif: le statut de réplication de l'instance est `stream`
+* `-1`: statut de réplication est `startup` ou `backup`
+* `-1000`: l'instance n'est pas connectée au primaire
+* négatif: l'instance a un lag supérieur au paramètre `max_lag` positionné
+sur la ressource `pgsqlms`
+
+Les scores positifs distribués aux secondaires en réplication sont dégressifs
+par pas de `10` à partir de `1000`. L'ordre dépend de deux critères: le lag
+avec le primaire et le nom de l'instance tel que positionné dans
+`application_name`.
+
+Suite au précédent TP, vous devriez observer les scores suivants:
 
 ~~~console
-# crm_mon -DnA1
-# pcs node attribute
+# crm_simulate -sL|grep promotion
+pgsqld:0 promotion score on hanode1: 1001
+pgsqld:2 promotion score on hanode2: 1000
+pgsqld:1 promotion score on hanode3: 990
 ~~~
 
-Le score des ressources est mis à jour si nécessaire lors de l'exécution de
-l'action `monitor` de PAF. Cette action est planifiée à intervalle régulier par
-`LRMd`. L'intervalle est spécifié dans la configuration de la ressource. Il
-peut donc être nécessaire d'attendre après une action comme une bascule avant
-que le `monitor` ne passe et les scores soient mis à jour.
+Tout d'abord, nous observons que le cluster a choisi de démarrer trois clones
+en respect de la valeur par défaut du paramètre `clone-max`, positionnée au
+nombre de nœuds existants. Ces ressources sont suffixé d'un identifiant:
+`pgsqld:0`, `pgsqld:1` et `pgsqld:2`.
 
-Les scores positionnés par l'agent sont de:
-
-* `1001` pour l'instance promue
-* un score décroissant à partir de `1000` avec un pas de `10` pour les
-  instances standby
-* le score des instance standby est décroissant par ordre alphabétique.
-
-Observer désormais les scores tel que calculés par le cluster:
+Concernant le placement des clones, le cluster actuellement configuré doit
+présenter des scores similaires à ceux-ci:
 
 ~~~console
-# crm_simulate -sL | grep "promotion score"
-pgsqld:0 promotion score on srv1: 1003
-pgsqld:1 promotion score on srv2: 1000
-pgsqld:2 promotion score on srv3: 990
-
+# crm_simulate -sL|grep 'native_color: pgsqld'
+native_color: pgsqld:0 allocation score on hanode1: 1002
+native_color: pgsqld:0 allocation score on hanode2: 0
+native_color: pgsqld:0 allocation score on hanode3: 0
+native_color: pgsqld:2 allocation score on hanode1: -INFINITY
+native_color: pgsqld:2 allocation score on hanode2: 1001
+native_color: pgsqld:2 allocation score on hanode3: 0
+native_color: pgsqld:1 allocation score on hanode1: -INFINITY
+native_color: pgsqld:1 allocation score on hanode2: -INFINITY
+native_color: pgsqld:1 allocation score on hanode3: 991
 ~~~
 
-Ces scores tiennent compte de tous les scores existants dans la configuration:
-stickiness, score de localisation ou de colocation, etc. Attention, les
-stickiness peuvent s'accumuler ! Effectivement, ils s'appliquent aux
-ressources, mais aussi aux groupes qui contiennent des ressources ou aux
-ressources gérant clone promu.
+Les scores `1002`, `1001` et `991` correspondent à la somme des _master scores_
+avec le _stickiness_ de `1` associé à la ressource.
 
-Si nous prenons l'exemple du clone `pgsqld:0` de la ressource `pgsqld`, ce
-dernier a un promotion score de `1003` sur `srv1`. Ce score est la somme de:
-
-* `pgsqld:0 allocation score on srv1: 1002`: master score de `1001` + stickiness de `1`
-* `pgsqld-ha allocation score on srv1: 1`: stickiness du rôle master au sein
-  de `pgsqld-ha`
-
-La ressource `pgsqld` étant un des clones de la ressource `pgsqld-ha`, le
-rôle `master` de cette dernière hérite aussi du score de stickiness de sa
-ressource parent.
-
-Concernant les scores `-INFINITY`, nous devinons bien ici comment ils sont
-distribués:
+Voici pourquoi et comment sont distribués les scores `-INFINITY`:
 
 1. le premier clone `pgsqld:0` pouvait démarrer n'importe où.
-2. une fois `pgsqld:0` démarré sur `srv1`, les clones ne pouvant coexister sur
-   le même nœud, `pgsqld:1` a un score `-INFINITY` sur `srv1`, mais peu
-   démarrer sur n'importe lequel des deux autres nœuds
-3. `pgsqld:2` a un score de `-INFINITY` sur `srv1` et `srv2` à cause de la
-   présence des deux autres clones. Il ne peut démarrer que sur `srv3`.
+2. une fois `pgsqld:0` démarré sur `hanode1`, les clones ne pouvant coexister sur
+   le même nœud (`clone-node-max=1`), `pgsqld:1` a un score `-INFINITY` sur
+   `hanode1`, mais peu démarrer sur n'importe lequel des deux autres nœuds
+3. `pgsqld:2` a un score de `-INFINITY` sur `hanode1` et `hanode2` à cause de la
+   présence des deux autres clones. Il ne peut démarrer que sur `hanode3`.
 
 :::
 
 -----
 
-## Diagramme du monitor
-
-[Diagramme](https://github.com/ClusterLabs/PAF/blob/master/docs/dev/action-monitor.pdf)
+### TP: étude du premier démarrage
 
 ::: notes
 
-FIXME
+Le log de `LRMd` étant configuré en mode debug, les messages de debug de PAF
+son visibles dans les log.
+
+FIXME: renommer en pgsqld-clone
+
+1. identifier l'opération `start` dans les log de Pacemaker __sur le primaire__
+2. identifier les messages de `pgsqlms` concernant son statut avant et après démarrage
+3. identifier la décision de l'agent de positionner son master score
+4. identifier sur le DC la décision de créer une nouvelle transition pour
+   promouvoir l'instance primaire
+5. identifier l'opération de promotion sur le primaire
+6. identifier sur le primaire la distributions des scores
 
 :::
 
 -----
 
-### TP
-
-FIXME
+### Correction: Étude du premier démarrage
 
 ::: notes
 
-Identifier dans les logs le "push" de la CIB ("cib_process_request")
+Le log de `LRMd` étant configuré en mode debug, les messages de debug de PAF
+son visibles dans les log.
+
+FIXME: renommer en pgsqld-clone
+
+1. identifier l'opération `start` dans les log de Pacemaker __sur le primaire__
 
 ~~~
-cib_process_replace:  Replaced 0.85.23 with 0.91.0 from hanode1
+lrmd:  info: executing - rsc:pgsqld action:start call_id:27
 ~~~
 
-Identifier le DC et les actions du pengine :
+2. identifier les messages de `pgsqlms` concernant son statut avant et après démarrage
 
-* Décide du monitor des ressources => identifier les actions du lrmd de chaque nœud
-* Observer le comportement de PAF et lire le diagramme de monitor en //
+~~~
+pgsqlms(pgsqld) DEBUG: _controldata: instance "pgsqld" state is "shut down"
+~~~
 
-Décrire le démarrage :
+Au début de l'opération `start`, `pgsqlms` vérifie toujours le statut de
+l'instance en effectuant les mêmes contrôles que l'opération `monitor`. Il
+détecte bien ici que l'instance est arrêtée en tant que primaire.
 
-  1. Action monitor
-  2. Demarrage en mode standby. Qui déclenche les action? => le lrmd
-  3. Notify
-  4. Le pengine prend une nouvelle décision :
-     
-     ~~~
-     pengine:    debug: master_color: pgsqld:1 master score: 1
-     pengine:     info: master_color: Promoting pgsqld:1 (Slave hanode1)
-     pengine:    debug: master_color: pgsqld:0 master score: -1
-     pengine:    debug: master_color: pgsqld:2 master score: -1
-     pengine:     info: master_color: pgsql-ha: Promoted 1 instances of a possible 1 to master
-     pengine:    debug: native_assign_node:   Assigning hanode1 to pgsql-master-ip
-     pengine:    debug: master_create_actions:        Creating actions for pgsql-ha
-     ~~~
-  5. Comparaison des LSN puis promotion
-     Est-ce que les secondaires se connectent sur le primaire? => non la vip n'a pas (encore) été affectée :
-     
-     ~~~
-     WARNING: No secondary connected to the master
-     ~~~
-  6. Ensuite, le pengine prend la décision d'affecter la vip :
-     
-     ~~~
-     pengine:    debug: native_assign_node:   Assigning hanode1 to pgsql-master-ip
-     pengine:    debug: master_create_actions:        Creating actions for pgsql-ha
-     ~~~
-  7. Enfin, les secondaires raccrochent bien :
-     
-     ~~~
-     INFO: Update score of "hanode2" from -1000 to 1000 because of a change in the replication lag (0).
-     INFO: Update score of "hanode3" from -1000 to 990 because of a change in the replication lag (0).
-     ~~~
+Pour comparaison, une instance secondaire est signalée avec le message suivant:
+
+~~~
+pgsqlms(pgsqld)  DEBUG: instance "pgsqld" state is "shut down in recovery"
+~~~
+
+Une fois l'opération confirmée, nous constatons bien que le l'instance est
+démarrée en tant que standby.
+
+~~~
+pgsqlms(pgsqld) DEBUG: _confirm_role: instance pgsqld is a secondary
+pgsqlms(pgsqld)  INFO: Instance "pgsqld" started
+~~~
+
+
+3. identifier la décision de l'agent de positionner son master score
+
+~~~
+pgsqlms(pgsqld)  INFO: No master score around. Set mine to 1
+~~~
+
+Vous remarquerez que ce message n'apparaît sur les autres instances.'
+
+4. identifier sur le DC la décision de créer une nouvelle transition pour
+   promouvoir l'instance primaire
+
+~~~
+pengine:  debug: pgsqld:1 master score: 1
+pengine:   info: Promoting pgsqld:1 (Slave hanode1)
+pengine:  debug: pgsqld:0 master score: -1
+pengine:  debug: pgsqld:2 master score: -1
+pengine:   info: pgsql-clone: Promoted 1 instances of a possible 1 to master
+pengine:  debug: Assigning hanode1 to pgsql-master-ip
+[...]
+pengine:   info:   Leave    pgsqld:0        (Slave hanode2          )
+pengine: notice: * Promote  pgsqld:1        (Slave -> Master hanode1)
+pengine:   info:   Leave    pgsqld:2        (Slave hanode3          )
+pengine: notice: * Start    pgsql-master-ip (hanode1                )
+~~~
+
+Cette transition décide de promouvoir l'instance sur `hanode1` et d'y
+démarrer l'adresse IP associée grâce à la colocation créée.
+
+5. identifier l'opération de promotion sur le primaire
+
+~~~
+crmd:      info: Performing op=pgsqld_promote_0
+lrmd:      info: executing - rsc:pgsqld action:promote
+[...]
+pgsqlms(pgsqld)[29050]: Mar 20 21:52:40  INFO: Promote complete
+lrmd:      info: finished - rsc:pgsqld action:promote exit-code:0
+crmd:    notice: Result of promote operation for pgsqld on hanode1: 0 (ok)
+~~~
+
+6. identifier sur le primaire la distributions des scores
+
+Une fois la promotion réalisée et avant de la confirmer au cluster, l'agent
+vérifie le statut de l'instance de la même manière que l'opération `monitor`.
+L'adresse IP n'étant pas encore associée à ce moment là, aucun secondaire n'est
+alors connecté.  Vous devriez donc observer les messages suivants:
+
+~~~
+pgsqlms(pgsqld) WARNING: No secondary connected to the master
+pgsqlms(pgsqld) WARNING: "hanode3" is not connected to the primary
+pgsqlms(pgsqld) WARNING: "hanode2" is not connected to the primary
+~~~
+
+Au prochain appel à l'opération `monitor`, vous devriez ensuite observer:
+
+~~~
+pgsqlms(pgsqld) INFO: Update score of "hanode2" from -1000 to 1000 because of a change in the replication lag (0).
+pgsqlms(pgsqld) INFO: Update score of "hanode3" from -1000 to 990 because of a change in the replication lag (0).
+~~~
 
 :::
 
 -----
 
-## Détail d'un switchover
+# Administration du cluster
 
-1. arrêt propre de l'instance primaire
-2. redémarrage de l'instance primaire en secondaire
-3. tentative de promotion du secondaire ayant le LSN le plus élevé au
-   dernier monitor
-  1. comparaison des LSN actuels entre les secondaires
-  2. poursuite de la promotion si le secondaire élu est toujours le plus avancé
-  3. annulation de la promotion ("soft error") sinon pour déclencher une
-     nouvelle transition
+-----
+
+## Démarrer/arrêter le cluster
+
+* pas de mécanique d'arrêt contrôlé et simultané de tous les nœuds
+* désactiver les ressources avant d'éteindre le cluster
+* au cas par cas ou avec l'option `stop-all-resources`
+* utiliser l'attribut de nœuds `standby` pour un nœud isolé
 
 ::: notes
 
-Dans le cadre de PostgreSQL, un switchover désigne la promotion planifiée d'une
-instance secondaire.
+Pacemaker n'a pas de mécanique prévue pour interrompre tous les nœuds du
+cluster de façon contrôlée. Ainsi, si les nœuds sont éteints les uns après
+les autres, quele qu'en soit la raison, le cluster peut avoir le temps de
+réagir et planifier des opérations qui pourront être exécutées ou non.
+
+Même avec un outil comme `pcs` qui exécute les commandes d'arrêts sur tous
+les nœuds en même temps, il y a toujours un risque de race condition.
+
+À ce propos, voir ce mail et la discussion autour:
+
+<http://lists.clusterlabs.org/pipermail/users/2017-December/006963.html>
+
+Il existe deux solutions pour éteindre le cluster, arrêter les ressources ou
+positionner le paramètre de cluster `stop-all-resources` à `true`.
+
+Si l'arrêt ne concerne qu'un seul serveur (eg. mise à jour du noyau, 
+évolution matériel, ...), il est possible de le positionner en
+« veille » grâce à l'attribut de nœud `standby`. Lorsque cet attribut est
+activé sur un nœud, Pacemaker bascule toutes les ressources qu'il héberge
+ailleurs dans le cluster et n'en démarrera plus dessus.
+
+:::
+
+-----
+
+### TP: arrêt du cluster
+
+::: notes
+
+1. placer `hanode3` en mode standby
+2. observer les contraintes pour `pgsql-clone`
+3. retirer le mode standby de `hanode3`
+4. désactiver toutes les ressources
+5. éteindre le cluster
+6. démarrer le cluster
+7. réactiver les ressources.
+
+:::
+
+-----
+
+### Correction: arrêt du cluster
+
+::: notes
+
+1. placer `hanode3` en mode standby
+
+~~~console
+# pcs node standby hanode3 --wait
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 ]
+     Stopped: [ hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+Toutes les ressources de `hanode3` ont bien été interrompues.
+
+NOTE: `pcs node standby <node_name>` à remplacé `pcs cluster standby` dans la
+version  0.10.1 de pcs.
+
+
+2. observer les contraintes pour `pgsql-clone`
+
+~~~console
+# pcs constraint location show resource pgsql-clone
+Location Constraints:
+~~~
+
+Il n'y a aucune contrainte, le cluster refuse simplement de démarrer une
+ressource sur `hanode3`.
+
+3. retirer le mode standby de `hanode3`
+
+~~~console
+# pcs node unstandby hanode3 --wait
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+4. désactiver toutes les ressources
+
+Deux solutions. La première consiste à positionner `stop-all-resources=true`:
+
+~~~console
+# pcs property set stop-all-resources=true
+
+# [...] après quelques secondes
+
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Stopped: [ hanode1 hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Stopped
+~~~
+
+L'intérêt de se paramètre est que le cluster va interrompre toutes les
+ressources en une seule transition:
+
+~~~
+pengine:  debug: unpack_config:     Stop all active resources: true
+pengine:  debug: native_color:      Forcing fence_vm_hanode1 to stop
+pengine:  debug: native_color:      Forcing fence_vm_hanode2 to stop
+pengine:  debug: native_color:      Forcing fence_vm_hanode3 to stop
+pengine:  debug: native_color:      Forcing pgsqld:1 to stop
+pengine:  debug: native_color:      Forcing pgsqld:0 to stop
+pengine:  debug: native_color:      Forcing pgsqld:2 to stop
+pengine: notice: * Stop fence_vm_hanode1 (        hanode2 )
+pengine: notice: * Stop fence_vm_hanode2 (        hanode1 )
+pengine: notice: * Stop fence_vm_hanode3 (        hanode1 )
+pengine: notice: * Stop pgsqld:0         (  Slave hanode2 )
+pengine: notice: * Stop pgsqld:1         ( Master hanode1 )
+pengine: notice: * Stop pgsqld:2         (  Slave hanode3 )
+pengine: notice: * Stop pgsql-master-ip  (        hanode1 )
+~~~
+
+Son désavantage est que le cluster réagit après que le paramètre ait été
+positionné. L'outil `pcs` ne peut donc pas attendre la fin de la transition
+pour rendre la main, ce qui est gênant dans le cadre d'un script par exemple.
+
+La seconde solution consiste à arrêter chacune des ressources, une à une.
+Dans ce cas, nous pouvons demander à `pcs` d'attendre la fin de l'opération,
+mais il faut potentiellement exécuter plusieurs commandes donc.
+
+~~~console
+# pcs resource disable pgsql-clone --wait
+~~~
+
+5. éteindre le cluster
+
+~~~console
+# pcs cluster stop --all
+~~~
+
+6. démarrer le cluster
+
+~~~console
+# pcs cluster start --all
+~~~
+
+7. réactiver les ressources.
+
+~~~console
+# pcs property set stop-all-resources=true
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Stopped: [ hanode1 hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Stopped
+# pcs property set stop-all-resources=false
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+:::
+
+-----
+
+## Maintenances du cluster
+
+* `maintenance-mode`
+  * concerne toutes les ressources
+  * désactive toutes les opérations
+  * arrête les opérations `monitor`
+* `is-managed`
+  * ressource par ressource
+  * ne désactive pas les opérations `monitor`
+  * ne réagit plus aux changements de statut 
+* commandes `cleanup` ou `refresh` pour rafraîchir une ressource
+
+::: notes
+
+L'attribut de ressource `is-managed` permet de désactiver les réactions du
+cluster pour la ressource concernée. Une fois cet attribut positionné à
+`false`, le cluster n'exécute plus aucune nouvelle action de sa propre
+initiative. Cependant, les opérations récurrentes de `monitor` sont maintenues.
+Un statut différent de celui attendu n'est simplement pas considéré comme une
+erreur.
+
+Le paramètre `maintenance-mode` quand à lui permet de placer l'ensemble du
+cluster en mode maintenance lorsqu'il est positionné à `true`. Ce paramètre
+de cluster concerne __toutes__ les ressources.
+
+Une fois le mode maintenance activé, comme avec l'attribut `is-managed`,
+Pacemaker n'exécute plus aucune opération de sa propre initiative, mais il
+désactive __aussi__ toutes les opérations récurrentes de `monitor`.
+
+Quelque soit la méthode utilisée pour désactiver temporairement les réactions
+du cluster, une fois que ce dernier reprend le contrôle, il compare le statut
+des ressources avec celui qu'elles avaient auparavant. Ainsi, si une ressource
+a été arrêtée ou déplacée entre temps, il peut déclencher des actions
+correctives ! Avant de quitter l'un ou l'autre des modes, veillez à simuler la
+réaction du cluster à l'aide de `crm_simulare`.
+
+Lorsque `maintenance-mode` est activé, il peut être utile de demander au
+cluster de rafraîchir le statut des ressources. Deux commandes existent:
+`crm_ressource --cleanup` ou `crm_ressource --refresh` (et leurs équivalents
+avec `pcs`).
+
+La première ne travaille que sur les ressources ayant eu une erreur. Elle
+nettoie l'historique des erreurs, les `failcount`, puis exécute une
+seule opération `monitor` pour recalculer le statut de la ressource. Elle n'a
+aucun effet sur les ressources n'ayant aucune erreur.
+
+La seconde commande effectue les mêmes opérations, travaille aussi sur les
+ressources saines et nettoie tout l'historique en plus des erreurs.
+
+:::
+
+-----
+
+### TP: maintenance
+
+::: notes
+
+1. désactiver `is-managed` pour la ressource `pgsql-clone`
+2. arrêter manuellement PostgreSQL sur `hanode2`
+3. observer la réaction du cluster
+4. exporter la CIB  courante dans le fichier `is-managed.xml` et y activer le
+   paramètre `is-managed` pour la ressource `pgsql-clone` 
+5. simuler la réaction du cluster en utilisant la CIB `is-managed.xml` en entrée
+6. appliquer la modification de `is-managed.xml` et observer la réaction du
+   cluster
+7. activer le mode maintenance sur l'ensemble du cluster
+8. arrêter manuellement PostgreSQL sur `hanode3`
+9. exécuter une commande `cleanup` pour `pgsqld` sur le seul nœud `hanode2`
+10. exécuter une commande `cleanup` pour `pgsqld` sur le seul nœud `hanode3`
+11. exécuter une commande `refresh` pour `pgsqld` sur le seul nœud `hanode3`
+12. simuler la sortie du mode maintenance puis appliquer la modification au
+    cluster
+
+:::
+
+-----
+
+### Correction: maintenance
+
+::: notes
+
+1. désactiver `is-managed` pour la ressource `pgsql-clone`
+
+~~~console
+# pcs resource unmanage pgsql-clone
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     pgsqld	(ocf::heartbeat:pgsqlms):	Master hanode1 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode2 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode3 (unmanaged)
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+2. arrêter manuellement PostgreSQL sur `hanode2`
+
+Notez que nous ne pouvons pas utiliser `systemctl`. Le service est
+désactivé et arrêté aux yeux de systemd.
+
+~~~console
+# sudo -iu postgres /usr/pgsql-12/bin/pg_ctl -D /var/lib/pgsql/12/data/ -m fast stop
+~~~
+
+3. observer la réaction du cluster
+
+Après quelques secondes, le cluster constate que `pgsqld` est arrêté sur
+`hanode2`, mais il ne réagit pas.
+
+~~~console
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     pgsqld	(ocf::heartbeat:pgsqlms):	Master hanode1 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode3 (unmanaged)
+     Stopped: [ hanode2 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+~~~
+pengine: debug: pgsqld_monitor_16000 on hanode2 returned 'not running' (7) instead of the expected value: 'ok' (0)
+pengine:  info: resource pgsqld:1 isn't managed
+[...]
+pengine: debug: custom_action:    Action pgsqld:0_start_0 (unmanaged)
+pengine: debug: custom_action:    Action pgsqld:0_demote_0 (unmanaged)
+pengine: debug: custom_action:    Action pgsqld:0_stop_0 (unmanaged)
+pengine: debug: custom_action:    Action pgsqld:0_promote_0 (unmanaged)
+pengine: debug: custom_action:    Action pgsqld:1_start_0 (unmanaged)
+pengine: debug: custom_action:    Action pgsqld:1_stop_0 (unmanaged)
+pengine: debug: custom_action:    Action pgsqld:1_start_0 (unmanaged)
+pengine:  info: LogActions:       Leave   fence_vm_hanode1        (Started hanode2)
+pengine:  info: LogActions:       Leave   fence_vm_hanode2        (Started hanode1)
+pengine:  info: LogActions:       Leave   fence_vm_hanode3        (Started hanode1)
+pengine:  info: LogActions:       Leave   pgsqld:0        (Master unmanaged)
+pengine:  info: LogActions:       Leave   pgsqld:1        (Slave unmanaged)
+pengine:  info: LogActions:       Leave   pgsqld:2        (Stopped unmanaged)
+pengine:  info: LogActions:       Leave   pgsql-master-ip (Started hanode1)
+~~~
+
+4. exporter la CIB  courante dans le fichier `is-managed.xml` et y activer le paramètre `is-managed` pour la ressource `pgsql-clone`
+
+~~~console
+# pcs cluster cib is-managed.xml
+# pcs -f is-managed.xml resource manage pgsql-clone
+~~~
+
+5. simuler la réaction du cluster en utilisant la CIB `is-managed.xml` en entrée
+
+Le cluster décide de redémarrer l'instance sur `hanode2`.
+
+~~~console
+# crm_simulate -Sx is-managed.xml 
+[...]
+Transition Summary:
+ * Recover    pgsqld:2     ( Slave hanode2 )  
+
+Executing cluster transition:
+ * Pseudo action:   pgsql-clone_pre_notify_stop_0
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_stop_0
+ * Pseudo action:   pgsql-clone_stop_0
+ * Resource action: pgsqld          stop on hanode2
+ * Pseudo action:   pgsql-clone_stopped_0
+ * Pseudo action:   pgsql-clone_post_notify_stopped_0
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_stopped_0
+ * Pseudo action:   pgsql-clone_pre_notify_start_0
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_start_0
+ * Pseudo action:   pgsql-clone_start_0
+ * Resource action: pgsqld          start on hanode2
+ * Pseudo action:   pgsql-clone_running_0
+ * Pseudo action:   pgsql-clone_post_notify_running_0
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_running_0
+ * Resource action: pgsqld          monitor=16000 on hanode2
+
+Revised cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+6. appliquer la modification de `is-managed.xml` et observer la réaction du cluster
+
+~~~console
+# pcs cluster cib-push is-managed.xml
+~~~
+
+Le cluster détecte __immédiatement__ un statut différent de celui attendu et
+lève une erreur:
+
+~~~console
+# pcs resource failcount show pgsqld     
+Failcounts for resource 'pgsqld'
+  hanode2: 1
+~~~
+
+Dans les log du DC:
+
+~~~
+pengine:    debug: pgsqld_monitor_16000 on hanode2 returned 'not running' (7) instead of the expected value: 'ok' (0)
+pengine:  warning: Processing failed monitor of pgsqld:1 on hanode2: not running | rc=7
+pengine:     info:   Start recurring monitor (16s) for pgsqld:1 on hanode2
+pengine:     info:   Start recurring monitor (16s) for pgsqld:1 on hanode2
+pengine:     info:   Leave   fence_vm_hanode1  (Started hanode2)
+pengine:     info:   Leave   fence_vm_hanode2  (Started hanode1)
+pengine:     info:   Leave   fence_vm_hanode3  (Started hanode1)
+pengine:     info:   Leave   pgsqld:0          (Master hanode1 )
+pengine:   notice: * Recover pgsqld:1          (Slave hanode2  )  
+pengine:     info:   Leave   pgsqld:2          (Slave hanode3  )
+pengine:     info:   Leave   pgsql-master-ip   (Started hanode1)
+~~~
+
+7. activer le mode maintenance sur l'ensemble du cluster
+
+Le cluster ne gère plus aucune les ressource.
+
+~~~console
+# pcs property set maintenance-mode=true
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld] (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode3 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Master hanode1 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode2 (unmanaged)
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1 (unmanaged)
+~~~
+
+8. arrêter manuellement PostgreSQL sur `hanode3`
+
+~~~console
+# sudo -iu postgres /usr/pgsql-12/bin/pg_ctl -D /var/lib/pgsql/12/data/ -m fast stop
+~~~
+
+Le cluster ne détecte pas le changement de statut de la ressource.
+
+9. exécuter une commande `cleanup` pour `pgsqld` sur le seul nœud `hanode2`
+
+~~~console
+# pcs resource cleanup pgsqld --node=hanode2
+Cleaned up pgsqld:0 on hanode2
+Cleaned up pgsqld:1 on hanode2
+Cleaned up pgsqld:2 on hanode2
+
+# pcs resource failcount show pgsqld
+No failcounts for resource 'pgsqld'
+
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld] (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode3 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Master hanode1 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode2 (unmanaged)
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1 (unmanaged)
+~~~
+
+Nous observons que l'historique des incidents de `pgsqld` sur `hanode2` a disparu.
+
+Le clone `pgsqld` est cependant toujours vu comme démarré sur `hanode3`.
+
+10. exécuter une commande `cleanup` pour `pgsqld` sur le seul nœud `hanode3`
+
+Rien ne change. La commande n'a pas d'effet sur les ressources n'ayant pas eu
+d'incident.
+
+~~~console
+# pcs resource cleanup pgsqld --node=hanode3
+Cleaned up pgsqld:0 on hanode3
+Cleaned up pgsqld:1 on hanode3
+Cleaned up pgsqld:2 on hanode3
+
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld] (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode3 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Master hanode1 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode2 (unmanaged)
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1 (unmanaged)
+~~~
+
+11. exécuter une commande `refresh` pour `pgsqld` sur le seul nœud `hanode3`
+
+Le cluster a détecté que la ressource était arrêtée et le consigne dans la
+CIB.
+
+~~~console
+# pcs resource refresh pgsqld --node=hanode3
+Cleaned up pgsqld:0 on hanode3
+Cleaned up pgsqld:1 on hanode3
+Cleaned up pgsqld:2 on hanode3
+Waiting for 3 replies from the CRMd... OK
+
+# pcs resource failcount show pgsqld
+No failcounts for resource 'pgsqld'
+
+# pcs resource show 
+ Master/Slave Set: pgsql-clone [pgsqld] (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Master hanode1 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode2 (unmanaged)
+     Stopped: [ hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1 (unmanaged)
+~~~
+
+12. simuler la sortie du mode maintenance puis appliquer la modification au
+cluster
+
+Le cluster prévoie de démarrer l'instance sur `hanode3`
+
+~~~console
+# pcs cluster cib maintenance-mode.xml
+# pcs -f maintenance-mode.xml property set maintenance-mode=false
+# crm_simulate -Sx maintenance-mode.xml
+[...]
+Transition Summary:
+ * Start      pgsqld:2     ( hanode3 )  
+
+Executing cluster transition:
+ * Resource action: fence_vm_hanode1 monitor=60000 on hanode2
+ * Resource action: fence_vm_hanode2 monitor=60000 on hanode1
+ * Resource action: fence_vm_hanode3 monitor=60000 on hanode1
+ * Pseudo action:   pgsql-clone_pre_notify_start_0
+ * Resource action: pgsql-master-ip monitor=10000 on hanode1
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_start_0
+ * Pseudo action:   pgsql-clone_start_0
+ * Resource action: pgsqld          start on hanode3
+ * Pseudo action:   pgsql-clone_running_0
+ * Pseudo action:   pgsql-clone_post_notify_running_0
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_running_0
+ * Resource action: pgsqld          monitor=15000 on hanode1
+ * Resource action: pgsqld          monitor=16000 on hanode2
+ * Resource action: pgsqld          monitor=16000 on hanode3
+
+Revised cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+Après avoir appliqué la modification sur le cluster, ce dernier démarre
+effectivement la ressource, mais aucune erreur n'est levée. Le cluster
+s'aperçoit simplement qu'il peut déployer une instance de plus.
+
+~~~console
+# pcs cluster cib-push maintenance-mode.xml
+# pcs resource failcount show pgsqld
+No failcounts for resource 'pgsqld'
+~~~
+
+:::
+
+-----
+
+## Simuler des événements
+
+* la commande `crm_simulate` permet de simuler les réactions du cluster
+* elle peut aussi injecter des événements, eg.:
+  * crash d'un nœud
+  * injecter une opération et son code retour, avant transition
+  * décider du code retour d'une opération pour la prochaine transition
+* chaque appel exécute une seule transition
+* possibilité de chaîner les simulations en reprenant le résultat de la précédente
+* utile pour analyser les transitions passées
+
+::: notes
+
+Jusqu'à présent l'outil `crm_simulate` a été utilisé pour simuler les
+réactions du cluster en fonction d'une situation stable: une CIB de travail
+dans un fichier XML que nous manipulons (`crm_simulate -S -x FICHIER`) ou la
+CIB en cours d'utilisation par le cluster (`crm_simulate -S -L`).
+
+Il est aussi possible d'utiliser cet outil pour injecter des opérations et
+leur code retour grâce à l'argument `--op-inject` ou `-i`. Le format de
+l'argument est alors le suivant:
+`${resource}_${task}_${interval}@${node}=${rc}`, avec:
+
+* `${resource}`: le nom de la ressource
+* `${task}`: l'opération'
+* `${interval}`: l'intervalle de récurrence de la commande, en millisecondes
+* `${node}`: le nœud sur lequel l'opération est simulée
+* `${rc}`: le code retour.
+
+Le code retour doit être précisé de façon numérique. La liste des codes
+retours est disponible dans le chapitre [_Ressource Agent_ (_RA_)].
+
+Par exemple, la commande suivante injecte une opération `monitor` indiquant que
+la ressource `pgsqld` est arrêtée sur `hanode2`:
+
+~~~
+--op-inject=pgsqld_monitor_15000@hanode2=7
+~~~
+
+L'argument `--op-fail` ou `-F` permet de prédire le code retour d'une opération
+si elle est planifiée durant la simulation. Le format est identique à celui de
+`--op-inject`. Il est donc possible d'injecter une opération en entrée de la
+simulation avec `--op-inject` et de prédire le code retour d'une ou plusieurs
+des opérations planifiées par le cluster en réponse.
+
+D'autres événements sont supportés, tel que l'arrêt d'un nœud ou sa
+défaillance (respectivement `--node-down` et `--node-fail`), le changement de
+quorum (`--quorum`) ou le retour d'un nœud (`--node-up`).
+
+Quelque soit la simulation effectué, il est utile d'en sauvegarder l'état de
+sortie grâce à l'argument `--save-output=FICHIER`. Chaque simulation ne crée
+qu'une seule transition. Le fichier obtenu peut donc être réutilisé
+directement en entrée d'une autre simulation afin d'étudier les réactions du
+cluster suite à la défaillance d'une première transition par exemple.
+
+Ces actions restent cependant de simples simulation, à aucun moment l'agent
+n'est exécuté. Ainsi, les éventuels paramètres positionnés par ce dernier
+au cours des opérations ne seront pas positionnés. Vous pouvez néanmoins les
+positionner vous même dans les fichiers XML de simulation à l'aide des outils
+`pcs`, `crm_attribute`, `crm_master`, ...
+
+Enfin, Chaque transition calculée et appliquée en production par le cluster
+est enregistrée localement par le `pengine`. Par exemple, dans les log:
+
+~~~
+pengine:   notice: Calculated transition 71, saving inputs in /var/lib/pacemaker/pengine/pe-input-135.bz2
+~~~
+
+Il est possible d'observer le contenu de cette transition très simplement
+grâce à `crm_simulate`, ce qui est utile dans l'analyse d'un événement passé:
+
+~~~console
+# crm_simulate --simulate --xml-file /var/lib/pacemaker/pengine/pe-input-135.bz2
+Using the original execution date of: 2020-03-26 17:30:27Z
+
+Current cluster status:
+[...]
+~~~
+
+:::
+
+-----
+
+## Détection de panne
+
+* perte d'un nœud
+  * détectée par Corosync
+  * immédiatement communiqué à Pacemaker
+  * bascules rapides
+* le temps de détection d'une panne sur la ressource dépend du `monitor interval`
+* la transition calculée dépendent du type et du rôle de la ressource
+* le cluster essaie de redémarrer sur le même nœud si possible
+* pas de failback automatique
+
+::: notes
+
+En cas de panne, la ressource est arrêtée ou déplacée vers un autre nœud
+dans les cas suivants:
+
+* perte totale du nœud où résidait la ressource
+* `failcount` de la ressource supérieur ou égal au `migration-threshold`
+* erreur retournée par l'opération `monitor` de type `hard`
+  (voir [_Ressource Agent_ (_RA_)])
+* perte du quorum pour la partition locale
+
+Dans le cas de la perte du nœud, Corosync détecte très rapidement qu'un membre
+a quitté le groupe brusquement. Il indique immédiatement à Pacemaker que le
+nombre de membre du cluster a changé. La première action de Pacemaker est
+habituellement de déclencher un _fencing_ du nœud disparu, au cas où ce dernier
+ne soit pas réellement éteint ou qu'il puisse revenir inopinément et rendre le
+cluster instable. Les ressources hébergées sur le nœud disparu sont déplacées
+une fois le _fencing_ confirmé.
+
+Dans le cas d'une ressource est défaillante, si l'erreur retournée par
+l'opération a un niveau de criticité `hard` (voir [_Ressource Agent_ (_RA_)]),
+la ressource est démarrée sur un autre nœud.
+
+Dans les autres cas, tant que le `failcount` ne dépasse pas le
+`migration-threshold` de la ressource, le cluster tente de redémarrer cette
+dernière sur le même nœud (`recovery`).
+
+Que la ressource soit redémarrée sur le même nœud ou déplacée ailleurs,
+Pacemaker tente toujours un arrêt (opération `stop`) de celle-ci. Or, si
+l'opération `stop` échoue, elle est "promue" en fencing lors de la transition
+suivante. Ce comportement est dicté par la propriété `on-fail=fence` de
+l'action `stop` (valeur par défaut). Il est __fortement__ déconseillé de
+modifier ce comportement.
+
+Les chapitres suivants présentent les réactions du cluster en fonction du
+rôle de l'instance: secondaire ou primaire.
+
+De plus, Pacemaker n'a pas d'opération de `failback`. Du reste, ce type
+d'opération se prête mal à l'automatisation dans le cadre d'un SGBD. Concernant
+PostgreSQL, la procédure de failback est aussi différente en fonction du
+rôle de l'instance au moment de la défaillance.
+
+:::
+
+-----
+
+## Défaillance d'un secondaire
+
+* transition: `stop` -> `start`
+* cas détecté par l'agent
+  * `notify` pré-stop: phase de recovery de PostgreSQL
+
+::: notes
+
+Un incident sur un standby est traité par le cluster par une action `recovery`
+qui consiste à enchaîner les deux opérations `stop` et `start` ainsi que les
+différentes actions `notify` pré et post opération.
+
+L'agent PAF détecte ces transitions de `recovery` du cluster sur le même nœud.
+Il tente alors de corriger le crash de l'instance locale en la démarrant afin
+que celle-ci puisse effectuer sa phase de _recovery_ usuelle. Cette opération
+est réalisée en tout début de transition durant l'action `notify` pré-stop.
+
+![Primary recovery](medias/paf-standby-recover.png)
+
+:::
+
+-----
+
+### TP: Failover d'un secondaire
+
+::: notes
+
+Supprimer toutes éventuelles contraintes temporaires liées aux TP précédents.
+
+Ce TP simule d'abord un incident sur un secondaire, puis compare la simulation
+avec la réalité.
+
+1. positionner le paramètre `migration-threshold` de pgsqld à `2`
+2. créer un fichier de simulation `fail-secondary-0.xml` pour travailler dessus
+3. injecter une erreur `soft` lors du monitor sur la ressource `pgsqld` de
+   `hanode3`. Enregistrer le résultat dans `fail-secondary-1.xml`
+4. envoyer un signal SIGKILL aux processus `postgres` sur `hanode3` et vérifier
+   le comportement simulé
+5. injecter la même erreur en utilisant comme situation de départ
+   `fail-secondary-1.xml`
+6. Tuer une seconde fois les processus `postgres` sur `hanode3`
+7. reproduire en simulation le comportement observé. Enregistrez les
+   résultats dans `fail-secondary-2.xml` puis `fail-secondary-3.xml`
+
+:::
+
+-----
+
+### Correction: Failover d'un secondaire
+
+::: notes
+
+Ce TP simule d'abord un incident sur un secondaire, puis compare la simulation
+avec la réalité.
+
+
+1. positionner le paramètre `migration-threshold` de pgsqld à `2`
+
+~~~console
+# pcs resource update pgsqld meta migration-threshold=2
+~~~
+
+2. créer un fichier de simulation `fail-secondary-0.xml` pour travailler dessus
+
+~~~console
+# pcs cluster cib fail-secondary-0.xml
+~~~
+
+3. injecter une erreur `soft` lors du monitor sur la ressource `pgsqld` de
+   `hanode3`. Enregistrer le résultat dans `fail-secondary-1.xml`
+
+~~~console
+# crm_simulate --simulate                    \
+  --xml-file=fail-secondary-0.xml            \
+  --save-output=fail-secondary-1.xml         \
+  --op-inject=pgsqld_monitor_16000@hanode3=1 
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+
+Performing requested modifications
+ + Injecting pgsqld_monitor_15000@hanode3=1 into the configuration
+ + Injecting attribute fail-count-pgsqld#monitor_15000=value++ into /node_state '3'
+ + Injecting attribute last-failure-pgsqld#monitor_15000=1585235516 into /node_state '3'
+
+Transition Summary:
+ * Recover    pgsqld:0     ( Slave hanode3 )  
+
+Executing cluster transition:
+ * Cluster action:  clear_failcount for pgsqld on hanode3
+ * Pseudo action:   pgsql-clone_pre_notify_stop_0
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_stop_0
+ * Pseudo action:   pgsql-clone_stop_0
+ * Resource action: pgsqld          stop on hanode3
+ * Pseudo action:   pgsql-clone_stopped_0
+ * Pseudo action:   pgsql-clone_post_notify_stopped_0
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_stopped_0
+ * Pseudo action:   pgsql-clone_pre_notify_start_0
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_start_0
+ * Pseudo action:   pgsql-clone_start_0
+ * Resource action: pgsqld          start on hanode3
+ * Pseudo action:   pgsql-clone_running_0
+ * Pseudo action:   pgsql-clone_post_notify_running_0
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_running_0
+ * Resource action: pgsqld          monitor=16000 on hanode3
+
+Revised cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+Le cluster redémarre l'instance sur le même nœud. Son `failcount` est
+incrémenté de `1`.
+
+La transition effectue bien une action `stop` suivie d'une action `start`.
+
+~~~console
+# pcs -f fail-secondary-1.xml resource failcount show pgsqld     
+Failcounts for resource 'pgsqld'
+  hanode3: 1
+~~~
+
+4. envoyer un signal `SIGKILL` aux processus `postgres` sur `hanode3` et vérifier
+   le comportement simulé
+
+~~~console
+# pkill -SIGKILL postgres
+~~~
+
+Le comportement simulé est bien le même que celui observé.
+
+~~~console
+# pcs resource failcount show pgsqld
+Failcounts for resource 'pgsqld'
+  hanode3: 1
+
+# pcs resource show 
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+5. injecter la même erreur en utilisant comme situation de départ
+   `fail-secondary-1.xml`
+
+~~~console
+# crm_simulate --simulate                      \
+    --xml-file=fail-secondary-1.xml            \
+    --save-output=fail-secondary-2.xml         \
+    --op-inject=pgsqld_monitor_16000@hanode3=1 
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+
+Performing requested modifications
+ + Injecting pgsqld_monitor_16000@hanode3=1 into the configuration
+ + Injecting attribute fail-count-pgsqld#monitor_16000=value++ into /node_state '3'
+ + Injecting attribute last-failure-pgsqld#monitor_16000=1585243357 into /node_state '3'
+
+Transition Summary:
+ * Stop       pgsqld:0     ( Slave hanode3 )   due to node availability
+
+Executing cluster transition:
+ * Cluster action:  clear_failcount for pgsqld on hanode3
+ * Pseudo action:   pgsql-clone_pre_notify_stop_0
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_stop_0
+ * Pseudo action:   pgsql-clone_stop_0
+ * Resource action: pgsqld          stop on hanode3
+ * Pseudo action:   pgsql-clone_stopped_0
+ * Pseudo action:   pgsql-clone_post_notify_stopped_0
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_stopped_0
+
+Revised cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 ]
+     Stopped: [ hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+Le `failcount` ayant atteint la valeur de `migration-threshold`, la ressource
+doit quitter le nœud. Néanmoins, tous les autres nœuds possédant déjà un
+clone et le paramètre `clone-node-max` étant à `1`, ce troisème clone ne peut
+démarrer nulle part.
+
+~~~console
+# pcs -f fail-secondary-2.xml resource failcount show pgsqld
+Failcounts for resource 'pgsqld'
+  hanode3: 2
+~~~
+
+6. Tuer une seconde fois les processus `postgres` sur `hanode3`
+
+~~~console
+# pkill -SIGKILL postgres
+~~~
+
+Cette fois-ci, le comportement est différent. La ressource n'est pas
+simplement isolée, c'est tout le nœud `hanode3` est isolé.
+
+~~~console
+# pcs status nodes 
+Pacemaker Nodes:
+ Online: hanode1 hanode2
+ Standby:
+ Maintenance:
+ Offline: hanode3
+[...]
+~~~
+
+Les log de `hanode3` montrent les erreurs suivantes:
+
+~~~
+lrmd[3248]:    info: executing - rsc:pgsqld action:stop call_id:85
+pgsqlms(pgsqld): ERROR: Instance "pgsqld" controldata indicates a running secondary instance, the instance has probably crashed
+pgsqlms(pgsqld): ERROR: Unexpected state for instance "pgsqld" (returned 1)
+lrmd[3248]:    info: finished - rsc:pgsqld action:stop call_id:85 pid:9962 exit-code:1 exec-time:161ms queue-time:0ms
+~~~
+
+L'agent PAF est très stricte et contrôle l'état de l'instance avant chaque
+opération. Lors de l'opération stop, il détecte que l'instance se trouve
+dans un état incohérent et lève alors une erreur.
+
+À partir de cette erreur, les log du DC présentent les messages suivants:
+
+~~~
+crmd:  warning: status_from_rc:    Action 2 (pgsqld_stop_0) on hanode3 failed (target: 0 vs. rc: 1): Error
+
+pengine: warning: Processing failed stop of pgsqld:0 on hanode3: unknown error | rc=1
+pengine: warning: Cluster node hanode3 will be fenced: pgsqld:0 failed there
+pengine: warning: Scheduling Node hanode3 for STONITH
+pengine:  notice: Stop of failed resource pgsqld:0 is implicit after hanode3 is fenced
+pengine:  notice: * Fence (reboot) hanode3 'pgsqld:0 failed there'
+pengine:    info:   Leave   fence_vm_hanode1  (Started hanode2)
+pengine:    info:   Leave   fence_vm_hanode2  (Started hanode1)
+pengine:    info:   Leave   fence_vm_hanode3  (Started hanode1)
+pengine:  notice: * Stop       pgsqld:0       (Slave hanode3  )
+pengine:    info:   Leave   pgsqld:1          (Master hanode1)
+pengine:    info:   Leave   pgsqld:2          (Slave hanode2)
+pengine:    info:   Leave   pgsql-master-ip   (Started hanode1)
+pengine: warning: Calculated transition 75 (with warnings), saving inputs in /var/lib/pacemaker/pengine/pe-warn-0.bz2
+
+crmd:   notice: te_fence_node:     Requesting fencing (reboot) of node hanode3
+stonith-ng:   notice: initiate_remote_stonith_op:        Requesting peer fencing (reboot) of hanode3
+stonith-ng:   notice: crm_update_peer_state_iter:        Node hanode3 state is now lost | nodeid=3 previous=member source=crm_update_peer_proc
+crmd:   notice: crm_update_peer_state_iter:        Node hanode3 state is now lost
+~~~
+
+Une nouvelle transition est calculée et l'opération `stop` est "promue" en
+fencing.
+
+7. reproduire en simulation le comportement observé. Enregistrez les
+   résultats dans `fail-secondary-2.xml` puis `fail-secondary-3.xml`
+
+~~~console
+# crm_simulate --simulate                      \
+    --xml-file=fail-secondary-1.xml            \
+    --save-output=fail-secondary-2.xml         \
+    --op-inject=pgsqld_monitor_16000@hanode3=1 \
+    --op-fail=pgsqld_stop_0@hanode3=1
+[...]
+Performing requested modifications
+ + Injecting pgsqld_monitor_16000@hanode3=1 into the configuration
+ + Injecting attribute fail-count-pgsqld#monitor_16000=value++ into /node_state '3'
+ + Injecting attribute last-failure-pgsqld#monitor_16000=1585245905 into /node_state '3'
+
+Transition Summary:
+ * Stop       pgsqld:0     ( Slave hanode3 )   due to node availability
+
+Executing cluster transition:
+ * Cluster action:  clear_failcount for pgsqld on hanode3
+ * Pseudo action:   pgsql-clone_pre_notify_stop_0
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_stop_0
+ * Pseudo action:   pgsql-clone_stop_0
+ * Resource action: pgsqld          stop on hanode3
+	Pretending action 2 failed with rc=1
+ + Injecting attribute fail-count-pgsqld#stop_0=value++ into /node_state '3'
+ + Injecting attribute last-failure-pgsqld#stop_0=1585245905 into /node_state '3'
+ * Pseudo action:   pgsql-clone_stopped_0
+ * Pseudo action:   pgsql-clone_post_notify_stopped_0
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_stopped_0
+
+Revised cluster status:
+Node hanode3 (3): UNCLEAN (online)
+Online: [ hanode1 hanode2 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     pgsqld	(ocf::heartbeat:pgsqlms):	FAILED hanode3
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+
+# crm_simulate --simulate                      \
+    --xml-file=fail-secondary-2.xml            \
+    --save-output=fail-secondary-3.xml
+
+Current cluster status:
+Node hanode3 (3): UNCLEAN (online)
+Online: [ hanode1 hanode2 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     pgsqld	(ocf::heartbeat:pgsqlms):	FAILED hanode3
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+
+Transition Summary:
+ * Fence (reboot) hanode3 'pgsqld:0 failed there'
+ * Stop       pgsqld:0     ( Slave hanode3 )   due to node availability
+
+Executing cluster transition:
+ * Pseudo action:   pgsql-clone_pre_notify_stop_0
+ * Fencing hanode3 (reboot)
+ * Pseudo action:   pgsqld_post_notify_stop_0
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_stop_0
+ * Pseudo action:   pgsql-clone_stop_0
+ * Pseudo action:   pgsqld_stop_0
+ * Pseudo action:   pgsql-clone_stopped_0
+ * Pseudo action:   pgsql-clone_post_notify_stopped_0
+ * Resource action: pgsqld          notify on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_stopped_0
+ * Pseudo action:   pgsqld_notified_0
+
+Revised cluster status:
+Online: [ hanode1 hanode2 ]
+OFFLINE: [ hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 ]
+     Stopped: [ hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+:::
+
+-----
+
+## Failback d'un secondaire
+
+* suite à un incident sur la ressource ou la perte de son nœud
+* état incohérent de l'instance: statut différent du `pg_control`
+* PAF lève une erreur systématiquement pour toutes les opérations
+* une erreur sur l'action `stop` conduit à un fencing
+* conclusion: placer l'instance dans un état stable
+1. positionner la ressource en `is-managed=false`
+2. ré-intégrer le nœud dans le cluster
+3. démarrer la ressource manuellement, puis l'arrêter (état stable)
+4. effectuer un `refresh` de la ressource
+5. positionner `is-managed=true` pour la ressource
+
+::: notes
+
+Suite au crash d'une instance secondaire, si le cluster n'a pas réussi à
+l'arrêter localement, le serveur entier a dû être isolé (cf TP
+[Correction: Défaillance d'un secondaire]). L'instance est alors dans un état
+instable: son fichier interne `pg_control` indique un statut `in archive
+recovery` alors que cette dernière n'est pas démarrée et n'accepte aucune
+connexion.
+
+Dans cette situation, l'agent retourne une erreur pour toutes les opérations.
+Au démarrage du cluster sur le nœud concerné, ce dernier va vouloir
+contrôler l'état des ressources sur ce nœud et l'opération de `probe`
+(l'opération `monitor` non récurrente) va retourner une erreur.
+
+Il est même possible que le cluster tente d'effectuer un `recovery` de la
+ressource en effectuant les opérations `stop` puis `start`. Dans ce cas là,
+le nœud se fait une nouvelle fois isoler.
+
+Pour ré-intégrer le nœud et la ressource, l'idéal est de suivre la
+procédure suivante:
+
+1. positionner `is-managed=false` pour la ressource
+2. démarrer le cluster sur le nœud à ré-intégrer
+3. démarrer manuellement l'instance sur le nœud
+4. valider que cette dernière réplique correctement
+5. arrêter l'instance
+6. effectuer une commande `refresh` de la ressource
+7. supprimer `is-managed=false` pour la ressource
+
+Pour plus de facilité, il est possible d'utiliser ici `systemctl` pour
+démarrer et arrêter la ressource. L'important est qu'en fin de procédure,
+`systemd` ne voit pas l'instance comme étant démarrée de son point vue,
+cette dernière étant gérée non pas par lui mais par Pacemaker.
+
+:::
+
+-----
+
+### TP: Failback d'un secondaire
+
+::: notes
+
+1. désactiver la gestion du cluster de `pgsql-clone`
+2. démarrer le cluster sur `hanode3`
+3. démarrer manuellement l'instance PostgreSQL sur `hanode3`
+4. valider que cette dernière réplique correctement
+5. arrêter l'instance
+6. effectuer une commande `refresh` de `pgsqld`
+7. supprimer `is-managed=false` pour la ressource
+
+:::
+
+-----
+
+### Correction: Failback d'un secondaire
+
+::: notes
+
+1. désactiver la gestion du cluster de `pgsql-clone`
+
+~~~console
+# pcs resource unmanage pgsql-clone
+~~~
+
+2. démarrer le cluster sur `hanode3`
+
+~~~console
+# pcs cluster start
+~~~
+
+Attendre que le nœud soit bien ré-intégré dans le cluster.
+
+3. démarrer manuellement l'instance PostgreSQL sur `hanode3`
+
+~~~console
+# systemctl start postgresql-12
+~~~
+
+4. valider que cette dernière réplique correctement
+
+Depuis l'instance primaire, la ressource est détectée comme démarrée et
+PostgreSQL nous indique qu'elle réplique correctement:
+
+~~~console
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode2 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode3 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Master hanode1 (unmanaged)
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+ 
+# sudo -iu postgres psql
+postgres=# select state, application_name
+  from pg_stat_replication
+  where application_name = 'hanode3'; 
+   state   | application_name 
+-----------+------------------
+ streaming | hanode3
+(1 row)
+~~~
+
+5. arrêter l'instance
+
+~~~console
+# systemctl stop postgresql-12
+# systemctl show -p ActiveState postgresql-12
+ActiveState=inactive
+~~~
+
+Après vérification, plus aucun processus `postgres` n'est démarré. Son
+statut est cohérent:
+
+~~~console
+# /usr/pgsql-12/bin/pg_controldata /var/lib/pgsql/12/data/|grep state
+Database cluster state:               shut down in recovery
+~~~
+
+6. effectuer une commande `refresh` de `pgsqld`
+
+~~~console
+# pcs resource failcount show pgsqld hanode3
+Failcounts for resource 'pgsqld' on node 'hanode3'
+  hanode3: 3
+
+# pcs resource refresh pgsqld --node=hanode3
+Cleaned up pgsqld:0 on hanode3
+Cleaned up pgsqld:1 on hanode3
+Cleaned up pgsqld:2 on hanode3
+
+  * The configuration prevents the cluster from stopping or starting 'pgsql-clone' (unmanaged)
+Waiting for 3 replies from the CRMd... OK
+
+# pcs resource failcount show pgsqld hanode3
+No failcounts for resource 'pgsqld' on node 'hanode3'
+~~~
+
+Toutes les erreurs sont supprimées et le failcount est remis à 0.
+
+7. supprimer `is-managed=false` pour la ressource
+
+~~~console
+# pcs resource manage pgsql-clone
+~~~
+
+La ressource est démarrée sur `hanode3`.
+
+:::
+
+-----
+
+##  Défaillance du primaire
+
+1. transaction calculée
+  * `demote` -> `stop` -> `start` -> `promote`
+2. fencing du nœud hébergeant l'instance primaire en échec si nécessaire
+3. si migration, promotion du secondaire avec le meilleur master score
+  1. le secondaire désigné compare les `LSN` des secondaires
+  2. poursuite de la promotion s'il est toujours le plus avancé
+  3. sinon, annulation de la promotion et nouvelle transition
+
+::: notes
+
+En cas d'incident concernant l'instance primaire, la transition calculée
+effectue les quatre opérations suivantes dans cet ordre: `demote`, `stop`,
+`start` et `promote`. Ici aussi, les différentes actions `notify` pré et post
+opération sont bien entendu exécutées.
+
+Comme pour un secondaire, l'agent PAF détecte une transition effectuant ces
+opérations sur l'instance primaire sur un même nœud. Dans ce cas là, l'agent
+tente alors de corriger le crash de l'instance locale en la démarrant afin que
+celle-ci puisse effectuer sa phase de _recovery_ usuelle. Cette opération est
+réalisée en tout début de transition durant l'action `notify` pré-demote.
+
+![Primary recovery](medias/paf-primary-recover.png)
+
+Le choix de l'instance à promouvoir se fait en fonction des derniers master
+scores connus. Afin de s'assurer que le secondaire désigné est bien toujours le
+plus avancé dans la réplication, une élection est cependant déclenchée. En
+voici les étapes:
+
+1. opération `notify` pré-promote: chaque secondaire positionne son `LSN`
+   courant dans un attribut de nœud
+2. opération `promote`: l'instance désignée pour la promotion vérifie qu'il a
+   bien le LSN le plus avancé
+3. si un LSN plus avancé est trouvé:
+   * il positionne son master score à `1`
+   * il positionne le master score du secondaire plus avancé à `1000`
+   * il lève une erreur
+   * la transition est annulée et une nouvelle est calculée
+   * retour à l'étape 1.
+
+![Primary recovery](medias/paf-election.png)
+
+:::
+
+-----
+
+### TP: Failover du primaire
+
+::: notes
+
+1. simuler une erreur `soft` pour `pgsql-clone` sur `hanode1`
+2. tuer tous les processus PostgreSQL avec un signal `KILL`
+3. étudier la réaction du cluster
+4. nettoyer les `failcount` de `pgsql-clone`
+5. simuler une erreur `OCF_ERR_ARGS` sur `pgsql-clone`
+6. supprimer le fichier `/var/lib/pgsql/12/data/global/pg_control` sur `hanode1`
+7. étudier la réaction du cluster
+
+:::
+
+-----
+
+### Correction: Failover du primaire
+
+::: notes
+
+1. simuler une erreur `soft` pour `pgsql-clone` sur `hanode1`
+
+~~~console
+# crm_simulate --simulate --live --op-inject=pgsqld_monitor_15000@hanode1=1  
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+
+Performing requested modifications
+ + Injecting pgsqld_monitor_15000@hanode1=1 into the configuration
+ + Injecting attribute fail-count-pgsqld#monitor_15000=value++ into /node_state '1'
+ + Injecting attribute last-failure-pgsqld#monitor_15000=1585328861 into /node_state '1'
+
+Transition Summary:
+ * Recover    pgsqld:2     ( Master hanode1 )  
+
+Executing cluster transition:
+ * Cluster action:  clear_failcount for pgsqld on hanode1
+ * Pseudo action:   pgsql-clone_pre_notify_demote_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_demote_0
+ * Pseudo action:   pgsql-clone_demote_0
+ * Resource action: pgsqld          demote on hanode1
+ * Pseudo action:   pgsql-clone_demoted_0
+ * Pseudo action:   pgsql-clone_post_notify_demoted_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_demoted_0
+ * Pseudo action:   pgsql-clone_pre_notify_stop_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_stop_0
+ * Pseudo action:   pgsql-clone_stop_0
+ * Resource action: pgsqld          stop on hanode1
+ * Pseudo action:   pgsql-clone_stopped_0
+ * Pseudo action:   pgsql-clone_post_notify_stopped_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_stopped_0
+ * Pseudo action:   pgsql-clone_pre_notify_start_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_start_0
+ * Pseudo action:   pgsql-clone_start_0
+ * Resource action: pgsqld          start on hanode1
+ * Pseudo action:   pgsql-clone_running_0
+ * Pseudo action:   pgsql-clone_post_notify_running_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_running_0
+ * Pseudo action:   pgsql-clone_pre_notify_promote_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_promote_0
+ * Pseudo action:   pgsql-clone_promote_0
+ * Resource action: pgsqld          promote on hanode1
+ * Pseudo action:   pgsql-clone_promoted_0
+ * Pseudo action:   pgsql-clone_post_notify_promoted_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_promoted_0
+ * Resource action: pgsqld          monitor=15000 on hanode1
+
+Revised cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+~~~
+
+Un `recover` est planifié pour `pgsqld` sur `hanode1`. Ce dernier correspond
+aux opérations suivantes dans cet ordre:
+
+Action      Sub-action    Nœud(s)
+----------  ------------  ---------------------------------
+ `notify`    pre-demote    `hanode1`, `hanode2`, `hanode3`
+ `demote`    N/A           `hanode1`
+ `notify`    post-demote   `hanode1`, `hanode2`, `hanode3`
+ `notify`    pre-stop      `hanode1`, `hanode2`, `hanode3`
+ `stop`      N/A           `hanode1`
+ `notify`    post-stop     `hanode2`, `hanode3`
+ `notify`    pre-start     `hanode2`, `hanode3`
+ `start`     N/A           `hanode1`
+ `notify`    post-start    `hanode1`, `hanode2`, `hanode3`
+ `notify`    pre-promote   `hanode1`, `hanode2`, `hanode3`
+ `promote`   N/A           `hanode1`
+ `notify`    post-promote  `hanode1`, `hanode2`, `hanode3`
+
+2. tuer tous les processus PostgreSQL avec un signal `KILL`
+
+~~~console
+# pkill -SIGKILL postgres
+~~~
+
+3. étudier la réaction du cluster
+
+L'agent `pgsqlms` détecte que l'instance a a été interrompue brusquement:
+
+~~~
+pgsqlms(pgsqld): DEBUG: _confirm_stopped: no postmaster process found for instance "pgsqld"
+pgsqlms(pgsqld): DEBUG: _controldata: instance "pgsqld" state is "in production"
+pgsqlms(pgsqld): ERROR: Instance "pgsqld" controldata indicates a running primary instance, the instance has probably crashed
+~~~
+
+En réaction, `pengine` décide de redémarrer l'instance sur le même nœud
+(sur le DC):
+
+~~~
+pengine:   info:   Start recurring monitor (15s) for pgsqld:1 on hanode1
+pengine:   info:   Leave   fence_vm_hanode1 (Started hanode2)
+pengine:   info:   Leave   fence_vm_hanode2 (Started hanode1)
+pengine:   info:   Leave   fence_vm_hanode3 (Started hanode1)
+pengine:   info:   Leave   pgsqld:0         (Slave hanode2  )
+pengine: notice: * Recover pgsqld:1         (Master hanode1 )
+pengine:   info:   Leave   pgsqld:2         (Slave hanode3  )
+pengine:   info:   Leave   pgsql-master-ip  (Started hanode1)
+~~~
+
+Durant l'opération `notify` pré-demote, l'agent tente un recovery de
+l'instance afin de la remettre en ordre de marche:
+
+~~~
+pgsqlms(pgsqld): INFO: Trying to start failing master "pgsqld"...
+[...]            
+pgsqlms(pgsqld): INFO: State is "in production" after recovery attempt
+~~~
+
+Le reste de la transition se déroule comme prévu et l'instance revient bien
+en production. Le comportement est bien le même que celui simulé. Voici les
+actions déclenchées par le DC (log remis en forme):
+
+~~~
+# grep -E 'crmd:.*Initiating' /var/log/cluster/corosync.log
+[...]
+crmd:  notice: Initiating notify  pgsqld_pre_notify_demote_0   on hanode1
+crmd:  notice: Initiating notify  pgsqld_pre_notify_demote_0   on hanode2
+crmd:  notice: Initiating notify  pgsqld_pre_notify_demote_0   on hanode3
+
+crmd:  notice: Initiating demote  pgsqld_demote_0 locally      on hanode1
+
+crmd:  notice: Initiating notify  pgsqld_post_notify_demote_0  on hanode1
+crmd:  notice: Initiating notify  pgsqld_post_notify_demote_0  on hanode2
+crmd:  notice: Initiating notify  pgsqld_post_notify_demote_0  on hanode3
+
+crmd:  notice: Initiating notify  pgsqld_pre_notify_stop_0     on hanode1
+crmd:  notice: Initiating notify  pgsqld_pre_notify_stop_0     on hanode2
+crmd:  notice: Initiating notify  pgsqld_pre_notify_stop_0     on hanode3
+
+crmd:  notice: Initiating stop    pgsqld_stop_0 locally        on hanode1
+
+crmd:  notice: Initiating notify  pgsqld_post_notify_stop_0    on hanode2
+crmd:  notice: Initiating notify  pgsqld_post_notify_stop_0    on hanode3
+
+crmd:  notice: Initiating notify  pgsqld_pre_notify_start_0    on hanode2
+crmd:  notice: Initiating notify  pgsqld_pre_notify_start_0    on hanode3
+
+crmd:  notice: Initiating start   pgsqld_start_0 locally       on hanode1
+
+crmd:  notice: Initiating notify  pgsqld_post_notify_start_0   on hanode1
+crmd:  notice: Initiating notify  pgsqld_post_notify_start_0   on hanode2
+crmd:  notice: Initiating notify  pgsqld_post_notify_start_0   on hanode3
+
+crmd:  notice: Initiating notify  pgsqld_pre_notify_promote_0  on hanode1
+crmd:  notice: Initiating notify  pgsqld_pre_notify_promote_0  on hanode2
+crmd:  notice: Initiating notify  pgsqld_pre_notify_promote_0  on hanode3
+
+crmd:  notice: Initiating promote pgsqld_promote_0 locally     on hanode1
+
+crmd:  notice: Initiating notify  pgsqld_post_notify_promote_0 on hanode1
+crmd:  notice: Initiating notify  pgsqld_post_notify_promote_0 on hanode2
+crmd:  notice: Initiating notify  pgsqld_post_notify_promote_0 on hanode3
+~~~
+
+4. nettoyer les `failcount` de `pgsql-clone`
+
+~~~console
+# pcs resource failcount reset pgsqld
+~~~
+
+5. simuler une erreur `OCF_ERR_ARGS` sur `pgsql-clone`
+
+Le code retour `OCF_ERR_ARGS` correspond à une erreur de niveau `hard`. Ainsi,
+bien que le `migration-threshold` ne soit pas atteint, le cluster doit basculer
+l'instance ailleurs.
+
+~~~console
+# crm_simulate --simulate --live --op-inject=pgsqld_monitor_15000@hanode1=2 
+
+Current cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode1 ]
+     Slaves: [ hanode2 hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode1
+
+Performing requested modifications
+ + Injecting pgsqld_monitor_15000@hanode1=2 into the configuration
+ + Injecting attribute fail-count-pgsqld#monitor_15000=value++ into /node_state '1'
+ + Injecting attribute last-failure-pgsqld#monitor_15000=1585330828 into /node_state '1'
+
+Transition Summary:
+ * Promote    pgsqld:0            ( Slave -> Master hanode2 )  
+ * Stop       pgsqld:2            (          Master hanode1 )   due to node availability
+ * Move       pgsql-master-ip     (      hanode1 -> hanode2 )  
+
+Executing cluster transition:
+ * Resource action: pgsqld          cancel=16000 on hanode2
+ * Cluster action:  clear_failcount for pgsqld on hanode1
+ * Pseudo action:   pgsql-clone_pre_notify_demote_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_demote_0
+ * Pseudo action:   pgsql-clone_demote_0
+ * Resource action: pgsqld          demote on hanode1
+ * Pseudo action:   pgsql-clone_demoted_0
+ * Pseudo action:   pgsql-clone_post_notify_demoted_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_demoted_0
+ * Pseudo action:   pgsql-clone_pre_notify_stop_0
+ * Resource action: pgsql-master-ip stop on hanode1
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Resource action: pgsqld          notify on hanode1
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_stop_0
+ * Pseudo action:   pgsql-clone_stop_0
+ * Resource action: pgsqld          stop on hanode1
+ * Pseudo action:   pgsql-clone_stopped_0
+ * Pseudo action:   pgsql-clone_post_notify_stopped_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_stopped_0
+ * Pseudo action:   pgsql-clone_pre_notify_promote_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Pseudo action:   pgsql-clone_confirmed-pre_notify_promote_0
+ * Pseudo action:   pgsql-clone_promote_0
+ * Resource action: pgsqld          promote on hanode2
+ * Pseudo action:   pgsql-clone_promoted_0
+ * Pseudo action:   pgsql-clone_post_notify_promoted_0
+ * Resource action: pgsqld          notify on hanode2
+ * Resource action: pgsqld          notify on hanode3
+ * Pseudo action:   pgsql-clone_confirmed-post_notify_promoted_0
+ * Resource action: pgsql-master-ip start on hanode2
+ * Resource action: pgsqld          monitor=15000 on hanode2
+ * Resource action: pgsql-master-ip monitor=10000 on hanode2
+
+Revised cluster status:
+Online: [ hanode1 hanode2 hanode3 ]
+
+ fence_vm_hanode1	(stonith:fence_virsh):	Started hanode2
+ fence_vm_hanode2	(stonith:fence_virsh):	Started hanode1
+ fence_vm_hanode3	(stonith:fence_virsh):	Started hanode1
+ Master/Slave Set: pgsql-clone [pgsqld]
+     Masters: [ hanode2 ]
+     Slaves: [ hanode3 ]
+     Stopped: [ hanode1 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode2
+~~~
+
+6. supprimer le fichier `/var/lib/pgsql/12/data/global/pg_control` sur `hanode1`
+
+~~~console
+# rm -f /var/lib/pgsql/12/data/global/pg_control
+~~~
+
+7. étudier la réaction du cluster
+
+Le cluster prévoie la même transition que celle simulée. Cependant, à cause
+de l'état incohérent de l'instance, les opération `demote` et `stop`
+interrompent deux transitions et la dernière erreur provoque l'isolation de
+`hanode1`.
+
+Première transition, correspondant à ce qui avait été simulé:
+
+~~~
+pengine: notice: * Stop    pgsqld:0        (            Master hanode1 )
+pengine:   info:   Leave   pgsqld:1        (             Slave hanode3 )
+pengine: notice: * Promote pgsqld:2        (   Slave -> Master hanode2 )
+pengine: notice: * Move    pgsql-master-ip (        hanode1 -> hanode2 )
+
+crmd:   debug:  Unpacked transition 136: 41 actions in 41 synapses
+
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_demote_0   on hanode1
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_demote_0   on hanode2
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_demote_0   on hanode3
+
+crmd:  notice:  Initiating demote  pgsqld_demote_0              on hanode1
+crmd: warning:  Action 15 (pgsqld_demote_0) on hanode2 failed
+
+crmd:  notice:  Initiating notify  pgsqld_post_notify_demote_0  on hanode1
+crmd:  notice:  Initiating notify  pgsqld_post_notify_demote_0  on hanode2
+crmd:  notice:  Initiating notify  pgsqld_post_notify_demote_0  on hanode3
+~~~
+
+La seconde transition prévoit de terminer l'arrêt de l'instance sur `hanode1`
+puis d'effectuer la promotion sur `hanode2`. Elle termine en erreur sur
+l'opération `stop`:
+
+~~~
+pengine: notice: * Stop    pgsqld:0        (             Slave hanode1 )
+pengine:   info:   Leave   pgsqld:1        (             Slave hanode3 )
+pengine: notice: * Promote pgsqld:2        (   Slave -> Master hanode2 )
+pengine: notice: * Stop    pgsql-master-ip (                   hanode1 )
+
+crmd:   debug:  Unpacked transition 137: 24 actions in 24 synapses
+
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_stop_0     on hanode1
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_stop_0     on hanode2
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_stop_0     on hanode3
+
+crmd:  notice:  Initiating stop    pgsqld_stop_0                on hanode1
+crmd: warning:  Action 3 (pgsqld_stop_0) on hanode1 failed
+
+crmd:  notice:  Initiating notify  pgsqld_post_notify_stop_0    on hanode3
+crmd:  notice:  Initiating notify  pgsqld_post_notify_stop_0    on hanode2
+~~~
+
+La troisième transition prévoie d'isoler `hanode1` afin de s'assurer que
+l'instance est bien arrêtée, puis de promouvoir l'instance sur `hanode2` et y
+déplacer l'adresse IP virtuelle. Cette dernière arrive au bout:
+
+~~~
+pengine:  notice: * Fence (reboot) hanode2 'pgsqld:0 failed there'
+pengine:  notice: * Stop    pgsqld:0        (            Master hanode1 )
+pengine:    info:   Leave   pgsqld:1        (             Slave hanode3 )
+pengine:  notice: * Promote pgsqld:2        (   Slave -> Master hanode2 )
+pengine:  notice: * Move    pgsql-master-ip (        hanode2 -> hanode2 )
+
+crmd:   debug:  Unpacked transition 138: 43 actions in 43 synapses
+
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_demote_0   on hanode3
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_demote_0   on hanode2
+
+crmd:  notice:  Initiating notify  pgsqld_post_notify_demote_0  on hanode3
+crmd:  notice:  Initiating notify  pgsqld_post_notify_demote_0  on hanode2
+
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_stop_0     on hanode3
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_stop_0     on hanode2
+
+crmd:  notice:  Initiating notify  pgsqld_post_notify_stop_0    on hanode3
+crmd:  notice:  Initiating notify  pgsqld_post_notify_stop_0    on hanode2
+
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_promote_0  on hanode3
+crmd:  notice:  Initiating notify  pgsqld_pre_notify_promote_0  on hanode2
+
+crmd:  notice:  Initiating promote pgsqld_promote_0             on hanode2
+
+crmd:  notice:  Initiating notify  pgsqld_post_notify_promote_0 on hanode3
+crmd:  notice:  Initiating notify  pgsqld_post_notify_promote_0 on hanode2
+~~~
+
+Dans les log, nous trouvons aussi les traces de l'élection qui a lieu entre
+`hanode2` et `hanode3`:
+
+~~~
+attrd: info:Setting lsn_location-pgsqld[hanode2]: (null) -> 21#100672008
+attrd: info:Setting lsn_location-pgsqld[hanode3]: (null) -> 21#100672008
+[...]
+pgsqlms(pgsqld): DEBUG: checking if current node is the best candidate for promotion
+pgsqlms(pgsqld): DEBUG: comparing with "hanode3": TL#LSN is 21#100672008
+pgsqlms(pgsqld):  INFO: Promote complete
+~~~
+
+:::
+
+
+-----
+
+## Failback du primaire
+
+* suite à un incident sur la ressource ou la perte de son nœud
+* même problématique que pour un secondaire
+* l'instance doit en plus être reconstruite en secondaire
+* le reste de la procédure est similaire au failback d'un secondaire
+
+::: notes
+
+Suite à la perte brutale d'une instance primaire, le cluster bascule le rôle
+`Master` sur le meilleur secondaire disponible. Néanmoins, il est possible que
+l'ancien primaire possède toujours des données qui n'avaient pas été
+répliquées. Dans ces circonstances, il n'est pas recommandé de rattacher
+directement l'ancien primaire au nouveau. Il est nécessaire de le
+"resynchroniser".
+
+Différentes méthodes sont disponibles mais ne sont pas abordées dans ce
+document. Par exemple: `pg_rewind`, restauration _PITR_ ou `pg_basebackup`.
+
+Une fois l'instance resynchronisée, le reste de la procédure est identique à
+celle détaillée dans le chapitre [Failback d'un secondaire]:
+
+1. re-synchroniser l'instance sur le nœud
+2. positionner `is-managed=false` pour la ressource
+3. démarrer le cluster sur le nœud à ré-intégrer
+4. démarrer manuellement l'instance sur le nœud
+5. valider que cette dernière réplique correctement
+6. arrêter l'instance
+7. effectuer une commande `refresh` de la ressource
+8. supprimer `is-managed=false` pour la ressource
+
+Pour plus de facilité, il est possible d'utiliser ici `systemctl` pour
+démarrer et arrêter la ressource. L'important est qu'en fin de procédure,
+`systemd` ne voit pas l'instance comme étant démarrée de son point vue,
+cette dernière étant gérée non pas par lui mais par Pacemaker.
+
+:::
+
+-----
+
+### TP: Failback du primaire
+
+::: notes
+
+1. re-synchroniser l'instance `hanode1`
+2. désactiver la gestion du cluster de `pgsql-clone`
+3. démarrer le cluster sur `hanode1`
+4. démarrer manuellement l’instance PostgreSQL sur `hanode1`
+5. valider que cette dernière réplique correctement
+6. arrêter l’instance
+7. effectuer une commande `refresh` de `pgsqld`
+8. supprimer `is-managed=false` pour la ressource
+
+:::
+
+-----
+
+### Correction: Failback du primaire
+
+::: notes
+
+1. re-synchroniser l'instance `hanode1`
+
+~~~console
+# su - postgres
+$ rm -r ~postgres/12/data/*
+$ /usr/pgsql-12/bin/pg_basebackup -h 10.20.30.5 -D ~postgres/12/data/ -P
+$ sed -ri "s/hanode[0-9]+/$(hostname -s)/" ~postgres/12/data/pg_hba.conf
+$ cat <<EOF > ~postgres/12/data/conf.d/01-standby.conf
+primary_conninfo = 'host=10.20.30.5 application_name=$(hostname -s)'
+EOF
+$ touch ~postgres/12/data/standby.signal
+~~~
+
+2. désactiver la gestion du cluster de `pgsql-clone`
+
+~~~console
+# pcs resource unmanage pgsql-clone
+~~~
+
+3. démarrer le cluster sur `hanode1`
+
+~~~console
+# pcs cluster start
+~~~
+
+4. démarrer manuellement l’instance PostgreSQL sur `hanode1`
+
+~~~console
+# systemctl start postgresql-12
+~~~
+
+5. valider que cette dernière réplique correctement
+
+Depuis `hanode2`, la ressource est détectée comme démarrée et PostgreSQL nous
+indique qu'elle réplique correctement:
+
+~~~console
+# pcs resource show
+ Master/Slave Set: pgsql-clone [pgsqld]
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode3 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Master hanode2 (unmanaged)
+     pgsqld	(ocf::heartbeat:pgsqlms):	Slave hanode1 (unmanaged)
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode2
+ 
+# sudo -iu postgres psql
+postgres=# select state, application_name
+  from pg_stat_replication
+  where application_name = 'hanode1';
+   state   | application_name 
+-----------+------------------
+ streaming | hanode1
+
+(1 row)
+~~~
+
+6. arrêter l’instance
+
+~~~console
+# systemctl stop postgresql-12
+~~~
+
+Attendre que Pacemaker détecte l'arrêt de l'instance.
+
+7. effectuer une commande `refresh` de `pgsqld`
+
+~~~console
+# pcs resource failcount show pgsqld hanode1
+Failcounts for resource 'pgsqld' on node 'hanode1'
+  hanode1: 2
+
+# pcs resource refresh pgsqld --node=hanode1
+Cleaned up pgsqld:0 on hanode1
+Cleaned up pgsqld:1 on hanode1
+Cleaned up pgsqld:2 on hanode1
+
+  * The configuration prevents the cluster from stopping or starting 'pgsql-clone' (unmanaged)
+Waiting for 3 replies from the CRMd... OK
+
+# pcs resource failcount show pgsqld hanode1
+No failcounts for resource 'pgsqld' on node 'hanode1'
+~~~
+
+8. supprimer `is-managed=false` pour la ressource
+
+~~~console
+# pcs resource manage pgsql-clone
+~~~
+
+:::
+
+-----
+
+## Détails d'un switchover
+
+* opération planifiée
+* macro-procédure:
+  1. arrêt propre de l'instance primaire
+  2. redémarrage de l'instance primaire en secondaire
+  3. vérification du secondaire désigné
+  4. élection et promotion du secondaire
+  
+::: notes
+
+Dans le cadre de cette formation, un _switchover_ désigne la promotion
+contrôlée d'une instance secondaire et le raccrochage de l'ancien primaire en
+tant que secondaire, sans reconstruction.
 
 Le switchover s'appuie sur la procédure standard de PostgreSQL pour effectuer
-la bascule :
+la bascule.:
 
-* `demote` de la primaire : cette étape consiste à éteindre l'instance primaire.
-  Avant qu'elle ne s'arrête, l'instance primaire envoie tous les journaux de
-  transactions nécessaires aux secondaires **connectées**.
-* `promote` de la secondaire élue : cette étape consiste à effectuer un `pg_ctl
-  promote` sur l'instance. L'instance secondaire fini de rejouer ses journaux
-  de transactions avant que l'action `promote` ne se termine.
-* `start` de l'ancienne primaire en standby. L'instance primaire est transformée
-  en standby et raccorchée à la nouvelle primaire. Pour se faire l'instance est
-  démarrée après avoir :
-  * créer un fichier `recovery.conf` dans PGDATA en utilisant le fichier
-    `recovery_template` pour les versions précédent PostgreSQL 12.
-  * créet un fichier `standby.signal` dans PGDATA pour les autres versions.
+* __Rétrograder le primaire__
+  
+  Cette étape consiste à éteindre l'instance primaire et la redémarrer en tant
+  que secondaire. Avant qu'elle ne s'arrête, l'instance primaire envoie tous
+  les journaux de transactions nécessaires aux secondaires **connectées**.
 
-Au moment de la promotion, si la standby choisie n'est plus la plus récente.
-C'est à dire qu'elle a été déconnectée entre le dernier monitor et le demote du
-master. La transition créé par pacemaker est annulée. Une nouvelle secondaire
-est choisie et le processus se répète.
+  Cette étape est effectuée durant l'opération `demote`.
+* __Contrôle du secondaire__
+  
+  Cette étape consiste à vérifier sur le secondaire que tous les journaux de
+  transaction de l'ancien primaire ont bien été reçu, jusqu'au `shutdown
+  checkpoint`.
+  
+  L'agent interrompt la transition en cas d'échec de ces contrôle. Le cluster
+  décide alors que faire en fonction des contraintes en place.
+  
+  Cette étape est réalisée lors de l'opération `notify` exécutée juste
+  avant la promotion.
+* __Promotion du secondaire__
+  
+  Exécution de `pg_ctl promote` sur l'instance secondaire. Cette étape est
+  réalisée par l'opération `promote`.
 
-Le choix de la secondaire dépend de la procédure de switchover choisie :
+Le choix du secondaire à promouvoir dépend de la procédure choisie pour
+déplacer le rôle. Il existe deux méthodes pour demander au cluster de
+déplacer le rôle `Master` vers un autre nœud.
 
-* `pcs resource move <resource_name> <node_name> --master` : dans ce cas on
-  choisi nous même le nœud cible du switchover.
-* `pcs resource ban <resource_name> --master` : dans ce cas la ressource
-  PostgreSQL ne peut plus tourner sur le nœud d'ou elle a été bannie.
-  L'instance secondaire avec le LSN le plus élevé sera promue.
-* `pcs resource move <resource_name> --master` : cette commande est équivalente
-  à un `ban` de la ressource.
+La première consiste à bannir le rôle `Master` de son emplacement actuel.
+Cela implique de positionner une contrainte location `-INFINITY` pour le
+rôle `Master` sur son nœud courant. Attention, la contrainte concerne bien
+le rôle et non la ressource ! Dans cette situation, le cluster choisi et
+promeut alors le clone avec le master score le plus élevé. Cette procédure
+se traduit avec les commandes `pcs` suivantes:
 
-Les deux méthodes s'appuient sur des contraintes de localisation pour provoquer
-la bascule :
-* `ban` ou `move` sans cible: une contrainte de localisation avec un score
-  `-INFINITY` est placée sur le nœud courant ;
-* `move` avec une cible : une contrainte de localisation avec un score de
-  `+INFINITY` est placée sur le nœud cible.
+~~~
+pcs resource ban <resource_name> --master
+# ou
+pcs resource move <resource_name> --master
+~~~
+
+La seconde méthode consiste à imposer l'emplacement du rôle `Master` avec
+une contrainte de location `INFINITY` sur un nœud. Cette procédure
+se traduit avec la commande `pcs` suivante:
+
+~~~
+pcs resource move <resource_name> --master <node_name>
+~~~
+
+Dans ces commandes, `<resource_name>` désigne la ressource multi-state et non
+le nom des clones.
 
 Dans les deux cas, il faut penser à supprimer ces contraintes après le
 switchover avec la commande `pcs resource clear <resource_name>`.
@@ -3293,1016 +6639,156 @@ suppression de la contrainte de localisation.
 
 -----
 
-### TP: switchover
-
+### TP: Switchover
 
 ::: notes
 
-Provoquer une bascule manuelle vers le nœud `hanode2` :
+1. provoquer une bascule vers le nœud `hanode2`
+2. afficher les contraintes pour la ressource `pgsql-clone`
+3. observer les scores au sein du cluster
+4. retirer la contrainte positionnée par la bascule
+5. observer la transition proposée dans les log du DC
+6. répéter les même opérations en effectuant la bascule avec chacune des
+   commandes suivantes :
+
+~~~
+pcs resource move pgsql-clone --master
+pcs resource ban pgsql-clone --master
+~~~
+
+Pour chacune, observer :
+
+* les contraintes posées par `pcs`
+* le statut de la ressource sur le nœud où la contrainte est posée
+
+7. retirer les contraintes des commandes précédentes sur la ressource
+
+:::
+
+-----
+
+### Correction: Switchover
+
+::: notes
+
+
+1. provoquer une bascule vers le nœud `hanode3`
 
 ~~~console
-# pcs resource move pgsql-ha hanode2 --master
-# pcs status
-# crm_simulate -sL
+# pcs resource move --master --wait pgsql-clone hanode3
+Resource 'pgsql-clone' is master on node hanode3; slave on nodes hanode1, hanode2.
 ~~~
 
-Identifier les actions dans les logs :
-
-~~~
-cib/configuration/constraints:  <rsc_location id="cli-prefer-pgsql-ha"
-[...]  rsc="pgsql-ha" role="Master" node="hanode2" score="INFINITY"/>
-[...]
-pengine:     info: LogActions:   Leave   fence_vm_paf1   (Started hanode2)
-pengine:     info: LogActions:   Leave   fence_vm_paf2   (Started hanode1)
-pengine:     info: LogActions:   Leave   fence_vm_paf3   (Started hanode1)
-pengine:     info: LogActions:   Leave   pgsqld:0        (Slave hanode3)
-pengine:   notice: LogAction:     * Demote     pgsqld:1          ( Master -> Slave hanode1 )  
-pengine:   notice: LogAction:     * Promote    pgsqld:2          ( Slave -> Master hanode2 )  
-pengine:   notice: LogAction:     * Move       pgsql-master-ip   (        hanode1 -> hanode2 )  
-~~~
-
-Quel est l'ordre des opérations sur hanode1 et sur hanode2?
-
-1. hanode1 : demote puis arrêt de la ressource pgsql-master-ip
-2. hanode2 : une fois les deux actions sur hanode1 réalisées => promotion de
-   postgres :
-  1. Comparaison des différents LSN :
-     
-     ~~~
-     pgsql_promote: checking if current node is the best candidate for promotion
-     ~~~
-  2. Promotion de hanode2
-  3. Une fois la promotion effectuée, démarrage de la vip sur hanode2
-
-Afficher les contraintes pour la ressource pgsql-ha
+2. afficher les contraintes pour la ressource `pgsql-clone`
 
 ~~~console
-# pcs constraint location show resource pgsql-ha
+# pcs constraint location show resource pgsql-clone
 Location Constraints:
-  Resource: pgsql-ha
-    Enabled on: hanode2 (score:INFINITY) (role: Master)
+  Resource: pgsql-clone
+    Enabled on: hanode3 (score:INFINITY) (role: Master)
 ~~~
 
-Il faut penser à faire un clear sinon le score restera en place :
+Une constrainte de localisation avec un poid `INFINITY` a été créée pour le
+rôle `Master` de `pgsql-clone` sur `hanode2`.
 
-~~~
-#pcs resource clear pgsql-ha
-~~~
-
-Répéter les même opérations en effectuant le switchover avec chacune des
-commandes suivantes :
-
-* `pcs resource move pgsql-ha --master`
-* `pcs resource ban pgsql-ha --master`
-
-Observer :
-
-* les contraintes posées par `pcs` ;
-* le statut de la ressource sur le nœud ou la contrainte est posée.
-
-
-Nettoyer la ressource et effectuer un switchover avec la commande `move` sans
-l'option `--master` :
+3. observer les scores au sein du cluster
 
 ~~~console
-# pcs resource clear pgsql-ha
-# pcs resource move pgsql-ha hanode1
+# crm_simulate -sL|grep 'promotion score'
+pgsqld:0 promotion score on hanode3: INFINITY
+pgsqld:2 promotion score on hanode1: 1000
+pgsqld:1 promotion score on hanode2: 990
+
 ~~~
 
-Observer la contrainte de localisation posée par `pcs` :
+Cette contrainte de localisation influence directement le score de promotion
+calculé.
 
-~~~ console
-# pcs constraint location show resource pgsql-ha
+4. retirer la contrainte positionnée par la bascule
+
+~~~console
+# pcs resource clear pgsql-clone
+
+# crm_simulate -sL|grep "promotion score"
+pgsqld:0 promotion score on hanode3: 1001
+pgsqld:2 promotion score on hanode1: 1000
+pgsqld:1 promotion score on hanode2: 990
+
+# pcs constraint location show resource pgsql-clone
 Location Constraints:
-  Resource: pgsql-ha
-    Enabled on: hanode1 (score:INFINITY) (role: Started)
 ~~~
 
-Pour un ressource multi-state, les commandes qui peuvent être influencées par
-le rôle de la ressource utilisent la valeur par défaut `role: Started`.
+La situation revient à la normale et l'instance principale reste à son
+nouvel emplacement.
 
-La contrainte posée par `pcs` signifie que la ressource doit être démarée sur
-le nœud `hanode1`. La ressource PostgreSQL est une resource multi-state, elle
-doit être démarée en tant que `slave` par pacemaker. Le cluster procède ensuite
-à la promotion de la ressource sur le nœud avec le score le plus élevé (ici
-c'est aussi `hanode1`).
+5. observer la transition proposée dans les log du DC
 
-La même commande lancée avec l'option `--master` demande explicitement la
-promotion sur le nœud `hanode1` (role: Master). Dans ce cas, il n'y a pas de
-différence entre le résultat final des deux commandes. Cependant dans certains
-scénarios d'incident, il est possible que le résultat diffère.
+~~~
+pengine:  debug: Allocating up to 3 pgsql-clone instances to a possible 3 nodes (at most 1 per host, 1 optimal)
+pengine:  debug: Assigning hanode1 to pgsqld:1
+pengine:  debug: Assigning hanode2 to pgsqld:2
+pengine:  debug: Assigning hanode3 to pgsqld:0
+pengine:  debug: Allocated 3 pgsql-clone instances of a possible 3
+pengine:  debug: pgsqld:0 master score: 1000000
+pengine:   info: Promoting pgsqld:0 (Slave hanode3)
+pengine:  debug: pgsqld:1 master score: 1001
+pengine:  debug: pgsqld:2 master score: 990
+pengine:   info: pgsql-clone: Promoted 1 instances of a possible 1 to master
+pengine:  debug: Assigning hanode3 to pgsql-master-ip
+pengine:   info: Start recurring monitor (15s) for pgsqld:0 on hanode3
+pengine:   info: Cancelling action pgsqld:0_monitor_16000 (Slave vs. Master)
+pengine:   info: Cancelling action pgsqld:1_monitor_15000 (Master vs. Slave)
+pengine:   info: Start recurring monitor (16s) for pgsqld:1 on hanode1
+pengine:   info: Start recurring monitor (15s) for pgsqld:0 on hanode3
+pengine:   info: Start recurring monitor (16s) for pgsqld:1 on hanode2
+pengine:   info: Start recurring monitor (10s) for pgsql-master-ip on hanode3
+pengine:   info:   Leave   fence_vm_hanode1  (Started hanode2)
+pengine:   info:   Leave   fence_vm_hanode2  (Started hanode1)
+pengine:   info:   Leave   fence_vm_hanode3  (Started hanode1)
+pengine: notice: * Promote pgsqld:0          (Slave -> Master hanode3)
+pengine: notice: * Demote  pgsqld:1          (Master -> Slave hanode2)
+pengine:   info:   Leave   pgsqld:2          (Slave hanode1          )
+pengine: notice: * Move    pgsql-master-ip   (hanode2 -> hanode3     )
+~~~
 
-Nettoyer la ressource et effetuer maintenant le test avec la commande `ban`
-sans `--master`:
+6. répéter les même opérations en effectuant la bascule avec chacune des
+   commandes suivantes :
+
+~~~
+pcs resource move pgsql-clone --master
+pcs resource ban pgsql-clone --master
+~~~
+
+Ces deux commandes sont similaires. Dans les deux cas, une contrainte de
+localisation avec un score `-INFINITY` est positionnée pour le rôle `Master`
+sur le nœud l'hébergeant.
 
 ~~~console
-# pcs resource clear pgsql-ha
-# pcs resource ban pgsql-ha
-~~~
+# pcs resource ban --master --wait pgsql-clone
+Warning: Creating location constraint cli-ban-pgsql-clone-on-hanode1 with a score of -INFINITY for resource pgsql-clone on node hanode1.
+This will prevent pgsql-clone from being promoted on hanode1 until the constraint is removed. This will be the case even if hanode1 is the last node in the cluster.
+Resource 'pgsql-clone' is master on node hanode2; slave on nodes hanode1, hanode3.
 
-Afficher la contrainte pour la ressource `pgsql-ha` :
-
-~~~ console
-# pcs constraint location show resource pgsqld-clone
+# pcs constraint location show resource pgsql-clone
 Location Constraints:
-  Resource: pgsql-ha
-    Disabled on: hanode1 (score:-INFINITY) (role: Started)
+  Resource: pgsql-clone
+    Disabled on: hanode1 (score:-INFINITY) (role: Master)
+
+
+# crm_simulate -sL|grep "promotion score"
+pgsqld:1 promotion score on hanode1: 1001
+pgsqld:2 promotion score on hanode3: 990
+pgsqld:0 promotion score on hanode2: -INFINITY
 ~~~
 
-La contrainte posée par `pcs` interdit le démarrage de la ressource.
-
-La même commande lancée avec l'option `--master` empêche la promotion de
-l'instance sur le nœud (role: Master), la ressource reste donc démarée en tant
-que `slave`. Dans ce cas, on voit une grosse différence entre la version avec
-et sans `--master`.
-
-Lorsque l'on travaille avec des ressources multi-state, il est donc préférable
-d'utiliser les commandes `ban` et `move` avec l'option `--master` pour faire
-une switchover car elle décrit exactement ce que l'on souhaite.
-
-Avant de terminer ce TP, penser à nettoyer la ressource.
-
-:::
-
------
-
-## Algorithme d'élection
-
-1. la position LSN des secondaires mise dans un attribut lors des monitor
-2. au moment d'une bascule, tentative d'élire le secondaire le plus avancé
-3. s'il n'est plus le plus avancé, alors annulation de l'élection
-  * ce qui déclenche une nouvelle transition et donc la promotion d'un autre secondaire
-  * cela déclenche également une "soft error"
-
-::: notes
-
-FIXME
-
-:::
-
------
-
-## Détail d'un failover
-
-1. fencing du nœud hébergeant l'instance primaire en échec si nécessaire
-2. tentative de promotion du secondaire ayant le LSN le plus élevé au dernier
-   monitor
-  1. comparaison des LSN actuels entre les secondaires
-  2. poursuite de la promotion si le secondaire élu est toujours le plus avancé
-  3. annulation de la promotion ("soft error") sinon pour déclencher une
-     nouvelle transition
-
-::: notes
-
-Dans le contexte de PostgreSQL, un failover désigne la promotion non planifiée
-d'une instance secondaire suite à un incident.
-
-Pour pacemaker, cette promotion correspond au déplacement du rôle `master` vers
-un autre nœud. Du fait de la présence d'une containte de colocation entre le
-rôle `master` et la VIP, cette dernière bascule aussi.
-
-Le failover n'aura lieu que si :
-
-* l'incident concerne le nœud ou se trouve la ressource PostgreSQL avec le rôle
-  master ;
-* la ressource master ne peut pas redémarrer sur le nœud dans le temps qui lui
-  est donné (timeout de l'action start).
-
-Le failover s'accompagne du fencing du nœud en erreur. Ce comportement est
-dicté par le fait que la propriété `on-fail` de l'action start est `fence`
-(valeur par défaut).
-
-Le choix de l'instance qui va devenir primaire se fait en fonction du LSN des
-instances secondaires.  L'instance ayant le LSN le plus élevé est choisie.
-Pendant la promotion, les LSN sont à nouveau comparés. Si le secondaire élu
-n'est plus le plus récent alors la transition est annulé et une nouvelle
-élection est réalisée.
-
-:::
-
------
-
-### TP: failover
-
-::: notes
-
-FIXME : on fait un failover ici alors qu'on en refait un plus tard dans les TP?
-
-* provoquer un incident (s'assurer qu'un clean a bien été fait suite au précédent switchover)
-* détailler les actions et processus d'élection
-
-kill -9 sur le pid du postmaster :
-
-1. le monitor de la ressource passe en "failed"
-2. Pacemaker redémarre la ressource sur le nœud.
-
-Suppression du fichier `/var/lib/pgsql/10/data/global/pg_control`
-
-1. postgreSQL se crashe
-2. monitor en failed
-3. tentative de redémarrage en échec
-4. Fencing de hanode2
-5. Choix de l'instance avec le LSN le plus élevé
-6. Promotion
-7. Déplacement de la VIP
-
-:::
-
------
-
-## Démarrer/arrêter le cluster
-
-* Faire attention à ce qu'aucune ressource ne soit démarrée sur le nœud avant
-  de l'arrêter.
-  * désactiver les ressources
-  * mettre le nœud en standby
-
-::: notes
-
-Précision à propos du démarrage et de l'arrêt d'un cluster avec une ressource
-stateful active cf. ce mail et la discussion autour:
-<http://lists.clusterlabs.org/pipermail/users/2017-December/006963.html>
-
-Pas de bonne solution à part éteindre la ressource stateful avant d'éteindre le
-cluster
+7. retirer les contraintes des commandes précédentes sur la ressource
 
 ~~~console
-# pcs node standby hanode3
-# reboot
-# pcs cluster start
-# pcs node unstandby hanode3
-~~~
-
-ou
-
-~~~console
-# pcs resource disable pgsql-ha
-# pcs cluster stop --all
-# pcs cluster start --all
-# pcs resource enable pgsql-ha
-~~~
-
-NOTE: `pcs node standby <node_name>` à remplacé `pcs cluster standby` dans la
-version  0.10.1 de pcs.
-
-:::
-
------
-
-## Limitations
-
-* version de PostgreSQL supportée 9.3+
-* le demote de l'instance primaire nécessite un arrêt
-* trop strict sur l'arrêt brutal d'une instance
-* pas de reconstruction automatique de l'ancien primaire après failover
-* pas de gestion des slots de réplication
-
-::: notes
-
-Une incohérence entre l'état de l'instance et le controldata provoque une erreur fatale ! Ne __jamais__ utiliser
- `pg_ctl -m immediate stop` !
-
-Limitations levees:
-
-* ne gère pas plusieurs instances PostgreSQL sur un seul nœud. Corrigé dans le commit 1a7d375.
-* n'exclut pas une instance secondaire quel que soit son retard. Ajout du parametre maxlag dans le commit a3bbfa3.
-
-:::
-
------
-
-## Fonctionnalités manquantes dans PostgreSQL pour améliorer la situation
-
-* valider sur l'esclave ce qu'il a reçu du maître (cas du switchover)
-* demote «à chaud»
-
-::: notes
-
-FIXME
-
-:::
-
------
-
-# Réactions du cluster
-
-FIXME
-
------
-
-## Mode maintenance vs resource unmanaged
-
-Différences entre les deux FIXME FIXME
-
-::: notes
-
-Pour éviter que les cluster ne réagissent à un incident, il est possible de le passer en mode maintenance :
-
-~~~console
-# pcs property set maintenance-mode=true
-~~~
-
-Pour l'en sortir :
-
-~~~console
-# pcs property set maintenance-mode=false
-~~~
-
-Si passer tout le cluster en mode maintenance est trop contraignant, il est possible de désactiver la supervision
-d'une ressource en particulier.
-
-~~~console
-# pcs resource unmanage dummy1
-~~~
-
-L'attribut `is-managed=false` est alors attaché à cette ressource. Cela est visible avec la commande :
-
-~~~console
-# pcs resource show dummy1
-~~~
-
-L'opération inverse peut ensuite être réalisée :
-
-~~~console
-# pcs resource manage dummy1
-~~~
-
-:::
-
------
-
-## TP: simuler des actions
-
-Simulation de "soft error".
-
-::: notes
-
-FIXME : 
-[voir lien](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/1.1/html/Pacemaker_Explained/s-config-testing-changes.html)
-
-**Attention**, si vous avez positionné le `failure-timeout` à une valeur basse (eg. 30s), certaines étapes de ce TP
-peuvent ne pas donner le résultat attendu si plus de 30s s'écoulent entre deux étapes.
-
-Pour éviter cela, positionner ce paramètre par exemple à 4h :
-
-~~~console
-# pcs resource update pgsqld meta failure-timeout=4h
-~~~
-
-Il est également possible d'utiliser le paramètre `-t` (`--set-datetime=value`)
-de la commande `crm_simulate`.
-
-Visualiser l'état courant du cluster :
-
-~~~console
-# crm_simulate --simulate --live-check
-~~~
-
-Injecter une "soft error" sur l'action monitor de `pgsqld` du nœud maître, enregistrer l'état obtenu dans le fichier
-`/tmp/step1.xml` :
-
-~~~console
-# crm_simulate --simulate --live-check --op-inject=pgsqld_monitor_15000@hanode2=1 -O /tmp/step1.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode2 ]
-     Slaves: [ hanode1 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode2
-
-Performing requested modifications
- + Injecting pgsqld_monitor_15000@hanode2=1 into the configuration
- + Injecting attribute fail-count-pgsqld=value++ into /node_state '2'
- + Injecting attribute last-failure-pgsqld=1517309617 into /node_state '2'
-
-Transition Summary:
- * Recover    pgsqld:1     ( Master hanode2 )  
-
-Executing cluster transition:
- * Cluster action:  clear_failcount for pgsqld on hanode2
- * Pseudo action:   pgsql-ha_pre_notify_demote_0
- * Resource action: pgsqld          notify on hanode1
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_demote_0
- * Pseudo action:   pgsql-ha_demote_0
- * Resource action: pgsqld          demote on hanode2
- * Pseudo action:   pgsql-ha_demoted_0
- * Pseudo action:   pgsql-ha_post_notify_demoted_0
- * Resource action: pgsqld          notify on hanode1
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-post_notify_demoted_0
- * Pseudo action:   pgsql-ha_pre_notify_stop_0
- * Resource action: pgsqld          notify on hanode1
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_stop_0
- * Pseudo action:   pgsql-ha_stop_0
- * Resource action: pgsqld          stop on hanode2
- * Pseudo action:   pgsql-ha_stopped_0
- * Pseudo action:   pgsql-ha_post_notify_stopped_0
- * Resource action: pgsqld          notify on hanode1
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-post_notify_stopped_0
- * Pseudo action:   pgsql-ha_pre_notify_start_0
- * Pseudo action:   all_stopped
- * Resource action: pgsqld          notify on hanode1
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_start_0
- * Pseudo action:   pgsql-ha_start_0
- * Resource action: pgsqld          start on hanode2
- * Pseudo action:   pgsql-ha_running_0
- * Pseudo action:   pgsql-ha_post_notify_running_0
- * Resource action: pgsqld          notify on hanode1
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-post_notify_running_0
- * Pseudo action:   pgsql-ha_pre_notify_promote_0
- * Resource action: pgsqld          notify on hanode1
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_promote_0
- * Pseudo action:   pgsql-ha_promote_0
- * Resource action: pgsqld          promote on hanode2
- * Pseudo action:   pgsql-ha_promoted_0
- * Pseudo action:   pgsql-ha_post_notify_promoted_0
- * Resource action: pgsqld          notify on hanode1
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-post_notify_promoted_0
- * Resource action: pgsqld          monitor=15000 on hanode2
-
-Revised cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode2 ]
-     Slaves: [ hanode1 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode2
-~~~
-
-Le CRM effectue un `recover` sur la ressource (`stop` / `start` sur le même nœud).
-
-Simuler deux autres "soft errors" sur `pgsqld` pour atteindre le seuil de `migration-threshold` :
-
-~~~console
-# crm_simulate -S -x /tmp/step1.xml -i pgsqld_monitor_15000@hanode2=1 -O /tmp/step2.xml
-[...]
-
-# crm_simulate -S -x /tmp/step2.xml -i pgsqld_monitor_15000@hanode2=1 -O /tmp/step3.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode2 ]
-     Slaves: [ hanode1 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode2
-
-Performing requested modifications
- + Injecting pgsqld_monitor_15000@hanode2=1 into the configuration
- + Injecting attribute fail-count-pgsqld=value++ into /node_state '2'
- + Injecting attribute last-failure-pgsqld=1517309851 into /node_state '2'
-
-Transition Summary:
- * Promote    pgsqld:0            ( Slave -> Master hanode1 )  
- * Stop       pgsqld:1            (          Master hanode2 )   due to node availability
- * Move       pgsql-master-ip     (      hanode2 -> hanode1 )  
-
-Executing cluster transition:
-[...]
-
-Revised cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode1 ]
-     Slaves: [ hanode3 ]
-     Stopped: [ hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode1
-~~~
-
-Le CRM décide de promouvoir la ressource maître sur `hanode1` et d'y déplacer également l'IP virtuelle.
-
-
-Depuis l'étape 1, injecter une erreur sur le monitor de `pgsqld` du nœud maître et simuler une erreur de son démarrage
-(échec du `recover`), puis générer le graphe de transition associé à l'état final (`/tmp/step4.xml`) :
-
-~~~console
-# crm_simulate -S -x /tmp/step1.xml -i pgsqld_monitor_15000@hanode2=1 -F pgsqld_start_0@hanode2=1 -O /tmp/step4.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode2 ]
-     Slaves: [ hanode1 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode2
-
-Performing requested modifications
- + Injecting pgsqld_monitor_15000@hanode2=1 into the configuration
- + Injecting attribute fail-count-pgsqld=value++ into /node_state '2'
- + Injecting attribute last-failure-pgsqld=1517310141 into /node_state '2'
-
-Transition Summary:
- * Recover    pgsqld:1     ( Master hanode2 )  
-
-Executing cluster transition:
-[...]
-
-Revised cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     pgsqld (ocf::heartbeat:pgsqlms): FAILED Master hanode2
-     Slaves: [ hanode1 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode2
-
-# crm_simulate -S -x /tmp/step4.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     pgsqld (ocf::heartbeat:pgsqlms): FAILED Master hanode2
-     Slaves: [ hanode1 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode2
-
-Transition Summary:
- * Promote    pgsqld:0            ( Slave -> Master hanode1 )  
- * Stop       pgsqld:1            (          Master hanode2 )   due to node availability
- * Move       pgsql-master-ip     (      hanode2 -> hanode1 )  
-
-Executing cluster transition:
-[...]
-
-Revised cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode1 ]
-     Slaves: [ hanode3 ]
-     Stopped: [ hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode1
-~~~
-
-Comme précédemment, le CRM décide de promouvoir la ressource maître sur `hanode1` et d'y déplacer également l'IP
-virtuelle.
-
-Depuis l'étape 2, injecter une erreur sur le monitor de `pgsqld` pour déclencher la bascule sur `failcount` et simuler
-une erreur "hard" (`rc > 1`) de sa promotion sur `hanode1` (échec de la bascule), puis générer le graphe de transition
-associé à l'état final (`/tmp/step5.xml`) :
-
-~~~console
-# crm_simulate -S -x /tmp/step2.xml -i pgsqld_monitor_15000@hanode2=1 -F pgsqld_promote_0@hanode1=2 -O /tmp/step5.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode2 ]
-     Slaves: [ hanode1 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode2
-
-Performing requested modifications
- + Injecting pgsqld_monitor_15000@hanode2=1 into the configuration
- + Injecting attribute fail-count-pgsqld=value++ into /node_state '2'
- + Injecting attribute last-failure-pgsqld=1517311267 into /node_state '2'
-
-Transition Summary:
- * Promote    pgsqld:0            ( Slave -> Master hanode1 )  
- * Stop       pgsqld:1            (          Master hanode2 )   due to node availability
- * Move       pgsql-master-ip     (      hanode2 -> hanode1 )  
-
-Executing cluster transition:
-[...]
-
-Revised cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     pgsqld (ocf::heartbeat:pgsqlms): FAILED Master hanode1
-     Slaves: [ hanode3 ]
-     Stopped: [ hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
-
-# crm_simulate -S -x /tmp/step5.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     pgsqld (ocf::heartbeat:pgsqlms): FAILED Master hanode1
-     Slaves: [ hanode3 ]
-     Stopped: [ hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
-
-Transition Summary:
- * Stop       pgsqld:0            (          Master hanode1 )   due to node availability
- * Promote    pgsqld:1            ( Slave -> Master hanode3 )  
- * Start      pgsql-master-ip     (                 hanode3 )  
-
-Executing cluster transition:
-[...]
-
-Revised cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode3 ]
-     Stopped: [ hanode1 hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode3
-~~~
-
-On peut constater que si la ressource ne peut être promue sur `hanode1`, le CRM décide de promouvoir la ressource sur
-le dernier nœud disponible `hanode3`.
-
-A partir de l'état "step5.xml", simuler la perte du nœud `hanode3`
-
-~~~console
-# crm_simulate -S -x /tmp/step5.xml --node-fail=hanode3 -O /tmp/step6.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode3
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     pgsqld (ocf::heartbeat:pgsqlms): FAILED Master hanode1
-     Slaves: [ hanode3 ]
-     Stopped: [ hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
-
-Performing requested modifications
- + Failing node hanode3
-
-Transition Summary:
- * Fence (reboot) hanode3 'peer is no longer part of the cluster'
- * Move       fence_vm_hanode2     ( hanode3 -> hanode1 )  
- * Stop       pgsqld:0             (     Master hanode1 )   due to node availability
- * Stop       pgsqld:1             (      Slave hanode3 )   due to node availability
-
-Executing cluster transition:
-[...]
-
-Revised cluster status:
-Online: [ hanode1 hanode2 ]
-OFFLINE: [ hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode1
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Stopped: [ hanode1 hanode2 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
-~~~
-
-La ressource `pgsqld` ne peut plus être déplacée nulle part, à cause des échecs précédents sur `hanode1` et `hanode2`,
-elle est donc arrêtée.
-
-Simuler le retour en ligne du nœud `hanode3` :
-
-~~~console
-# crm_simulate -S -x /tmp/step6.xml --node-up=hanode3 -O /tmp/step7.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 ]
-OFFLINE: [ hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode1
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Stopped: [ hanode1 hanode2 hanode3 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
-
-Performing requested modifications
- + Bringing node hanode3 online
-
-Transition Summary:
- * Start      pgsqld:0     ( hanode3 )  
-
-Executing cluster transition:
-[...]
-
-Revised cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode1
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Slaves: [ hanode3 ]
-     Stopped: [ hanode1 hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
-
-# crm_simulate -S -x /tmp/step7.xml
-
-Current cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode1
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Slaves: [ hanode3 ]
-     Stopped: [ hanode1 hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Stopped
-
-Transition Summary:
- * Promote    pgsqld:0            ( Slave -> Master hanode3 )  
- * Start      pgsql-master-ip     (                 hanode3 )  
-
-Executing cluster transition:
- * Resource action: pgsqld          cancel=16000 on hanode3
- * Pseudo action:   pgsql-ha_pre_notify_promote_0
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_promote_0
- * Pseudo action:   pgsql-ha_promote_0
- * Resource action: pgsqld          promote on hanode3
- * Pseudo action:   pgsql-ha_promoted_0
- * Pseudo action:   pgsql-ha_post_notify_promoted_0
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-post_notify_promoted_0
- * Resource action: pgsql-master-ip start on hanode3
- * Resource action: pgsqld          monitor=15000 on hanode3
- * Resource action: pgsql-master-ip monitor=10000 on hanode3
-
-Revised cluster status:
-Online: [ hanode1 hanode2 hanode3 ]
-
- fence_vm_hanode1 (stonith:fence_virsh):  Started hanode2
- fence_vm_hanode2 (stonith:fence_virsh):  Started hanode1
- fence_vm_hanode3 (stonith:fence_virsh):  Started hanode2
- Master/Slave Set: pgsql-ha [pgsqld]
-     Masters: [ hanode3 ]
-     Stopped: [ hanode1 hanode2 ]
- pgsql-master-ip  (ocf::heartbeat:IPaddr2): Started hanode3
-~~~
-
-Lorsque le nœud `hanode3` redevient opérationnel, la ressource `pgsqld` y est de nouveau démarrée et ensuite promue.
-
-A partir de l'état initial, utiliser `crm_shadow` pour ajouter une contrainte de localisation à 200 pour `pgsql-ha` sur
-`hanode1`, simuler le résultat et valider la configuration :
-
-~~~console
-# crm_shadow --create pgsql-ha_on_hanode1
-
-shadow[pgsql-ha_on_hanode1] # pcs constraint location pgsql-ha prefers hanode1=200
-
-shadow[pgsql-ha_on_hanode1] # crm_shadow -d
-Diff: --- 0.156.0 2
-Diff: +++ 0.157.0 (null)
-+  /cib:  @epoch=157
-++ /cib/configuration/constraints:  <rsc_location id="location-pgsql-ha-hanode1-200"
-  [...] node="hanode1" rsc="pgsql-ha" score="200"/>
-
-shadow[pgsql-ha_on_hanode1] # crm_shadow -F
-/var/lib/pacemaker/cib/shadow.pgsql-ha_on_hanode1
-
-shadow[pgsql-ha_on_hanode1] # exit
-
-# crm_simulate -S -x /var/lib/pacemaker/cib/shadow.pgsql-ha_on_hanode1
-[...]   
-Transition Summary:
-* Promote    pgsqld:0            ( Slave -> Master hanode1 )  
-* Demote     pgsqld:1            ( Master -> Slave hanode2 )  
-* Move       pgsql-master-ip     (      hanode2 -> hanode1 )
-[...]
-~~~
-
-Puisque nous avons indiqué que nous souhaitions voir la ressource `pgsqld` maître sur le nœud `hanode1`, le CRM
-applique le changement demandé.
-
-Note : il est possible d'appliquer les changements testés à l'aide de `crm_shadow` en utilisant la commande :
-
-~~~
-crm_shadow --force --commit pgsql-ha_on_hanode1
-~~~
-
-:::
-
------
-
-## TP: provoquer une bascule manuelle
-
-* pour faire partir une ressource d'un nœud, il faut la bannir de ce nœud.
-* `pcs resource ban <resource_name>`
-* penser à retirer la contrainte de localisation placée par le `ban`.
-* la stickiness permet d'éviter que la ressource ne revienne sur le nœud où
-  elle était.
-
-::: notes
-
-Bannir la ressource `pgsql-ha` de son nœud courant :
-
-~~~console
-# pcs resource ban pgsql-ha
-~~~
-
-Un score de `-INFINITY` est positionné sur le nœud `hanode2` pour la ressource `pgsql-ha` :
-
-  * Avec `crm_simulate` :
-
-~~~console
-# crm_simulate -sL|grep pgsql-ha
- Master/Slave Set: pgsql-ha [pgsqld]
-clone_color: pgsql-ha allocation score on hanode1: 0
-clone_color: pgsql-ha allocation score on hanode2: -INFINITY
-clone_color: pgsql-ha allocation score on hanode3: 0
-~~~
-
-  * Avec `pcs constraint`:
-
-~~~console
- pcs constraint
-Location Constraints:
-[...]
-  Resource: pgsql-ha
-    Disabled on: hanode2 (score:-INFINITY) (role: Started)
-~~~
-
-Pour enlever cette contrainte une fois la ressource déplacée :
-
-~~~console
-# pcs resource clear pgsql-ha
-~~~
-
-:::
-
------
-
-## TP: défaillance d'une ressource
-
-Crash d'un nœud et fencing
-
-::: notes
-
-Générer un graphe de simulation de l'arrêt brutal du nœud `hanode1`, sur lequel tourne la ressource `pgsql-ha` :
-
-~~~console
-# crm_simulate -sSL --node-fail=hanode1
-[...]
-Transition Summary:
- * Fence (reboot) hanode1 'peer is no longer part of the cluster'
- * Stop       pgsqld:0            (          Master hanode1 )   due to node availability
- * Promote    pgsqld:1            ( Slave -> Master hanode2 )  
- * Move       pgsql-master-ip     (      hanode1 -> hanode2 )  
-
-Executing cluster transition:
- * Resource action: pgsqld          cancel=16000 on hanode2
- * Pseudo action:   pgsql-ha_pre_notify_demote_0
- * Fencing hanode1 (reboot)
- * Pseudo action:   pgsqld_post_notify_stop_0
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_demote_0
- * Pseudo action:   pgsql-ha_demote_0
- * Pseudo action:   stonith_complete
- * Pseudo action:   pgsqld_demote_0
- * Pseudo action:   pgsql-ha_demoted_0
- * Pseudo action:   pgsql-ha_post_notify_demoted_0
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-post_notify_demoted_0
- * Pseudo action:   pgsql-ha_pre_notify_stop_0
- * Pseudo action:   pgsql-master-ip_stop_0
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_stop_0
- * Pseudo action:   pgsql-ha_stop_0
- * Pseudo action:   pgsqld_stop_0
- * Pseudo action:   pgsql-ha_stopped_0
- * Pseudo action:   pgsql-ha_post_notify_stopped_0
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-post_notify_stopped_0
- * Pseudo action:   pgsqld_notified_0
- * Pseudo action:   pgsql-ha_pre_notify_promote_0
- * Pseudo action:   all_stopped
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_promote_0
- * Pseudo action:   pgsql-ha_promote_0
- * Resource action: pgsqld          promote on hanode2
- * Pseudo action:   pgsql-ha_promoted_0
- * Pseudo action:   pgsql-ha_post_notify_promoted_0
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-post_notify_promoted_0
- * Resource action: pgsql-master-ip start on hanode2
- * Resource action: pgsqld          monitor=15000 on hanode2
- * Resource action: pgsql-master-ip monitor=10000 on hanode2
-[...]
-~~~
-
-Faire crasher le nœud :
-
-~~~console
-# echo c > /proc/sysrq-trigger
-~~~
-
-Suivre le déroulement des actions depuis un autre nœud :
-
-~~~console
-# crm_mon -of
-~~~
-
-Une nouvelle instance primaire a été promue, l'adresse IP virtuelle basculée et le nœud `hanode1` tué.
-
-Avant de pouvoir le réintégrer au cluster, il faut vérifier son état et résoudre les problèmes qui seraient rencontrés.
-
-Dans notre cas, la VM a dû être redémarrée. Il faut donc s'assurer maintenant que la machine est bien accessible et que
-l'instance PostgreSQL qui s'y trouve puisse démarrer en mode standby.
-
-~~~console
-# cp -p ~postgres/recovery.conf.pcmk ~postgres/10/data/recovery.conf
-# systemctl start postgresql-10
-# sudo -iu postgres psql -c "select pg_is_in_recovery();"
-# systemctl stop postgresql-10
-# pcs cluster start
-~~~
-
-Une fois que tout est correct, on peut simuler le retour du nœud :
-
-~~~console
-# crm_simulate -sSL --node-up=hanode1
-[...]
-Transition Summary:
- * Start      pgsqld:2     ( hanode1 )  
-
-Executing cluster transition:
- * Resource action: fence_vm_hanode1 monitor on hanode1
- * Resource action: fence_vm_hanode2 monitor on hanode1
- * Resource action: fence_vm_hanode3 monitor on hanode1
- * Resource action: pgsqld          monitor on hanode1
- * Pseudo action:   pgsql-ha_pre_notify_start_0
- * Resource action: pgsql-master-ip monitor on hanode1
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Pseudo action:   pgsql-ha_confirmed-pre_notify_start_0
- * Pseudo action:   pgsql-ha_start_0
- * Resource action: pgsqld          start on hanode1
- * Pseudo action:   pgsql-ha_running_0
- * Pseudo action:   pgsql-ha_post_notify_running_0
- * Resource action: pgsqld          notify on hanode2
- * Resource action: pgsqld          notify on hanode3
- * Resource action: pgsqld          notify on hanode1
- * Pseudo action:   pgsql-ha_confirmed-post_notify_running_0
- * Resource action: pgsqld          monitor=16000 on hanode1
-[...]
-~~~
-
-Redémarrer le service cluster du nœud :
-
-~~~console
-# pcs cluster start
-~~~
-
-Suivre le déroulement des actions :
-
-~~~console
-# crm_mon -of
+# pcs resource clear pgsql-clone
+# crm_simulate -sL|grep "promotion score"
+pgsqld:2 promotion score on hanode1: 1001
+pgsqld:1 promotion score on hanode2: 1000
+pgsqld:0 promotion score on hanode3: 990
 ~~~
 
 :::
@@ -4345,27 +6831,27 @@ CLUSTER OK: 3 nodes online, 7 resources configured
 L'outil ne rapporte pas d'erreur en cas d'incident sur une ressource:
 
 ~~~console
-[root@srv1 ~]# killall postgres
+# killall postgres
 
-[root@srv1 ~]# pcs resource show
+# pcs resource show
  Master/Slave Set: pgsqld-clone [pgsqld]
-     pgsqld	(ocf::heartbeat:pgsqlms):	FAILED srv1
-     Masters: [ srv2 ]
-     Slaves: [ srv3 ]
- pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started srv2
+     pgsqld	(ocf::heartbeat:pgsqlms):	FAILED hanode1
+     Masters: [ hanode2 ]
+     Slaves: [ hanode3 ]
+ pgsql-master-ip	(ocf::heartbeat:IPaddr2):	Started hanode2
 
-[root@srv1 ~]# crm_mon --simple-status
+# crm_mon --simple-status
 CLUSTER OK: 3 nodes online, 7 resources configured
 ~~~
 
 Mais remonte une erreur en cas de perte d'un nœud:
 
 ~~~console
-[root@srv1 ~]# pcs stonith fence srv3
-Node: srv3 fenced
+# pcs stonith fence hanode3
+Node: hanode3 fenced
 
-[root@srv1 ~]# crm_mon --simple-status
-CLUSTER WARN: offline node: srv3
+# crm_mon --simple-status
+CLUSTER WARN: offline node: hanode3
 ~~~
 
 Cette sonde est donc peu utile, car souvent en doublon avec une sonde
@@ -4568,3 +7054,7 @@ Il pourrait être intéressant d'adapter ce script pour utiliser l'outil
 laissés à l'exercice du lecteur.
 
 :::
+
+
+
+FIXME pgsql-ha pgsql-clone
