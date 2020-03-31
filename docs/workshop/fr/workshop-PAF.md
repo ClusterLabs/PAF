@@ -930,6 +930,8 @@ paramètres `totem` > `crypto_model`, `totem` > `crypto_cipher` et `totem` > `cr
 
 Il est également possible d'utiliser la compression.
 
+:::
+
 -----
 
 ## Clusters à deux nœuds
