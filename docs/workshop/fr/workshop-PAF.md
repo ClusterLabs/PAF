@@ -52,37 +52,41 @@ hide_author_in_slide: true
 
 La résistance d'une chaîne repose sur son maillon le plus faible.
 
-Un pré-requis à une architecture de haute disponibilité est d'utiliser du matériel de qualité, fiable, éprouvé,
-maîtrisé et répandu. Fonder son architecture sur une technologie peu connue et non maîtrisée est la recette parfaite
-pour une erreur humaine et une indisponibilité prolongée.
+Un pré-requis à une architecture de haute disponibilité est d'utiliser du
+matériel de qualité, fiable, éprouvé, maîtrisé et répandu.  Fonder son
+architecture sur une technologie peu connue et non maîtrisée est la recette
+parfaite pour une erreur humaine et une indisponibilité prolongée.
 
-De même, chaque élément doit être redondé. La loi de Murphy énonce que « tout ce qui peut mal tourner, tournera mal ».
-Cette loi se vérifie très fréquemment. Les incidents se manifestent rarement là où on ne les attend le plus. Il faut
-réellement tout redonder:
+De même, chaque élément doit être redondé.  La loi de Murphy énonce que « tout
+ce qui peut mal tourner, tournera mal ».  Cette loi se vérifie très
+fréquemment.  Les incidents se manifestent rarement là où on ne les attend le
+plus.  Il faut réellement tout redonder :
 
 * chaque application ou service doit avoir une procédure de bascule
 * CPU (multi-socket), mémoire (multi-slot, ECC), disques (niveaux de RAID)
 * redondance du SAN
-* plusieurs alimentations électriques par serveur, plusieurs sources d'alimentation
-* plusieurs équipements réseaux, liens réseaux redondés, cartes réseaux, WAN et LAN
+* plusieurs alimentations électriques par serveur, plusieurs sources
+  d'alimentation
+* plusieurs équipements réseaux, liens réseaux redondés, cartes réseaux, WAN et
+  LAN
 * climatisation redondée
 * plusieurs équipements de fencing (et chemins pour accéder)
 * plusieurs administrateurs comprenant et maîtrisant chaque brique du cluster
 * ...
 
-S'il reste un seul `Single Point of Failure` dans l'architecture, ce point
-subira un jour où l'autre une défaillance.
+S'il reste un seul _Single Point of Failure_, ou _SPoF_, dans l'architecture,
+ce point subira un jour une défaillance.
 
 Concernant le synchronisme des horloges des serveurs entre eux, celui-ci est
-important pour les besoins applicatifs et la qualité des données. Suite à une
+important pour les besoins applicatifs et la qualité des données.  Suite à une
 bascule, les dates pourraient être incohérentes entre celles écrites par la
 précédente instance primaire et la nouvelle.
 
 Ensuite, ce synchronisme est important pour assurer une cohérence dans
-l'horodatage des journaux applicatifs entre les serveurs. La compréhension
-rapide et efficace d'un incident dépend directement de ce point. À noter qu'il
-est aussi possible de centraliser les log sur une architecture dédiée à part
-(attention aux SPoF ici aussi).
+l'horodatage des journaux applicatifs entre les serveurs.  La compréhension
+rapide et efficace d'un incident dépend directement de ce point.  À noter qu'il
+est aussi possible de centraliser les logs sur une architecture dédiée à part
+(attention aux _SPoF_ ici aussi).
 
 Le synchronisme des horloges est d'autant plus important dans les
 environnements virtualisés où les horloges ont facilement tendance à dévier.
@@ -91,37 +95,50 @@ environnements virtualisés où les horloges ont facilement tendance à dévier.
 
 -----
 
-## Fencing
+## _Fencing_
 
 * difficulté de déterminer l'origine d'un incident de façon logicielle
 * chaque brique doit toujours être dans un état déterminé
 * garantie de pouvoir sortir du système un élément défaillant
-* implémenté dans Pacemaker au travers du daemon `stonithd`
+* implémenté dans Pacemaker au travers du _daemon_ `stonithd`
 
 ::: notes
 
-Lorsqu'un serveur n'est plus accessible au sein d'un cluster, il est impossible aux autres nœuds de déterminer l'état
-réel de ce dernier. A-t-il crashé ? Est-ce un problème réseau ? Subit-il une forte charge temporaire ?
+Lorsqu'un serveur n'est plus accessible au sein d'un cluster, il est impossible
+aux autres nœuds de déterminer l'état réel de ce dernier.  A-t-il crashé ?
+Est-ce un problème réseau ?  Subit-il une forte charge temporaire ?
 
-Le seul moyen de répondre à ces questions est d'éteindre ou d'isoler le serveur fantôme d'autorité. Cette action permet
-de déterminer de façon certaine son statut : le serveur est hors cluster et ne reviendra pas sans action humaine.
+Le seul moyen de répondre à ces questions est d'éteindre ou d'isoler le serveur
+fantôme d'autorité.  Cette action permet de déterminer de façon certaine son
+statut : le serveur est hors _cluster_ et ne reviendra pas sans action humaine.
 
-Une fois cette décision prise, le cluster peut mettre en œuvre les actions nécessaires pour rendre les services en HA
-de nouveau disponibles.
+Une fois cette décision prise et appliquée avec succès, le _cluster_ peut
+mettre en œuvre les actions nécessaires pour rendre les services en HA de
+nouveau disponibles.
 
-Passer outre ce mécanisme, c'est s'exposer de façon certaine à des situations de `split brain` où deux instances
-PostgreSQL sont accessibles en écriture au sein du cluster, mais ne répliquent pas entre elles. Réconcilier les données
-de ces deux instances peut devenir un véritable calvaire et provoquer une ou plusieurs indisponibilités. Voici un
-exemple réel d'incident de ce type:
-<https://blog.github.com/2018-10-30-oct21-post-incident-analysis/>. Ici, une certaine quantité de donnée n'a pas été
-répliquée de l'ancien primaire vers le nouveau avant la bascule. En conséquence, plusieurs jours ont été nécessaire
-afin de réintégrer et réconcilier les données dans le cluster fraîchement reconstruit.
+Passer outre ce mécanisme, c'est s'exposer de façon certaine à des situations
+dites de _split brain_, où plusieurs sous-partitions du _cluster_ initial
+continuent à fonctionner de façon autonomes.
 
-Ne sous-estimez jamais le pouvoir d'innovation en terme d'incident des briques de votre cluster pour provoquer une
-partition des nœuds entre eux. En voici quelques exemples: <https://aphyr.com/posts/288-the-network-is-reliable>
+Par exemple, si le _cluster_ contient des ressources de bases de données en
+réplication avec une seule instance primaire, le _split brain_ indique que
+plusieurs instances sont accessibles simultanément en écriture au sein du
+_cluster_, mais ne répliquent pas entre elles.  Réconcilier les données de ces
+deux instances peut devenir un véritable calvaire et provoquer une ou plusieurs
+indisponibilités.  Voici un exemple réel d'incident de ce type :
+<https://blog.github.com/2018-10-30-oct21-post-incident-analysis/>.  Ici, une
+certaine quantité de données n'a pas été répliquée de l'ancien primaire vers le
+nouveau avant la bascule.  En conséquence, plusieurs jours ont été nécessaires
+afin de réintégrer et réconcilier les données dans le _cluster_ fraîchement
+reconstruit.
 
-À noter que PAF est pensé et construit pour les clusters configurés avec le fencing. En cas d'incident, il y a de
-fortes chances qu'une bascule n'ait jamais lieu pour un cluster dépourvu de fencing.
+Ne sous-estimez jamais le pouvoir d'innovation en terme d'incident des briques
+de votre _cluster_ pour provoquer une partition des nœuds entre eux.  En voici
+quelques exemples : <https://aphyr.com/posts/288-the-network-is-reliable>
+
+À noter que PAF est pensé et construit pour les _clusters_ configurés avec le
+_fencing_.  En cas d'incident, il y a de fortes chances qu'une bascule n'ait
+jamais lieu pour un _cluster_ dépourvu de _fencing_.
 
 :::
 
@@ -129,24 +146,24 @@ fortes chances qu'une bascule n'ait jamais lieu pour un cluster dépourvu de fen
 
 ## Quorum
 
-* quelle partie du cluster doit fonctionner en cas de partition réseau ?
-  * un vote à chaque élément du cluster
-  * le cluster ne fonctionne que s'il a la majorité des votes
+* quelle partie du cluster doit fonctionner en cas de partition réseau ?
+  * un vote à chaque élément du _cluster_
+  * le _cluster_ ne fonctionne que s'il a la majorité des votes
 
 ::: notes
 
-Le `quorum` est le nombre minimum de vote qu'une transaction distribuée doit
-obtenir pour être autorisée à effectuer une opération dans ce système. Son
+Le quorum est le nombre minimum de votes qu'une transaction distribuée doit
+obtenir pour être autorisée à effectuer une opération dans le système.  Son
 objectif est d'assurer la cohérence du système distribué.
 
-Pour se faire, chaque nœud du système se voit assigné un nombre de vote. Il
-faut au moins que `(N / 2) + 1` votes soient présents pour que le `quorum` soit
-atteint, avec "N" le nombre de votes possible. Le cluster ne fonctionne que si
-la majorité des nœuds sont présents.
+Pour ce faire, chaque nœud du système se voit assigner un nombre de votes.  Il
+faut au moins que `(N / 2) + 1` votes soient présents pour que le quorum soit
+atteint, avec `N` le nombre de votes possible.  Le _cluster_ ne fonctionne que
+si la majorité des nœuds sont présents.
 
-Suite à une partition réseau, le `quorum` permet au cluster de savoir
-quelle partition doit conserver les services actifs, où il doit les interrompre
-et qui peut déclencher des opérations de fencing si nécessaire.
+Suite à une partition réseau, le quorum permet au cluster de savoir quelle
+partition doit conserver les services actifs, celle(s) où il doit les
+interrompre, et qui peut déclencher des opérations de fencing si nécessaire.
 
 En plus d'arrêter ses services locaux, une partition du cluster n'atteignant
 pas le quorum ne peut notamment pas actionner le fencing des nœuds de la
@@ -161,7 +178,7 @@ Ce mécanisme est donc indispensable au bon fonctionnement du cluster.
 ## KISS
 
 * une architecture complexe pose des problèmes
-  * de mise en œuvre (risque de "SPOF")
+  * de mise en œuvre (risque de _SPOF_)
   * de maintenance
   * de documentation
 * il est préférable de toujours aller au plus simple
