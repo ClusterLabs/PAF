@@ -24,23 +24,31 @@ For more details about how to configure streaming replication with PostgreSQL,
 please refer to the
 [official documentation](http://www.postgresql.org/docs/current/static/index.html).
 
-Next, it requires a template of the `recovery.conf` file ready to use on
-__all the nodes__. You have to know that every single PostgreSQL instance will
-be started as a standby before one of them is picked by Pacemaker to be promoted
-as the master. Moreover, your cluster will move with switchovers, failovers,
-upgrade, etc. In short, each node should be able to be a standby. You can
-create such a template file suitable to your needs, the only requirements are:
+With PostgreSQL 11 and before, it requires a template of the `recovery.conf` file ready
+to use on __all the nodes__. You have to know that every single PostgreSQL instance will
+be started as a standby before one of them is picked by Pacemaker to be promoted as the
+master. Moreover, your cluster will move with switchovers, failovers, upgrade, etc. In
+short, each node should be able to be a standby. You can create such a template file
+suitable to your needs, the only requirements are:
 
   * have `standby_mode = on`
   * have `recovery_target_timeline = 'latest'`
   * a `primary_conninfo` with an `application_name` set to the node name
 
+If you are using PostgreSQL 12 and after, you don't need this template file. Just set the
+`primary_conninfo` parameter in the main configuration file. Note the
+`recovery_target_timeline` parameter is already set to `latest` by default.
+
 Moreover, if you rely on Pacemaker to move an IP resource on the node hosting
 the master role of PostgreSQL, make sure to add rules on the `pg_hba.conf` file
 of each instance to forbid self-replication.
 
+It is advised to put all these setups outside the `$PGDATA` to ease the procedure to
+rebuild standby without having to edit configuration files. Use `include` family
+parameters and eg. `hba_file`.
+
 Last but not least, during the very first startup of your cluster, the
-designated master will be the only instance stopped gently as a master. Take
+designated master will be the only instance stopped gently as a primary. Take
 great care of this when you setup your cluster for the first time
 
 
@@ -76,9 +84,10 @@ modified depending on the specificities of your installation.
     * default value: `/tmp`
   * `pgport`: Port the instance is listening on.
     * default value: `5432`
-  * `recovery_template`: Path to the `recovery.conf` template. This file is
-    simply copied by Pacemaker to `$PGDATA` under the `recovery.conf` name
-    before it starts the instance as a slave resource.
+  * `recovery_template`: Path to the `recovery.conf` template for PostgreSQL 11 and
+    before. This file is simply copied by Pacemaker to `$PGDATA` under the
+    `recovery.conf` name before it starts the instance as a slave resource. From
+    PostgreSQL 12 and after, the resource agent raise an error if the file exists.
     * default value: `$PGDATA/recovery.conf.pcmk`
   * `start_opts`: Additionnal arguments given to the postgres process on
     startup.
@@ -155,6 +164,9 @@ Here are the parameter for such resources:
   * `clone-node-max`: maximum number of PostgreSQL resources that can run _on a
     single node_. The only meaningful value here is `1`, do not set it to
     anything else. If not given, the default value is `1`.
+  * `notify=true`: enable action `notify` for the resource. You must enable it
+    explicitly as this action is disabled by default. This is mandatory
+    as the resource agent rely heavily on this action.
 
 
 ## Other considerations
@@ -175,9 +187,10 @@ you should refer to the
 See the Quick starts for full examples of cluster, resource creation and
 configuration:
 
-* [CentOS 6]({{ site.baseurl }}/Quick_Start-CentOS-6.html),
-* [CentOS 7]({{ site.baseurl }}/Quick_Start-CentOS-7.html) and 
-* [Debian 8]({{ site.baseurl }}/Quick_Start-Debian-8.html) .
+* [CentOS 6]({{ site.baseurl }}/Quick_Start-CentOS-6.html)
+* [CentOS 7]({{ site.baseurl }}/Quick_Start-CentOS-7.html)
+* [CentOS 8]({{ site.baseurl }}/Quick_Start-CentOS-8.html)
+* [Debian 8]({{ site.baseurl }}/Quick_Start-Debian-8.html)
 * [Debian 9]({{ site.baseurl }}/Quick_Start-Debian-9-crm.html)
 
 ## Cookbooks
