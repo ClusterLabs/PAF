@@ -11,7 +11,7 @@ title: PostgreSQL Automatic Failover - FAQ
 * [Why Pacemaker?](#why-pacemaker)
 * [What versions?](#what-versions)
 * [Will PAF protect me against data loss?](#protection-against-data-loss)
-* [Pacemaker triggered a failover, and now my old master cannot join the cluster anymore, what should I do?](#how-to-failback)
+* [Pacemaker triggered a failover, and now my old primary cannot join the cluster anymore, what should I do?](#how-to-failback)
 
 
 <a name="why-new-ra-for-postgresql"></a>
@@ -27,7 +27,7 @@ the RA tries hard to match PostgreSQL capabilities to Pacemaker requirement with
 complicated workarounds which makes it hard to manage. A lot boils down to the
 lock file requirement to protect the cluster against corruption after a demote.
 Because of it, you __must__ respect a strict stop/start order of the nodes and
-you can not swap the master role between nodes (let's call that a
+you can not swap the `Master` role between nodes (let's call that a
 "switchover").
 
 Moreover, the existing PostgreSQL agent takes control over the PostgreSQL
@@ -133,10 +133,10 @@ are sometimes mutually exclusive.
 
 
 <a name="how-to-failback"></a>
-__Q: Pacemaker triggered a failover, and now my old master cannot join the
+__Q: Pacemaker triggered a failover, and now my old primary cannot join the
 cluster anymore, what should I do?__
 
-__A__: You need to rebuild your old master from the new primary instance first.
+__A__: You need to rebuild your old primary from the new primary instance first.
 
 See the "Failover" section in the [administration page]({{ site.baseurl }}/administration.html).
 

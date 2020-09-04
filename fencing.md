@@ -27,7 +27,7 @@ various way:
 With the advent of virtualization, we could add another kind of fencing where
 the VM asks the hypervisor to force-shutdown one of its relatives.
 
-Should an issue happen where the master does not answer to the cluster,
+Should an issue happen where the primary does not answer to the cluster,
 successful fencing is the only way to be sure what is its status: shutdown or
 not able to accept new work or touch data. It avoids countless situations where
 you end up with split brain scenarios or data corruption.
@@ -345,7 +345,7 @@ switching off pacemaker before unfencing it.
 
 Watchdog devices are hardware able to reset servers on various conditions. The
 basic one is to reset the server on external demand, allowing the node to
-fence itself if needed (eg. failing to demote/stop a master).
+fence itself if needed (eg. failing to demote/stop a primary).
 
 Watchdogs are often initialized to start timer and reset the server if the timer
 elapses. An external program is then supposed to reset this timer before it

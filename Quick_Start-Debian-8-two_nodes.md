@@ -49,7 +49,7 @@ addresses of these servers are `192.168.2.10x/24` on the first interface,
 `192.168.3.10x/24` on the second one.
 
 The IP address `192.168.2.100`, called `pgsql-vip` in this tutorial, will be set
-on the server hosting the master PostgreSQL instance.
+on the server hosting the primary PostgreSQL instance.
 
 During the cluster setup, we use the node names in various places, make sure
 all your servers names can be resolved to the correct IPs. We usually set this
@@ -114,9 +114,9 @@ systemd-tmpfiles --create /etc/tmpfiles.d/postgresql-part.conf
 {: .warning}
 
 The resource agent requires the PostgreSQL instances to be already set up,
-ready to start and slaves ready to replicate. Make sure to setup your PostgreSQL
-master on your preferred node to host the master: during the very first startup
-of the cluster, PAF detects the master based on its shutdown status.
+ready to start and standbys ready to replicate. Make sure to setup your
+PostgreSQL primary on your preferred node to host it: during the very first
+startup of the cluster, PAF detects the primary based on its shutdown status.
 
 Moreover, it requires a `recovery.conf` template ready to use. You can create
 a `recovery.conf` file suitable to your needs, the only requirements are:
@@ -125,8 +125,8 @@ a `recovery.conf` file suitable to your needs, the only requirements are:
 * have `recovery_target_timeline = 'latest'`
 * a `primary_conninfo` with an `application_name` set to the node name
 
-Last but not least, make sure each instance will not be able to replicate with
-itself! A scenario exists where the master IP address `pgsql-vip` will be on
+Last but not least, make sure each instance is not able to replicate with
+itself! A scenario exists where the primary IP address `pgsql-vip` will be on
 the same node than a standby for a very short lap of time!
 
 > **NOTE**: as `recovery.conf.pcmk` and `pg_hba.conf` files are different
@@ -173,7 +173,8 @@ EOP
 exit
 ```
 
-On `srv1`, the master, restart the instance and give it the master IP address:
+On `srv1`, the primary, restart the instance and give it the primary vIP address
+(adapt the `eth0` interface to your system):
 
 ```
 systemctl restart postgresql@9.6-main
@@ -200,7 +201,7 @@ systemctl start postgresql@9.6-main
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
 disable them, as Pacemaker will take care of starting/stopping everything for
-you. Start with your master:
+you. Start with your primary:
 
 ```
 systemctl stop postgresql@9.6-main
@@ -208,7 +209,7 @@ systemctl disable postgresql@9.6-main
 echo disabled > /etc/postgresql/9.6/main/start.conf
 ```
 
-And remove the master IP address from `srv1`:
+And remove the vIP address from `srv1`:
 
 ```
 ip addr del 192.168.2.100/24 dev eth0
@@ -383,13 +384,13 @@ EOC
 ```
 
 In this quick start, we creates three different resources: `pgsql-ha`,
-`pgsql-master-ip` and `fence_vm_xxx`.
+`pgsql-pri-ip` and `fence_vm_xxx`.
 
 The `pgsql-ha` resource controls all the PostgreSQL instances of your cluster
 and decides where is the primary and where are the standbys.
 
-The `pgsql-master-ip` resource controls the `pgsql-vip` IP address. It is
-started on the node hosting the PostgreSQL master resource.
+The `pgsql-pri-ip` resource controls the `pgsql-vip` IP address. It is
+started on the node hosting the PostgreSQL primary resource.
 
 The last resources `fence_vm_xxx` are STONITH resources to manage fencing.
 This quick start uses the `fence_virsh` fencing agent, allowing to power on or
@@ -445,11 +446,11 @@ the same time:
 
   1. the PostgreSQL `pgsqld` resource
   2. the multistate `pgsql-ha` responsible to clone `pgsqld` everywhere and
-     define the roles (master/slave) of each clone
-  3. the IP address that must be started on the PostgreSQL master node
-  4. the collocation of the master IP address with the PostgreSQL master
+     define the roles (`Master`/`Slave`) of each clone
+  3. the IP address that must be started on the PostgreSQL primary node
+  4. the collocation of the vIP address with the PostgreSQL primary
      instance
-  5. the ordering constraints between the IP address and the PostgreSQL master
+  5. the ordering constraints between the vIP address and the primary instance
 
 ```
 crm conf <<EOC
@@ -472,30 +473,30 @@ primitive pgsqld pgsqlms                                                      \
 # 2. resource pgsql-ha
 ms pgsql-ha pgsqld meta notify=true
 
-# 3. the master IP address
-primitive pgsql-master-ip IPaddr2           \
+# 3. the vIP address
+primitive pgsql-pri-ip IPaddr2           \
   params ip=192.168.2.100 cidr_netmask=24 \
   op monitor interval=10s
 
-# 4. colocation of the pgsql-ha master and the master IP address
-colocation ip-with-master inf: pgsql-master-ip pgsql-ha:Master
+# 4. colocation of the pgsql-ha primary and the vIP address
+colocation ip-with-pri inf: pgsql-pri-ip pgsql-ha:Master
 
 # 5. ordering constraints
 order promote-then-ip Mandatory:         \
-  pgsql-ha:promote pgsql-master-ip:start \
+  pgsql-ha:promote pgsql-pri-ip:start \
   sequential=true symmetrical=false
 
 order demote-then-stop-ip Mandatory:   \
-  pgsql-ha:demote pgsql-master-ip:stop \
+  pgsql-ha:demote pgsql-pri-ip:stop \
   sequential=true symmetrical=false
 
 EOC
 ```
 
 > **WARNING**: in step 5, the start/stop and promote/demote order for these
-> resources must be asymetrical: we __MUST__ keep the master IP on the master
-> during its demote process so the standbies receive everything during the
-> master shutdown.
+> resources must be asymetrical: we __MUST__ keep the vIP on the primary
+> during its demote process so the standbies receive everything before its
+> shutdown.
 {: .warning}
 
 Note that the values for `timeout` and `interval` on each operation are based

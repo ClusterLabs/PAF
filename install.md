@@ -7,7 +7,7 @@ title: PostgreSQL Automatic Failover - Installation
 
 
 PostgreSQL Automatic Failover is a Pacemaker resource agent able to detect
-failure on a PostgreSQL master node and trigger failover to the best existing
+failure on a PostgreSQL primary node and trigger failover to the best existing
 standby node.
 
 This agent is written in perl. Its installation process follows the perl common
@@ -15,6 +15,13 @@ method, but its installation paths follow usual path used for OCF libraries and
 scripts.
 
 This manual explains the steps to install it correctly on your system.
+
+Table of contents:
+
+* [Using RPM packages](#using-rpm-packages)
+* [Using Debian packages](#using-debian-packages)
+* [Installation from the sources](#installation-from-the-sources)
+* [Testing](#testing)
 
 
 ## Using RPM packages

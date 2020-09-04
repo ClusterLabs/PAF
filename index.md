@@ -11,10 +11,10 @@ Thanks to Pacemaker and Corosync, PostgreSQL Automatic Failover (aka. PAF) is
 able to:
 
   * detect a failure of your PostgreSQL instance
-  * recover your master instance...
+  * recover your primary instance...
   * ... or failover to another node
   * Select the best available standby on failover (with the smallest lag)
-  * switchover roles in your cluster between your master and a standby
+  * switchover roles in your cluster between your primary and a standby
 
 Thanks to Pacemaker and Corsync, you can easily build a SAFE and ROBUST cluster
 with:
@@ -46,11 +46,11 @@ yet powerful.
 
 Once your PostgreSQL cluster built using internal streaming replication, PAF is
 able to expose to Pacemaker what is the current status of the PostgreSQL
-instance on each node: master, slave, stopped, catching up, etc. Should a
-failure occurs on the master, Pacemaker will try to recover it by default.
-Should the failure be non-recoverable, PAF allows the slaves to be able to
-elect the best of them (the closest one to the old master) and promote it as
-the new master. All of this thanks to the robust, feature-full and most
+instance on each node: primary, standby, stopped, catching up, etc. Should a
+failure occurs on the primary, Pacemaker will try to recover it by default.
+Should the failure be non-recoverable, PAF allows the standbys to be able to
+elect the best of them (the closest one to the old primary) and promote it as
+the new primary. All of this thanks to the robust, feature-full and most
 importantly experienced project: Pacemaker.
 
 For information about how to install, configure and manage this agent, as well

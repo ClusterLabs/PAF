@@ -9,17 +9,21 @@ In this document, we are working with cluster under CentOS 7.2 using mostly
 the `pcs` command. It supposes that the `pcsd` deamon is enabled and running and
 authentication between node is set up (see quick start).
 
+Make sure to experiment/train yourself on a testing plateform. Write your own
+doc related to your own environment. Check your doc and exercice it on a
+regular basis.
+
 Topics:
 
 * [Starting or stopping the cluster](#starting-or-stopping-the-cluster)
-* [Swapping master and slave roles between nodes](#swapping-master-and-slave-roles-between-nodes)
+* [Swapping primary and standby roles between nodes](#swapping-primary-and-standby-roles-between-nodes)
 * [PAF update](#paf-update)
 * [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
 * [Adding a node](#adding-a-node)
 * [Removing a node](#removing-a-node)
 * [Setting up a watchdog](#setting-up-a-watchdog)
 * [Forbidding a PAF resource on a node](#forbidding-a-paf-resource-on-a-node)
-* [Adding IPs on slaves nodes](#adding-ips-on-slaves-nodes)
+* [Adding IPs on standbys nodes](#adding-ips-on-standbys-nodes)
 
 
 ## Starting or stopping the cluster
@@ -94,23 +98,23 @@ pcs cluster start --all --wait
 pcs resource enable pgsql-ha --wait
 ```
 
-## Swapping master and slave roles between nodes
+## Swapping primary and standby roles between nodes
 
-In this chapter, we describe how to move the master role from one node to the
-other and getting back to the cluster the former master as a slave.
+In this chapter, we describe how to move the primary role from one node to the
+other and getting back to the cluster the former primary as a standby.
 
-Here is the command to move the master role from `srv1` to `srv2`:
+Here is the command to move the primary role from `srv1` to `srv2`:
 
 ```
 # pcs resource move --master pgsql-ha srv2
 # pcs resource clear pgsql-ha
 ```
 
-That's it. Note that the former master became a slave and start replicating with
-the new master.
+That's it. Note that the former primary became a standby and start replicating
+with the new primary.
 
 You could add `--wait` so the command exits when everything is done. Here is an
-example moving back the master to `srv1`:
+example moving back the primary to `srv1`:
 
 ```
 # pcs resource move --wait --master pgsql-ha srv1
@@ -118,13 +122,12 @@ Resource 'pgsql-ha' is master on node srv1; slave on node srv2.
 # pcs resource clear pgsql-ha
 ```
 
-To move the resource, `pcs` sets an `INFINITY` constraint location for the
-master on the given node. You must clear this constraint to avoid unexpected
-location behavior using the `pcs resource clear` command.
+An `INFINITY` constraint location is set to move the primary role to the given
+node. You must clear this constraint to avoid unexpected location behavior
+using the `pcs resource clear` command.
 
-Note that giving the destination node is not mandatory. If no destination node
-is given, `pcs` set a `-INFINITY` score for the master resource on its current
-node to force it to move away:
+Giving the destination node is not mandatory. If no destination node is given,
+a `-INFINITY` score is set on the primary current node to force it to move away:
 
 ```
 # pcs resource move --wait --master pgsql-ha
@@ -169,16 +172,18 @@ will still be in charge of other resources.
 
 Considers the PostgreSQL multistate resource is called `pgsql-ha`.
 
-The following command achieve two goals. The first one forbids the cluster resource manager to react on unexpected
-status by putting the resource in unmanaged mode (`unmanage pgsql-ha`). The second one stops the monitor actions for
-this resources (`--monitor`).
+The following command achieve two goals. The first one forbids the cluster
+resource manager to react on unexpected status by putting the resource in
+unmanaged mode (`unmanage pgsql-ha`). The second one stops the monitor actions
+for this resources (`--monitor`).
 
 ```
 # pcs resource unmanage pgsql-ha --monitor
 ```
 
-Notice `(unmanaged)` appeared in `crm_mon`. In the following command, the meta attribute `is-managed=false` appeared
-for the `pgsql-ha` resource and `enabled=false` appeared for the monitor actions:
+Notice `(unmanaged)` appeared in `crm_mon`. In the following command, the meta
+attribute `is-managed=false` appeared for the `pgsql-ha` resource and
+`enabled=false` appeared for the monitor actions:
 
 ```
 # pcs resource show pgsql-ha
@@ -205,14 +210,16 @@ Now, update PAF, eg.:
 # yum install -y https://github.com/ClusterLabs/PAF/releases/download/v2.2.1/resource-agents-paf-2.2.1-1.noarch.rpm
 ```
 
-We can now put the resource in `managed` mode again and enable the monitor actions:
+We can now put the resource in `managed` mode again and enable the monitor
+actions:
 
 ```
 # pcs resource manage pgsql-ha --monitor
 ```
 
-> __NOTE__: you might want to enable monitor action first to check everything is going fine before getting back the
-> control to the cluster. You can enable the monitor actions using the following commands (you __must__ to set all
+> __NOTE__: you might want to enable monitor action first to check everything is
+> going fine before getting back the control to the cluster. You can enable the
+> monitor actions using the following commands (you __must__ to set all
 > parameters related to the action):
 >
 > ```
@@ -220,8 +227,9 @@ We can now put the resource in `managed` mode again and enable the monitor actio
 > # pcs resource update pgsqld op monitor role=Slave timeout=10s interval=16s enabled=true
 > ```
 >
-> Monitor action should be executed immediately and report no errors. Check that everything is running correctly in
-> `crm_mon` and your log files before enabling the resource itself (without the `--monitor`):
+> Monitor action should be executed immediately and report no errors. Check
+> that everything is running correctly in `crm_mon` and your log files before
+> enabling the resource itself (without the `--monitor`):
 > 
 > ```
 > # pcs resource manage pgsql-ha
@@ -233,10 +241,10 @@ We can now put the resource in `managed` mode again and enable the monitor actio
 
 This chapter explains how to do a minor upgrade of PostgreSQL on a two node
 cluster. Nodes are called `srv1` and `srv2`, the PostgreSQL HA resource is
-called `pgsql-ha`. Node `srv1` is hosting the master.
+called `pgsql-ha`. Node `srv1` is hosting the primary.
 
-The process is quite simple: upgrade the standby first, move the master
-role and finally upgrade PostgreSQL on the former PostgreSQL master node.
+The process is quite simple: upgrade the standby first, move the primary
+role and finally upgrade PostgreSQL on the former PostgreSQL primary node.
 
 Here is how to upgrade PostgeSQL on the standby side:
 
@@ -254,8 +262,7 @@ Here are the details of these commands:
 - upgrade the PostgreSQL packages
 - allow the `pgsql-ha` resource to run on `srv2`, effectively starting it
 
-Now, we can move the PostgreSQL master resource to `srv2`, then take care
-of `srv1`:
+Now, we can move the primary resource to `srv2`, then take care of `srv1`:
 
 ```
 # pcs resource move --wait --master pgsql-ha srv2
@@ -265,7 +272,7 @@ of `srv1`:
 # pcs resource clear pgsql-ha
 ```
 
-Minor upgrade is finished. Feel free to move your master back to `srv1` if you
+Minor upgrade is finished. Feel free to move your primary back to `srv1` if you
 really need it.
 
 
@@ -274,7 +281,7 @@ really need it.
 In this chapter, we add server `srv3` hosting a PostgreSQL standby instance as a
 new node in an existing two node cluster.
 
-Setup everything so PostgreSQL can start on `srv3` as a slave and enter in
+Setup everything so PostgreSQL can start on `srv3` as a standby and enter in
 streaming replication. Remember to create the recovery configuration template
 file, setup the `pg_hba.conf` file etc.
 
@@ -432,12 +439,17 @@ device and the inter-communication with Pacemaker:
 # systemctl enable sbd.service
 ~~~
 
-Edit `/etc/sysconfig/sbd` and make sure you
-have `SBD_PACEMAKER=yes`, `SBD_WATCHDOG_DEV` pointing to the correct device
-and adjust the value of `SBD_WATCHDOG_TIMEOUT` to suit your need. This last
+Edit `/etc/sysconfig/sbd` and make sure you have:
+
+* the parameter `SBD_PACEMAKER=yes` uncommented
+* the parameter `SBD_WATCHDOG_DEV` pointing to the correct device
+
+You can adjust the value of `SBD_WATCHDOG_TIMEOUT` to suit your need. This last
 variable is the time sbd will use to initialize the recurrent hardware watchdog
 timer.
 
+We can now restart the cluster to set everything up. The watchdog capability
+is detected by the cluster manager on each node during the cluster startup.
 Start the cluster:
 
 ~~~
@@ -499,23 +511,24 @@ a resource on a node. On a node where your PostgreSQL cluster is not running,
 this "probe" action will fail, leading to bad cluster reactions.
 
 
-## Adding IPs on slaves nodes
+## Adding IPs on standbys nodes
 
-In this chapter, we are using a three node cluster with one PostgreSQL master
+In this chapter, we are using a three node cluster with one PostgreSQL primary
 instance and two standbys instances.
 
 As usual, we start from the cluster created in the quick start documentation:
-* one master resource called `pgsql-ha`
-* an IP address called `pgsql-master-ip` linked to the `pgsql-ha` master role
+* one primary resource called `pgsql-ha`
+* an IP address called `pgsql-pri-ip` linked to the `pgsql-ha` primary role
 
 See the [Quick Start CentOS 7]({{ site.baseurl}}/Quick_Start-CentOS-7.html#cluster-resources)
 for more informations.
 
 We want to create two IP addresses with the following properties:
+
 * start on a standby node
 * avoid to start on the same standby node than the other one
 * move to the available standby node should a failure occurs to the other one
-* move to the master if there is no standby alive
+* move to the primary if there is no standby alive
 
 To make this possible, we have to play with the resources co-location scores.
 
@@ -546,14 +559,15 @@ score of `-20` (higher than the stickiness of the cluster):
 {: .notice}
 
 Now, we add similar co-location constraints to define that each IP address
-prefers to run on a node with a slave of `pgsql-ha`:
-* colocations `with slave pgsql-ha 100` means the IP will prefer to bind with a
-  slave
-* colocations `with pgsql-ha 50` means that the IP will prefer to bind with a
-  Master __OR__ a Standby
+prefers to run on a node with a standby of `pgsql-ha`:
 
-We give higher priority to the slaves with the `100` score, but should the
-slaves be stopped, the `50` score push the IP to move to the master.
+* colocations `with slave pgsql-ha 100` means the IP will prefer to bind with a
+  standby
+* colocations `with pgsql-ha 50` means that the IP will prefer to bind with a
+  `Master` __OR__ a `Slave` role
+
+We give higher priority to the standbys with the `100` score, but should they
+all be stopped, the `50` score push the IP to move to the primary.
 
 ~~~
 # pcs constraint colocation add pgsql-ip-stby1 with slave pgsql-ha 100

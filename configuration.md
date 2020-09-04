@@ -13,6 +13,13 @@ Please note that we assume you are already familiar with both Pacemaker and
 PostgreSQL installation and configuration. In consequence, we only describe in
 this section the PAF related parameters.
 
+Table of contents:
+
+* [PostgreSQL configuration](#postgresql-configuration)
+* [PAF resource configuration](#paf-resource-configuration)
+* [Other considerations](#other-considerations)
+* [Full examples](#full-examples)
+* [Cookbooks](#cookbooks)
 
 ## PostgreSQL configuration
 
@@ -24,12 +31,13 @@ For more details about how to configure streaming replication with PostgreSQL,
 please refer to the
 [official documentation](http://www.postgresql.org/docs/current/static/index.html).
 
-With PostgreSQL 11 and before, it requires a template of the `recovery.conf` file ready
-to use on __all the nodes__. You have to know that every single PostgreSQL instance will
-be started as a standby before one of them is picked by Pacemaker to be promoted as the
-master. Moreover, your cluster will move with switchovers, failovers, upgrade, etc. In
-short, each node should be able to be a standby. You can create such a template file
-suitable to your needs, the only requirements are:
+With PostgreSQL 11 and before, it requires a template of the `recovery.conf`
+file ready to use on __all the nodes__. You have to know that every single
+PostgreSQL instance will be started as a standby before one of them is picked
+by Pacemaker to be promoted as the primary. Moreover, your cluster will move
+with switchovers, failovers, upgrade, etc. In short, each node should be able
+to be a standby. You can create such a template file suitable to your needs,
+the only requirements are:
 
   * have `standby_mode = on`
   * have `recovery_target_timeline = 'latest'`
@@ -40,16 +48,16 @@ If you are using PostgreSQL 12 and after, you don't need this template file. Jus
 `recovery_target_timeline` parameter is already set to `latest` by default.
 
 Moreover, if you rely on Pacemaker to move an IP resource on the node hosting
-the master role of PostgreSQL, make sure to add rules on the `pg_hba.conf` file
-of each instance to forbid self-replication.
+the primary instance of PostgreSQL, make sure to add rules on the `pg_hba.conf`
+file of each instance to forbid self-replication.
 
 It is advised to put all these setups outside the `$PGDATA` to ease the procedure to
 rebuild standby without having to edit configuration files. Use `include` family
 parameters and eg. `hba_file`.
 
 Last but not least, during the very first startup of your cluster, the
-designated master will be the only instance stopped gently as a primary. Take
-great care of this when you setup your cluster for the first time
+designated primary will be the only instance stopped gently as a primary. Take
+great care of this when you setup your cluster for the first time.
 
 
 ## PAF resource configuration
@@ -86,7 +94,7 @@ modified depending on the specificities of your installation.
     * default value: `5432`
   * `recovery_template`: Path to the `recovery.conf` template for PostgreSQL 11 and
     before. This file is simply copied by Pacemaker to `$PGDATA` under the
-    `recovery.conf` name before it starts the instance as a slave resource. From
+    `recovery.conf` name before it starts the instance as a standby resource. From
     PostgreSQL 12 and after, the resource agent raise an error if the file exists.
     * default value: `$PGDATA/recovery.conf.pcmk`
   * `start_opts`: Additionnal arguments given to the postgres process on
@@ -94,11 +102,12 @@ modified depending on the specificities of your installation.
     See `postgres --help` for available options. Usefull when the
     `postgresql.conf` file is not in the data directory (`PGDATA`), eg.:
     `-c config_file=/etc/postgresql/9.3/main/postgresql.conf`.
-  * `maxlag`: Maximum lag allowed on a standby before we set a negative master
-     score on it. The calculation is based on the difference between the current xlog 
-     location on the master and the write location on the standby.
-     This parameter must be a valid positive number as described in PostgreSQL documentation.
-     See: https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS-NUMERIC
+  * `maxlag`: Maximum lag allowed on a standby before we set a negative `master
+     score` on it. The calculation is based on the difference between the
+     current xlog location on the primary and the write location on the standby.
+     This parameter must be a valid positive number as described in PostgreSQL
+     documentation. See:
+     <https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS-NUMERIC>
     * default value: `0` (disabled)
 
 
@@ -120,28 +129,28 @@ before deciding a resource has failed to stop, and fence the node instead).
 
   * action `monitor` with parameter `role` set to `Master` (mandatory):
     check done regularly (based on the `interval` parameter's value) on the
-    local resource, it determines how fast a problem will be detected on the
-    master resource (primary PostgreSQL instance)
+    local resource, it determines how fast a problem will be detected on a
+    resource with the role `Master` (primary PostgreSQL instance)
     * parameter `interval` suggested value: `15s`
     * parameter `timeout` suggested value: `10s`
   * action `monitor` with parameter `role` set to `Slave` (mandatory):
     check done regularly (based on the `interval` parameter's value) on the
     local resource, it determines how fast a problem will be detected on a
-    slave resource (standby PostgreSQL instance)
-    * parameter `interval` suggested value: `16s` (you __must__ chose a 
-      different value from the master resource monitor action)
+    resource with the role `Slave` (standby PostgreSQL instance)
+    * parameter `interval` suggested value: `16s`. You __must__ chose a 
+      different value from the `role=Master` resource monitor action
     * parameter timeout suggested value: `10s`
   * action `start`: start the local PostgreSQL instance
     * parameter `timeout` suggested value: `60s`
   * action `stop`: stop the local PostgreSQL instance
     * parameter `timeout` suggested value: `60s`
-  * action `promote`: promote a slave resource as a master (and thus, promote
-    the related standby PostgreSQL instance to a primary role)
+  * action `promote`: promote a resource from role `Slave` to `Master` (and
+    thus, promote the related standby PostgreSQL instance to a primary role)
     * parameter `timeout` suggested value: `30s`
-  * action `demote`: demote a master resource as a slave (within PAF code,
-    this is implemented by stopping the primary PostgreSQL instance, and
-    starting it again as a standby, thus its timeout should at least be equal
-    to the sum of the ones of `stop` and `start` actions)
+  * action `demote`: demote a resource from role `Master` to `Slave`. Within
+    PAF code, this is implemented by stopping the primary PostgreSQL instance,
+    and starting it again as a standby. In consequence, its timeout should at
+    least be equal to the sum of the ones of `stop` and `start` actions.
     * parameter `timeout` suggested value: `120s`
   * action `notify`: executed at the same time on several nodes of the cluster
     before and after each actions. This is important in PAF mechanism.
@@ -150,8 +159,8 @@ before deciding a resource has failed to stop, and fence the node instead).
 ### Multi-state resource parameters
 
 After creating your PostgreSQL resource in previous chapter, you need to
-create the specific master/slave resource tht will clone the previous resource
-on several nodes, using two different states, `master` and `slave`.
+create the specific promotable resource that will clone the previous resource
+on several nodes, using two different roles `Master` and `Slave`.
 
 Here are the parameter for such resources:
 
@@ -173,7 +182,7 @@ Here are the parameter for such resources:
 
 Creating a working Pacemaker's cluster will usually involves much more
 configuration than just the PostgreSQL instances and resources.
-For example, having a Pacemaker's managed IP that is always up on the master
+For example, having a Pacemaker's managed IP that is always up on the primary
 PostgreSQL resource seems like a good idea. And obviously, you also have to
 configure [fencing]({{ site.baseurl }}/fencing.html).
 
@@ -195,7 +204,7 @@ configuration:
 
 ## Cookbooks
 
-Somes cookbooks are aailable to help you manage your cluster. See:
+Some cookbooks are available to help you manage your cluster. See:
 
 * [Cookbook for CentOS 7]({{ site.baseurl }}/CentOS-7-admin-cookbook.html) (using `pcs`)
 * [Cookbook for Debian 8]({{ site.baseurl }}/Debian-8-admin-cookbook.html) (using `crm`)

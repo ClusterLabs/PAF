@@ -86,8 +86,8 @@ root@srv1:~# for s in srv1 srv2 srv3; do ping -W1 -c1 $s; done| grep icmp_seq
 Make sure hostnames are correctly set on each nodes, or use `hostnamectl`.
 Eg.:
 
-~~~
-root@srv1:~# hostnamectl set-hostname srv1
+~~~bash
+hostnamectl set-hostname srv1
 ~~~
 
 
@@ -122,28 +122,28 @@ instance startup by Pacemaker.
 To create this sub folder on system initialization, we need to extend the
 existing `systemd-tmpfiles` configuration for `postgresql` to add it. In our
 environment `stats_temp_directory` is set
-to `/var/run/postgresql/9.6-main.pg_stat_tmp`, so we create the following
+to `/var/run/postgresql/12-main.pg_stat_tmp`, so we create the following
 file:
 
-~~~
+~~~bash
 cat <<EOF > /etc/tmpfiles.d/postgresql-part.conf
 # Directory for PostgreSQL temp stat files
-d /run/postgresql/9.6-main.pg_stat_tmp 0700 postgres postgres - -
+d /run/postgresql/12-main.pg_stat_tmp 0700 postgres postgres - -
 EOF
 ~~~
 
 To take this file in consideration immediately without rebooting the server,
 run the following command:
 
-~~~
+~~~bash
 systemd-tmpfiles --create /etc/tmpfiles.d/postgresql-part.conf
 ~~~
 
-Lastly, during Pacemaker and Corosync installation, Debian packaging automatically
-creates and start a dummy isolated node. We need to move it out of our way by
-destroying it before creating the real one:
+Lastly, during Pacemaker and Corosync installation, Debian packaging
+automatically creates and start a dummy isolated node. We need to move it out
+of our way by destroying it before creating the real one:
 
-~~~
+~~~bash
 pcs cluster destroy
 ~~~
 
@@ -158,9 +158,9 @@ pcs cluster destroy
 {: .warning}
 
 The resource agent requires the PostgreSQL instances to be already set up,
-ready to start and standbys ready to replicate. Make sure to setup your
-primary on your preferred node to host it: during the very first startup
-of the cluster, PAF detects the primary based on its shutdown status.
+ready to start and standbys ready to replicate. Make sure to setup your primary
+on your preferred node to host it: during the very first startup of the
+cluster, PAF detects the primary based on its shutdown status.
 
 PostgreSQL configuration need:
 
@@ -183,7 +183,7 @@ standbys. This quick start considers `srv1` is the preferred primary node.
 
 On all nodes:
 
-~~~
+~~~bash
 su - postgres
 
 cd /etc/postgresql/12/main/
@@ -210,7 +210,7 @@ exit
 On `srv1`, the primary, restart the instance and give it the primary vIP address
 (adapt the `eth0` interface to your system):
 
-~~~
+~~~bash
 systemctl restart postgresql@12-main
 
 ip addr add 192.168.122.70/24 dev eth0
@@ -219,7 +219,7 @@ ip addr add 192.168.122.70/24 dev eth0
 Now, on each standby (`srv2` and `srv3` here), we have to cleanup the instance
 created by the package and clone the primary. E.g.:
 
-~~~
+~~~bash
 systemctl stop postgresql@12-main
 su - postgres
 
@@ -478,8 +478,8 @@ Note that the values for `timeout` and `interval` on each operation are based
 on the minimum suggested value for PAF Resource Agent. These values should be
 adapted depending on the context.
 
-The last line of this command declare the resource `pgsqld` as promotable. This is
-handled by `pcs` which creates the `pgsqld-clone` resource automatically.
+The last line of this command declare the resource `pgsqld` as promotable. This
+is handled by `pcs` which creates the `pgsqld-clone` resource automatically.
 
 We add the IP address which should be started on the primary node:
 
@@ -515,5 +515,7 @@ instances replicating with each others, you should probably check:
 * Documentation about how to setup network bonding or teaming are popular on
   internet.  You can consult the Corosync documentation to support redundancy
   from there, but it best fits in the operating system layer.
+* have a look at our basic
   [administration cookbooks]({{ site.baseurl}}/documentation.html#administration).
   You mostly should look and adapt for Debian the one for [CentOS 7 using pcs]({{ site.baseurl}}/CentOS-7-admin-cookbook.html)
+

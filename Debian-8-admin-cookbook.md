@@ -11,7 +11,7 @@ the `crm` command.
 Topics:
 
 * [Starting or stopping the cluster](#starting-or-stopping-the-cluster)
-* [Swapping master and slave roles between nodes](#swapping-master-and-slave-roles-between-nodes)
+* [Swapping primary and standby roles between nodes](#swapping-primary-and-standby-roles-between-nodes)
 * [PAF update](#paf-update)
 * [PostgreSQL minor upgrade](#postgresql-minor-upgrade)
 * [Adding a node](#adding-a-node)
@@ -58,40 +58,40 @@ cluster in maintenance mode or ask the cluster to stop the resource first. Eg.:
 
 Don't forget on cluster start to run the opposite commands.
 
-## Swapping master and slave roles between nodes
+## Swapping primary and standby roles between nodes
 
-In this chapter, we describe how to move the master role from one node to the
-other and getting back to the cluster the former master as a slave.
+In this chapter, we describe how to move the primary role from one node to the
+other and getting back to the cluster the former primary as a standby.
 
-Here is the command to move the master role from `srv1` to `srv2`:
+Here is the command to move the primary role from `srv1` to `srv2`:
 
 ```
 # crm resource migrate pgsql-ha srv2
 # crm resource unmigrate pgsql-ha
 ```
 
-That's it. Note that the former master became a slave and start replicating with
-the new master.
+That's it. Note that the former primary became a standby and start replicating
+with the new primary.
 
-To move the resource, `crmsh` sets an `INFINITY` constraint location for the
-master on the given node. You must clear this constraint to avoid unexpected
+An `INFINITY` constraint location is set to move the primary role to the given
+node. You must clear this constraint to avoid unexpected
 location behavior using the ` crm resource unmigrate` command.
 
-Note that if you do not specify the destination node, `crm` set a `-INFINITY`
-score for the master resource on its current node to force it to move away:
+Giving the destination node is not mandatory. If no destination node is given,
+a `-INFINITY` score is set on the primary current node to force it to move away:
 
 ```
 # crm resource migrate pgsql-ha
 
 # crm resource contraints pgsql-ha
-    pgsql-master-ip                 (score=INFINITY, needs role=Master, id=ip-with-master)
+    pgsql-pri-ip                 (score=INFINITY, needs role=Master, id=ip-with-pri)
 * pgsql-ha
   : Node srv1                       (score=-INFINITY, id=cli-ban-pgsql-ha-on-srv1)
 
 # crm resource unmigrate pgsql-ha
 
 # crm resource contraints pgsql-ha
-    pgsql-master-ip                 (score=INFINITY, needs role=Master, id=ip-with-master)
+    pgsql-pri-ip                 (score=INFINITY, needs role=Master, id=ip-with-pri)
 * pgsql-ha
 ```
 
@@ -137,7 +137,7 @@ attribute `is-managed=false` in the `pgsql-ha` configuration:
 ```
 # crm configure show pgsql-ha
 ms pgsql-ha pgsqld \
-    meta master-max=1 master-node-max=1 clone-max=3 clone-node-max=1 notify=true is-managed=false target-role=Master
+    meta notify=true is-managed=false target-role=Master
 ```
 
 Now, we need to stop the recurring operations so the Local Resource Manager will
@@ -199,10 +199,10 @@ We can now put the resource in `managed` mode again:
 
 This chapter explains how to do a minor upgrade of PostgreSQL on a two node
 cluster. Nodes are called `srv1` and `srv2`, the PostgreSQL HA resource is
-called `pgsql-ha`. Node `srv1` is hosting the master.
+called `pgsql-ha`. Node `srv1` is hosting the primary.
 
-The process is quite simple: upgrade the standby first, move the master
-role and finally upgrade PostgreSQL on the former PostgreSQL master node.
+The process is quite simple: upgrade the standby first, move the primary
+role and finally upgrade PostgreSQL on the former PostgreSQL primary node.
 
 Here is how to upgrade PostgeSQL on the standby side:
 
@@ -220,8 +220,7 @@ Here are the details of these commands:
 - upgrade the PostgreSQL packages
 - allow the `pgsql-ha` resource to run on `srv2`, effectively starting it
 
-Now, we can move the PostgreSQL master resource to `srv2`, then take care
-of `srv1`:
+Now, we can move the primary resource to `srv2`, then take care of `srv1`:
 
 ```
 # crm --wait resource migrate pgsql-ha srv2
@@ -231,9 +230,8 @@ of `srv1`:
 # crm resource unmigrate pgsql-ha
 ```
 
-Minor upgrade is finished. Feel free to move your master back to `srv1` if you
+Minor upgrade is finished. Feel free to move your primary back to `srv1` if you
 really need it.
-
 
 
 ## Adding a node
@@ -241,7 +239,7 @@ really need it.
 In this chapter, we add server `srv3` hosting a PostgreSQL standby instance as a
 new node in an existing two node cluster.
 
-Setup everything so PostgreSQL can start on `srv3` as a slave and enter in
+Setup everything so PostgreSQL can start on `srv3` as a standby and enter in
 streaming replication. Remember to create the recovery configuration template
 file, setup the `pg_hba.conf` file etc.
 
@@ -431,6 +429,10 @@ Edit `/etc/default/sbd` and make sure you have:
 * the parameter `SBD_PACEMAKER=true` uncommented
 * the parameter `SBD_WATCHDOG_DEV` pointing to the correct device
 
+You can adjust the value of `SBD_WATCHDOG_TIMEOUT` to suit your need. This last
+variable is the time sbd will use to initialize the recurrent hardware watchdog
+timer.
+
 A watchdog device can only be handled by one process. Under Debian, Corosync
 has been compiled with watchdog support and steal the watchdog device before
 sbd can catch it, leading to a failure during sbd start:
@@ -525,19 +527,6 @@ its watchdog (if no other fencing device exist):
 
 If you stop Pacemaker but not Corosync or simulate a resource failing to
 stop or a resource fatal error, the node should fence itself immediately.
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ## Forbidding a PAF resource on a node

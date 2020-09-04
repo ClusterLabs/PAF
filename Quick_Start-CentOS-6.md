@@ -2,19 +2,47 @@
 layout: default
 title: PostgreSQL Automatic Failover - Quick start CentOS 7
 ---
+
 # Quick Start CentOS 6
 
-This quick start tutorial is based on CentOS 6.7, using the `pcs` command.
+This quick start purpose is to help you to build your first cluster to
+experiment with. It does *not* implement various good practices related to
+your system, Pacemaker or PostgreSQL. This quick start alone is not enough.
+During your journey in building a safe HA cluster, you must train about
+security, network, PostgreSQL, Pacemaker, PAF, etc.
+In regard with PAF, make sure to read carefully documentation from
+<https://clusterlabs.github.io/PAF/documentation.html>.
+
+This tutorial is based on CentOS 6.10, using Pacemaker 1.1.18, the `pcs` command
+and PostgreSQL 9.6.
 
 Table of contents:
 
+* [Repository setup](#repository-setup)
 * [Network setup](#network-setup)
 * [PostgreSQL and Cluster stack installation](#postgresql-and-cluster-stack-installation)
 * [PostgreSQL setup](#postgresql-setup)
-* [Cluster setup](#cluster-setup)
-* [Cluster resource creation and management](#cluster-resource-creation-and-management)
+* [Cluster pre-requisites](#cluster-pre-requisites)
+* [Cluster creation](#cluster-creation)
+* [Node fencing](#node-fencing)
+* [Cluster resources](#cluster-resources)
 * [Adding a node to the cluster](#adding-a-node-to-the-cluster)
 * [Conclusion](#conclusion)
+
+
+## Repository setup
+
+To install PAF and PostgreSQL, this tutorial uses the PGDG repository maintained
+by the PostgreSQL community. Here is how to add it:
+
+~~~bash
+yum install -y https://yum.postgresql.org/reporpms/EL-6-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+~~~
+
+> **NOTE**: you can not install PostgreSQL from official CentOS repository
+> as the supported version is 8.4 and PAF supports PostgreSQL 9.3 and after.
+{: .notice}
+
 
 ## Network setup
 
@@ -22,32 +50,25 @@ First, we should make sure NetworkManager is disabled. The network setup should
 NOT be dynamically handled by some external daemons. Only Pacemaker related
 processes should be able to deal with this:
 
-```
+~~~bash
 chkconfig NetworkManager off
 service NetworkManager stop
-```
+~~~
 
-During the cluster setup, we use the cluster name in various places, make sure
-all your servers names can be resolved to the correct IPs. We usually set this
-in the `/etc/hosts` file:
+The cluster we are about to build includes three servers called `srv1`,
+`srv2` and `srv3`. IP addresses of these servers are `192.168.122.5x/24`.
 
-```
-192.168.122.50 pgsql-vip
-192.168.122.51 srv1
-192.168.122.52 srv2
-192.168.122.53 srv3
-192.168.123.51 srv1-alt
-192.168.123.52 srv2-alt
-192.168.123.53 srv3-alt
-```
+> **NOTE**: It is essential to setup network redundancy, either at
+> system level using eg. bonding or teaming, or at cluster level.
+{: .notice}
 
-The IP address `192.168.122.50`, called `pgsql-vip` in this tutorial, will be set
-on the server hosting the master PostgreSQL intance.
+The IP address `192.168.122.50`, called `pgsql-vip` in this tutorial, will be
+set on the server hosting the primary PostgreSQL instance.
 
-Finally, we have to allow the network traffic related to the cluster and
-PostgreSQL to go through the firewalls:
+If the firewall is enabled, we have to allow the network traffic related to the
+cluster and PostgreSQL to go through:
 
-```
+~~~bash
 service iptables start
 
 # corosync
@@ -62,55 +83,82 @@ iptables -I INPUT -p tcp --dport 5432 -m state --state NEW,ESTABLISHED -j ACCEPT
 iptables -I OUTPUT -p tcp --sport 5432 -m state --state ESTABLISHED -j ACCEPT
 
 service iptables save
-```
+~~~
+
+During the cluster setup, we use the node names in various places,
+make sure all your server hostnames can be resolved to the correct IPs. We
+usually set this in the `/etc/hosts` file:
+
+~~~
+192.168.122.50 pgsql-vip
+192.168.122.51 srv1
+192.168.122.52 srv2
+192.168.122.53 srv3
+~~~
+
+Now, the three servers should be able to ping each others, eg.:
+
+~~~
+root@srv1:~# for s in srv1 srv2 srv3; do ping -W1 -c1 $s; done| grep icmp_seq
+64 bytes from srv1 (192.168.122.51): icmp_seq=1 ttl=64 time=0.028 ms
+64 bytes from srv2 (192.168.122.52): icmp_seq=1 ttl=64 time=0.296 ms
+64 bytes from srv3 (192.168.122.53): icmp_seq=1 ttl=64 time=0.351 ms
+~~~
+
+Make sure hostnames are correctly set on each nodes. Eg.:
+
+~~~
+srv1$ hostname -s
+srv1
+~~~
+
 
 ## PostgreSQL and Cluster stack installation
 
-We are using the PostgreSQL packages from the PGDG repository. Here is how to
-install and set up this repository on your system:
+Run this whole chapter on __ALL__ nodes.
 
-```
-yum install http://yum.postgresql.org/9.6/redhat/rhel-6-x86_64/pgdg-centos96-9.6-3.noarch.rpm
-```
+Let's install everything we need: PostgreSQL, Pacemaker, cluster related
+packages and PAF:
 
-Make sure to double adapt the previous command with the latest package available
-and the PostgreSQL version you need.
-
-We can now install everything we need for our cluster:
-
-```
-yum install -y corosync pacemaker postgresql93 postgresql93-contrib postgresql93-server resource-agents pcs pcsd cman fence-agents-virsh
-```
+~~~bash
+yum install -y postgresql96 postgresql96-contrib postgresql96-server \
+               pacemaker resource-agents pcs                         \
+               fence-agents-all fence-agents-virsh
+~~~
 
 Finally, we need to install the "PostgreSQL Automatic Failover" (PAF) resource agent:
 
-```
+~~~
 yum install -y https://github.com/ClusterLabs/PAF/releases/download/v1.1.0/resource-agents-paf-1.1.0-1.noarch.rpm
-```
+~~~
 
 ## PostgreSQL setup
 
 > **WARNING**: building PostgreSQL standby is not the main subject here. The
-> following steps are __**quick and dirty**__. They lack of security, WAL
-> retention and so on. Rely on the [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
+> following steps are __**quick and dirty, VERY DIRTY**__. They lack of
+> security, WAL retention and so on. Rely on the
+> [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/index.html)
 > for a proper setup.
 {: .warning}
 
-The resource agent requires the PostgreSQL instances to be already set up and
-ready to start. Moreover, it requires a `recovery.conf` template ready to use.
-You can create a `recovery.conf` file suitable to your needs, the only
-requirements are:
+The resource agent requires the PostgreSQL instances to be already set up,
+ready to start and standbys ready to replicate. Make sure to setup your
+primary on your preferred node to host it: during the very first startup
+of the cluster, PAF detects the primary based on its shutdown status.
 
-  * have ``standby_mode = on``
-  * have ``recovery_target_timeline = 'latest'``
-  * a ``primary_conninfo`` with an ``application_name`` set to the node name
+Moreover, it requires a `recovery.conf` template ready to use. You can create a
+`recovery.conf` file suitable to your needs, the only requirements are:
 
-Last but not least, make sure each instance will not be able to replicate with
-itself! A scenario exists where the master IP address `pgsql-vip` will be on
+* have `standby_mode = on`
+* have `recovery_target_timeline = 'latest'`
+* a `primary_conninfo` with an `application_name` set to the node name
+
+Last but not least, make sure each instance is not able to replicate with
+itself! A scenario exists where the primary IP address `pgsql-vip` will be on
 the same node than a standby for a very short lap of time!
 
-> **WARNING**: as `recovery.conf.pcmk` and `pg_hba.conf` files are different
-> on each node, it is best to keep them out of the `$PGDATA` so you do not have
+> **WARNING**: `primary_conninfo` and `pg_hba.conf` are different on each
+> node. It is best to keep them out of the `$PGDATA` so you do not have
 > to deal with them (or worst: forget to edit them) each time you rebuild a
 > standby! We advice you to deal with this using the `hba_file` parameter in
 > your `postgresql.conf` file and `recovery_template` parameter in PAF for the
@@ -118,9 +166,11 @@ the same node than a standby for a very short lap of time!
 {: .warning}
 
 Here are some quick steps to build your primary PostgreSQL instance and its
-standbys. On the primary:
+standbys. This quick start considers `srv1` is the preferred primary node.
 
-```
+On the primary:
+
+~~~bash
 service postgresql-9.6 initdb
 
 su - postgres
@@ -154,11 +204,11 @@ exit
 
 service postgresql-9.6 start
 ip addr add 192.168.122.50/24 dev eth0
-```
+~~~
 
-Now, on each standby, clone the primary. E.g.:
+Now, on other nodes, clone the primary as standby and configure it:
 
-```
+~~~bash
 su - postgres
 
 pg_basebackup -h pgsql-vip -D ~postgres/9.6/data/ -X stream -P
@@ -173,139 +223,163 @@ cp recovery.conf.pcmk recovery.conf
 exit
 
 service postgresql-9.6 start
-```
+~~~
+
+Check your three instances are replicating as expected (in processes, logs,
+`pg_stat_replication`, etc).
 
 Finally, make sure to stop the PostgreSQL services __everywhere__ and to
-disabling them, as Pacemaker will take care of starting/stopping everything for
-you:
+disable them, as Pacemaker will take care of starting/stopping everything for
+you during cluster normal cluster operations. Start with the primary:
 
-```
+~~~bash
 service postgresql-9.6 stop
 chkconfig postgresql-9.6 off
-```
+~~~
 
-And remove the master IP address from `srv1`:
+And remove the vIP from `srv1`:
 
-```
+~~~bash
 ip addr del 192.168.122.50/24 dev eth0
-```
+~~~
 
-
-## Cluster setup
-
-
-### Pacemaker
+## Cluster pre-requisites
 
 It is advised to keep Pacemaker off on server boot. It helps the administrator
 to investigate after a node fencing before Pacemaker starts and potentially
 enters in a death match with the other nodes. Make sure to disable Corosync as
 well to avoid unexpected behaviors. Run this on all nodes:
 
-```
+~~~bash
 chkconfig corosync off # important!
 chkconfig pacemaker off
-```
+~~~
 
+This guide uses the cluster management tool `pcsd` to ease the creation and
+setup of a cluster. It allows to create the cluster from command line, without
+editing configuration files or XML by hands.
 
-### Cluster creation
-
-This guide uses the cluster management tool `pcsd` provided by RHEL to ease the
-creation and setup of a cluster. It allows to create the cluster from command
-line, without editing configuration files or XML by hands.
-
-`pcsd` uses the hacluster system user to work and communicate with other
+`pcsd` uses the `hacluster` system user to work and communicate with other
 members of the cluster. We need to set a password to this user so it can
 authenticate to other nodes easily. As cluster management commands can be run on
 any member of the cluster, it is recommended to set the same password everywhere
 to avoid confusions:
 
-```
+~~~bash
 passwd hacluster
-```
+~~~
 
-Enable and start the `pcsd` daemon on all the nodes:
+Make sure the `pcsd` daemon is enabled and started on all nodes:
 
-```
+~~~bash
 chkconfig pcsd on
 service pcsd start
-```
+~~~
 
 Now, authenticate each node to the other ones using the following command:
 
-```
+~~~bash
 pcs cluster auth srv1 srv2 srv3 -u hacluster
-```
+~~~
 
-We can now create our cluster!
 
-```
+## Cluster creation
+
+The `pcs` cli tool is able to create and start the whole cluster for us. From
+one of the nodes, run the following command:
+
+~~~bash
 pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
-```
+~~~
 
-If you have an alternative network available (this is highly recommended), you
-can use the following syntax:
+> **NOTE**: Make sure you have a redundant network at system level. This is a
+> __**CRITICAL**__ part of your cluster. If you have second interfaces not in
+> bonding or teaming already (prefered method), you can add them to the cluster
+> setup using eg.:
+>
+> ~~~
+> pcs cluster setup --name cluster_pgsql srv1,srv1-alt srv2,srv2-alt srv3,srv3-alt
+> ~~~
+>
+> If your version of `pcs` does not support it (ie. CentOS 6.6 and bellow), you
+> can fallback on the old but useful `ccs` command:
+>
+> ~~~
+> pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
+> ccs -f /etc/cluster/cluster.conf --addalt srv1 srv1-alt
+> ccs -f /etc/cluster/cluster.conf --addalt srv2 srv2-alt
+> ccs -f /etc/cluster/cluster.conf --addalt srv3 srv3-alt
+> pcs cluster sync
+> ~~~
+{: .notice}
 
-```
-pcs cluster setup --name cluster_pgsql srv1,srv1-alt srv2,srv2-alt srv3,srv3-alt
-```
+This command creates the `/etc/corosync/corosync.conf` file and propagate
+it everywhere. For more information about it, read the `corosync.conf(5)`
+manual page.
 
-If your version of `pcs` does not support it (ie. CentOS 6.6 and bellow), you
-can fallback on the old but useful `ccs` command:
+> **WARNING**: whatever you edit in your `/etc/corosync/corosync.conf` file,
+> __**ALWAYS**__ make sure all the nodes in your cluster has the exact same
+> copy of the file. You can use `pcs cluster sync`.
+{: .warning}
 
-```
-pcs cluster setup --name cluster_pgsql srv1 srv2 srv3
-ccs -f /etc/cluster/cluster.conf --addalt srv1 srv1-alt
-ccs -f /etc/cluster/cluster.conf --addalt srv2 srv2-alt
-ccs -f /etc/cluster/cluster.conf --addalt srv3 srv3-alt
-pcs cluster sync
-```
+You can now start the whole cluster from one node:
 
-You can now start your cluster!
-
-```
+~~~bash
 pcs cluster start --all
-```
+~~~
 
-After some seconds of startup and cluster membership stuff, you should be able
+After some seconds of startup and cluster membership stuffs, you should be able
 to see your three nodes up in `crm_mon` (or `pcs status`):
 
-```
+~~~
 root@srv1:~# crm_mon -n1D
+
 Node srv1: online
 Node srv2: online
 Node srv3: online
-```
+~~~
 
-We can now feed this cluster with some resources to keep available. This guide
-use the cluster client `pcs` to setup everything.
+Now the cluster run, let's start with some basic setup of the cluster. Run
+the following command from **one** node only (the cluster takes care of
+broadcasting the configuration on all nodes):
+
+~~~bash
+pcs resource defaults migration-threshold=5
+pcs resource defaults resource-stickiness=10
+~~~
+
+This sets two default values for resources we create in the next chapter:
+
+* `resource-stickiness`: adds a sticky score for the resource on its current
+  node. It helps avoiding a resource move back and forth between nodes where it
+  has the same score.
+* `migration-threshold`: this controls how many time the cluster tries to
+  recover a resource on the same node before moving it on another one.
 
 
-## Cluster resource creation and management
+## Node fencing
 
-First of all, let's create an empty CIB file and fill it with some basic setup.
-We will push to the cluster once we are completely done with this chapter:
-
-```
-pcs cluster cib cluster1.xml
-pcs -f cluster1.xml resource defaults migration-threshold=5
-pcs -f cluster1.xml resource defaults resource-stickiness=10
-```
-
-In this quick start, we creates three different resources: `pgsql-ha`,
-`pgsql-master-ip` and `fence_vm_xxx`.
-
-The `pgsql-ha` resource controls all the PostgreSQL instances of your cluster
-and decides where is the primary and where are the standbys.
-
-The `pgsql-master-ip` resource controls the `pgsql-vip` IP address. It is
-started on the node hosting the PostgreSQL master resource.
-
-The last resources `fence_vm_xxx` are STONITH resources to manage fencing.
-This quick start uses the `fence_virsh` fencing agent, allowing to power on or
-off a virtual machine using the `virsh` command through a ssh connexion to the
-hypervisor. For more information about fencing, see documentation
-`docs/FENCING.md` in the source code or online:
+The most important resource in your cluster is the one able to fence a
+node. Please, stop reading this quick start and read our fencing
+documentation page before building your cluster. Take a deep breath, and read:
 [http://clusterlabs.github.com/PAF/fencing.html]({{ site.baseurl }}/fencing.html).
+
+> **WARNING**: I really mean it. You need fencing. PAF is expecting fencing to
+> work in your cluster. Without fencing, you will experience cluster refusing
+> to move anything, even with stonith disabled, or worst, a split brain if you
+> bend it hard enough to make it work anyway.
+> If you don't mind taking time rebuilding a database with corrupt and/or
+> incoherent data and constraints, that's fine though.
+{: .warning}
+
+> **NOTE**: if you can't have active fencing, look as storage base death or
+> watchdog methods. They are both described in the fencing documentation.
+{: .notice}
+
+In this tutorial, we choose to create one fencing resource per node to fence.
+They are called `fence_vm_xxx`and use the fencing agent `fence_virsh`, allowing
+to power on or off a virtual machine using the `virsh` command through a ssh
+connection to the hypervisor.
 
 > **WARNING**: unless you build your PoC cluster using libvirt for VM
 > management, there's great chances you will need to use a different STONITH
@@ -313,96 +387,126 @@ hypervisor. For more information about fencing, see documentation
 > adjust it.
 {: .warning}
 
-Now you've been warned, let's populating the cluster with some sample STONITH
-resources using virsh over ssh (`fence_virsh` fencing agent). First, we need
-to allow ssh password-less authentication to `<user>@192.168.122.1` so
-these fencing resource can work. Again, this is specific to this setup.
-Depending on your fencing topology, you might not need this step. Run on all
-node:
+Now you've been warned again and again, let's populating the cluster with some
+sample STONITH resources using virsh over ssh. First, we need to allow ssh
+password-less authentication to `<user>@192.168.122.1` so these fencing
+resource can work. Again, this is specific to this setup. Depending on your
+fencing topology, you might not need this step. Run on all node:
 
-```
+~~~bash
+ssh-keygen
 ssh-copy-id <user>@192.168.122.1
-```
+~~~
 
-We can now create one STONITH resource for each node and each fencing
+Check the ssh connections are working as expected.
+
+We can now create one STONITH resource for each node. Each fencing
 resource will not be allowed to run on the node it is supposed to fence.
-Note that in the `port` argument of the following commands, `srv[1-3]-c6` are 
-the names of the virutal machines as known by libvirtd side. See manpage 
+Note that in the `port` argument of the following commands, `srv[1-3]-c6` are
+the names of the virutal machines as known by libvirtd side. See manpage
 fence_virsh(8) for more infos.
 
-```
-pcs -f cluster1.xml stonith create fence_vm_srv1 fence_virsh                 \
-  pcmk_host_check="static-list" pcmk_host_list="srv1" ipaddr="192.168.122.1" \
-  login="<user>" port="srv1-c6" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv2 fence_virsh                 \
-  pcmk_host_check="static-list" pcmk_host_list="srv2" ipaddr="192.168.122.1" \
-  login="<user>" port="srv2-c6" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml stonith create fence_vm_srv3 fence_virsh                 \
-  pcmk_host_check="static-list" pcmk_host_list="srv3" ipaddr="192.168.122.1" \
-  login="<user>" port="srv3-c6" identity_file="/root/.ssh/id_rsa"
-pcs -f cluster1.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
-pcs -f cluster1.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
-pcs -f cluster1.xml constraint location fence_vm_srv3 avoids srv3=INFINITY
-```
+~~~bash
+pcs cluster cib fencing.xml
+pcs -f fencing.xml stonith create fence_vm_srv1 fence_virsh \
+  pcmk_host_check="static-list" pcmk_host_list="srv1"        \
+  ipaddr="192.168.122.1" login="<user>" port="srv1-c6"       \
+  identity_file="/root/.ssh/id_rsa"
+
+pcs -f fencing.xml stonith create fence_vm_srv2 fence_virsh \
+  pcmk_host_check="static-list" pcmk_host_list="srv2"        \
+  ipaddr="192.168.122.1" login="<user>" port="srv2-c6"       \
+  identity_file="/root/.ssh/id_rsa"
+
+pcs -f fencing.xml stonith create fence_vm_srv3 fence_virsh \
+  pcmk_host_check="static-list" pcmk_host_list="srv3"        \
+  ipaddr="192.168.122.1" login="<user>" port="srv3-c6"       \
+  identity_file="/root/.ssh/id_rsa"
+
+pcs -f fencing.xml constraint location fence_vm_srv1 avoids srv1=INFINITY
+pcs -f fencing.xml constraint location fence_vm_srv2 avoids srv2=INFINITY
+pcs -f fencing.xml constraint location fence_vm_srv3 avoids srv3=INFINITY
+pcs cluster cib-push scope=configuration fencing.xml
+~~~
+
+Using `crm_mon` You should see the three resources appearing in your cluster
+and being dispatched on nodes.
+
+
+## Cluster resources
+
+In this last chapter we create three resources: `pgsqld`, `pgsql-ha`,
+and `pgsql-pri-ip`.
+
+The `pgsqld` defines the properties of a PostgreSQL instance: where it is
+located, where are its binaries, its configuration files, how to montor it, and
+so on.
+
+The `pgsql-ha` resource controls all the PostgreSQL instances `pgsqld` in your
+cluster, decides where the primary is promoted and where the standbys
+are started.
+
+The `pgsql-pri-ip` resource controls the `pgsql-vip` IP address. It is
+started on the node hosting the PostgreSQL primary resource.
+
+Now the fencing is working, we can add all other resources and constraints all
+together in the same time. Create a new offline CIB:
+
+~~~bash
+pcs cluster cib cluster1.xml
+~~~
 
 We add the PostgreSQL `pgsqld` resource and the multistate `pgsql-ha`
-responsible to clone it everywhere and define the roles (master/slave) of each
-clone:
+responsible to clone it everywhere and define the roles (`Master`/`Slave`) of
+each clone:
 
-```
+~~~bash
 # pgsqld
 pcs -f cluster1.xml resource create pgsqld ocf:heartbeat:pgsqlms \
-    bindir=/usr/pgsql-9.6/bin pgdata=/var/lib/pgsql/9.6/data     \
+    bindir=/usr/pgsql-9.6/bin                                    \
+    pgdata=/var/lib/pgsql/9.6/data                               \
     op start timeout=60s                                         \
     op stop timeout=60s                                          \
-    op reload timeout=20s                                        \
     op promote timeout=30s                                       \
     op demote timeout=120s                                       \
     op monitor interval=15s timeout=10s role="Master"            \
     op monitor interval=16s timeout=10s role="Slave"             \
-    op notify timeout=60s                                        \
-    op meta-data timeout=5s                                      \
-    op validate-all timeout=5s                                   
+    op notify timeout=60s
 
 # pgsql-ha
-pcs -f cluster1.xml resource master pgsql-ha pgsqld \
-    master-max=1 master-node-max=1                  \
-    clone-max=3 clone-node-max=1 notify=true
-```
+pcs -f cluster1.xml resource master pgsql-ha pgsqld notify=true
+~~~
 
 Note that the values for `timeout` and `interval` on each operation are based
-on the minimum suggested value for PAF Resource Agent.
-These values should be adapted depending on the context.
+on the minimum suggested value for PAF Resource Agent. These values should be
+adapted depending on the context.
+
+The last line of this command declare the resource `pgsqld` as promotable. The
+`pgsql-ha` resource controls roles of `pgsqld` clones in the cluster.
 
 We add the IP address which should be started on the primary node:
 
-```
-pcs -f cluster1.xml resource create pgsql-master-ip ocf:heartbeat:IPaddr2 \
+~~~bash
+pcs -f cluster1.xml resource create pgsql-pri-ip ocf:heartbeat:IPaddr2 \
     ip=192.168.122.50 cidr_netmask=24 op monitor interval=10s
-```
+~~~
 
-We now define the collocation between `pgsql-ha` and `pgsql-master-ip`.
-Note that the start/stop and promote/demote order for these resource is
-asymetrical: we __must__ keep the master IP on the master during its demote
-process.
+We now define the collocation between `pgsql-ha` and `pgsql-pri-ip`. The
+start/stop and promote/demote order for these resources must be asymetrical: we
+__MUST__ keep the vIP on the primary during its demote process so the
+standbies receive everything during the primary shutdown.
 
-```
-pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsql-ha INFINITY
-pcs -f cluster1.xml constraint order promote pgsql-ha then start pgsql-master-ip symmetrical=false kind=Mandatory
-pcs -f cluster1.xml constraint order demote pgsql-ha then stop pgsql-master-ip symmetrical=false kind=Mandatory
-```
-
-And finally, we define a preference for our master node:
-
-```
-pcs -f cluster1.xml constraint location pgsql-ha prefers srv1=1
-```
+~~~bash
+pcs -f cluster1.xml constraint colocation add pgsql-pri-ip with master pgsql-ha INFINITY
+pcs -f cluster1.xml constraint order promote pgsql-ha then start pgsql-pri-ip symmetrical=false kind=Mandatory
+pcs -f cluster1.xml constraint order demote pgsql-ha then stop pgsql-pri-ip symmetrical=false kind=Mandatory
+~~~
 
 We can now push our CIB to the cluster, which will start all the magic stuff:
 
-```
-pcs cluster cib-push cluster1.xml
-```
+~~~bash
+pcs cluster cib-push scope=configuration cluster1.xml
+~~~
 
 ## Adding a node to the cluster
 
@@ -411,69 +515,69 @@ setup.
 
 On this new node, setup the pcsd deamon and its authentication:
 
-```
+~~~
 passwd hacluster
 chkconfig pcsd on
 service pcsd start
 pcs cluster auth srv1 srv2 srv3 srv4 -u hacluster
-```
+~~~
 
 On all other nodes, authenticate to the new node:
 
-```
+~~~
 pcs cluster auth srv4 -u hacluster
-```
+~~~
 
 We are now ready to add the new node. Put the cluster in maintenance mode so it
 does not move resources all over the place when the new node appears:
 
-```
+~~~
 pcs property set maintenance-mode=true
 pcs cluster node add srv4,srv4-alt
-```
+~~~
 
 Or, using the old commands if the syntax of `pcs` with alternate interface is
 not supported:
 
-```
+~~~
 pcs cluster node add srv4
 ccs -f /etc/cluster/cluster.conf --addalt srv4 srv4-alt
 pcs cluster sync
-```
+~~~
 
 And reload the corosync configuration on all the nodes if needed (it just fails
 if not needed):
 
-```
+~~~
 pcs cluster reload corosync
-```
+~~~
 
 We now need to allow one more clone in the cluster:
 
-```
+~~~
 pcs resource meta pgsql-ha clone-max=4
-```
+~~~
 
 Add the STONITH agent for the new node:
 
-```
+~~~
 pcs stonith create fence_vm_srv4 fence_virsh pcmk_host_check="static-list" pcmk_host_list="srv4" ipaddr="192.168.122.1" login="root" port="srv4-c6" action="off" identity_file="/root/.ssh/id_rsa"
 
 pcs constraint location fence_vm_srv4 avoids srv4=INFINITY
-```
+~~~
 
 And you can now exit your maintenance mode:
 
-```
+~~~
 pcs property set maintenance-mode=false
-```
+~~~
 
 ## Conclusion
 
 Now you know the basics to build a Pacemaker cluster hosting some PostgreSQL
-instance replicating with each others, you should probably check:
+instances replicating with each others, you should probably check:
 
 * [how to set up properly the PostgreSQL replication](https://www.postgresql.org/docs/current/static/high-availability.html)
-* this quick start show you how to implement network redundancy in Corosync,
-  but it best fits in the operating system layer. Documentation about how to
-  setup network bonding or teaming are popular on internet.
+* Documentation about how to setup network bonding or teaming are popular on
+  internet.  You can consult the Corosync documentation to support redundancy
+  from there, but it best fits in the operating system layer.
