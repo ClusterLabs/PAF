@@ -718,30 +718,34 @@ sub _controldata_to_ocf {
 # promotion score as Pacemaker considers any value greater than 1,000,000 as
 # INFINITY.
 #
-# This sub is supposed to be executed from a master monitor action.
+# This sub must be executed from a master monitor action.
 #
 sub _check_locations {
+    my $partition_nodes;
     my $node_score;
     my $row_num;
     my $row;
     my @rs;
 
-    # Call crm_node to exclude nodes that are not part of the cluster at this
-    # point.
-    my $partition_nodes = qx{ $CRM_NODE --partition };
+    # Set the master score if not already done
+    $node_score = _get_master_score();
+    _set_master_score( '1001' ) unless $node_score eq '1001';
+
+    # Ask crm_node what nodes are present in our current cluster partition
+    $partition_nodes = qx{ $CRM_NODE --partition };
 
     @rs = @{ _get_lag_scores() };
 
     $row_num = scalar @rs;
 
-    # If there is no row left at this point, it means that there is no
+    # If no lag are reported at this point, it means that there is no
     # secondary instance connected.
     ocf_log( 'warning', 'No secondary connected to the master' )
         if $row_num == 0;
 
     # For each standby connected, set their master score based on the following
     # rule: the first known node/application, with the highest priority and
-    # with an acceptable state.
+    # an acceptable state.
     while ( $row = shift @rs ) {
 
         if ( $partition_nodes !~ /$row->[0]/ ) {
@@ -796,6 +800,8 @@ sub _check_locations {
 
     # If there are still nodes in "partition_nodes", it means there is no
     # corresponding line in "pg_stat_replication".
+    # Exclude these nodes that are not part of the cluster at this
+    # point.
     foreach my $node (split /\s+/ => $partition_nodes) {
         # Exclude the current node.
         next if $node eq $nodename;
@@ -808,10 +814,6 @@ sub _check_locations {
         ocf_log( 'warning', '"%s" is not connected to the primary', $node );
         _set_master_score( '-1000', $node );
     }
-
-    # Finally set the master score if not already done
-    $node_score = _get_master_score();
-    _set_master_score( '1001' ) unless $node_score eq '1001';
 
     return $OCF_SUCCESS;
 }
