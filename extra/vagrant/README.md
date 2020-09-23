@@ -105,17 +105,26 @@ make all
 
 ## OS
 
-This Vagrant environment currently supports CentOS 7 and RHEL 8. Use `boxname` in your
-`vagrant.yml` file (see chapter "Customization") to set the OS you want, eg.: `centos/7`
-or `generic/rhel8`
+This Vagrant environment currently supports CentOS 7/8 and RHEL 7/8. Use
+`boxname` in your `vagrant.yml` file (see chapter "Customization") to set the
+OS you want, eg.: `centos/7`, `generic/rhel8`, ...
 
-In regard with RHEL 8, you must provide an active Redhat account with related
-subscriptions using `rhel_user` and `rhel_pass`. Set them in your `vagrant.yml` file
-(see chapter "Customization").
+you can find available boxes in: <https://app.vagrantup.com/boxes/search>
 
-Do not forget this Vagrant environment is building four VM. All will consume one
-subscription if you pick a Redhat box. You will have to remove them by hands (eg. from
-the Redhat website) as soon as you finish with your tests.
+Using RHEL requires the `vagrant-registration`. Install with:
+
+~~~bash
+vagrant plugin install vagrant-registration
+~~~
+
+You must provide an active Redhat account with related subscriptions using
+`rhel_user` and `rhel_pass`. Set them in your `vagrant.yml` file (see chapter
+"Customization").
+
+Do not forget this Vagrant environment is building multiple VM. All will
+consume one subscription if you pick a Redhat box. You might have to remove
+them by hands (eg. from the Redhat website) if for some reason the plugin did
+not.
 
 ## Cluster Test Suite
 
