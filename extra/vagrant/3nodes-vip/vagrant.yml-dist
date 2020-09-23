@@ -9,6 +9,6 @@
 #   - "srv2"
 #   - "srv3"
 # log_node: "log-sink"
-# vm_prefix: "paf_vm"
+# vm_prefix: "paf_3nvIP"
 # rhel_user: ""           # RHEL user account
 # rhel_pass: ""           # RHEL user account password

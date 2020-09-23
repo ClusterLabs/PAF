@@ -4,18 +4,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-PGVER="$1"
-HAPASS="$2"
-MASTER_IP="$3"
-SSH_LOGIN="$4"
-VM_PREFIX="$5"
-HOST_IP="$6"
-PGDATA="$7"
+declare PCMK_VER
+declare -a PGSQLD_RSC_OPTS
+declare -r PGVER="$1"
+declare -r HAPASS="$2"
+declare -r PRIM_IP="$3"
+declare -r SSH_LOGIN="$4"
+declare -r VM_PREFIX="$5"
+declare -r HOST_IP="$6"
+declare -r PGDATA="$7"
 shift 7
-NODES=( "$@" )
+declare -r -a NODES=( "$@" )
 
-CUSTOMDIR="${PGDATA}/conf.d"
+declare -r CUSTOMDIR="${PGDATA}/conf.d"
 
+# extract pacemaker major version
 PCMK_VER=$(yum info --quiet pacemaker|grep ^Version)
 PCMK_VER="${PCMK_VER#*: }" # extract x.y.z
 PCMK_VER="${PCMK_VER:0:1}" # extract x
@@ -66,6 +69,7 @@ done
 
 PGSQLD_RSC_OPTS=(
     "ocf:heartbeat:pgsqlms"
+
     "bindir=/usr/pgsql-${PGVER}/bin"
     "pgdata=${PGDATA}"
     "recovery_template=${CUSTOMDIR}/recovery.conf.pcmk"
@@ -93,13 +97,16 @@ if [ "$PCMK_VER" -eq 1 ]; then
     pcs -f cluster1.xml resource master pgsqld-clone pgsqld notify=true
 fi
 
-pcs -f cluster1.xml resource create pgsql-master-ip           \
-    "ocf:heartbeat:IPaddr2" "ip=${MASTER_IP}" cidr_netmask=24 \
+pcs -f cluster1.xml resource create pgsql-pri-ip            \
+    "ocf:heartbeat:IPaddr2" "ip=${PRIM_IP}" cidr_netmask=24 \
     op monitor interval=10s
 
-pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsqld-clone INFINITY
-pcs -f cluster1.xml constraint order promote pgsqld-clone "then" start pgsql-master-ip symmetrical=false
-pcs -f cluster1.xml constraint order demote pgsqld-clone "then" stop pgsql-master-ip symmetrical=false
+pcs -f cluster1.xml constraint colocation \
+    add pgsql-pri-ip with master pgsqld-clone INFINITY
+pcs -f cluster1.xml constraint order      \
+    promote pgsqld-clone "then" start pgsql-pri-ip symmetrical=false
+pcs -f cluster1.xml constraint order      \
+    demote pgsqld-clone  "then" stop  pgsql-pri-ip symmetrical=false
 
 pcs cluster cib-push scope=configuration cluster1.xml --wait
 
