@@ -18,5 +18,7 @@ debian/docs
 debian/rules
 debian/watch
 debian/source/format
+debian/patches/series
+debian/patches/10-default-host.patch
 t/pgsqlms
 t/README
