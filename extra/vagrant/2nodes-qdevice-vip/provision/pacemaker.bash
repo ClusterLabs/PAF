@@ -4,19 +4,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-PGVER="$1"
-HAPASS="$2"
-MASTER_IP="$3"
-SSH_LOGIN="$4"
-VM_PREFIX="$5"
-HOST_IP="$6"
-PGDATA="$7"
-QD_NODE="$8"
-shift 8
-NODES=( "$@" )
+declare PCMK_VER
+declare -a PGSQLD_RSC_OPTS
+declare -r PGVER="$1"
+declare -r HAPASS="$2"
+declare -r PRIM_IP="$3"
+declare -r PGDATA="$4"
+declare -r QD_NODE="$5"
 
-CUSTOMDIR="${PGDATA}/conf.d"
 
+shift 5
+declare -r -a NODES=( "$@" )
+
+declare -r CUSTOMDIR="${PGDATA}/conf.d"
+
+# extract pacemaker major version
 PCMK_VER=$(yum info --quiet pacemaker|grep ^Version)
 PCMK_VER="${PCMK_VER#*: }" # extract x.y.z
 PCMK_VER="${PCMK_VER:0:1}" # extract x
@@ -56,17 +58,6 @@ pcs -f cluster1.xml resource defaults migration-threshold=5
 pcs -f cluster1.xml resource defaults resource-stickiness=10
 pcs -f cluster1.xml property set stonith-watchdog-timeout=10s
 
-# for VM in "${NODES[@]}"; do
-#     FENCE_ID="fence_vm_${VM}"
-#     VM_PORT="${VM_PREFIX}_${VM}"
-#     pcs -f cluster1.xml stonith create "${FENCE_ID}" fence_virsh    \
-#         pcmk_host_check=static-list "pcmk_host_list=${VM}" \
-#         "port=${VM_PORT}" "ipaddr=${HOST_IP}" "login=${SSH_LOGIN}"  \
-#         "identity_file=/root/.ssh/id_rsa"
-#     pcs -f cluster1.xml constraint location "fence_vm_${VM}" \
-#         avoids "${VM}=INFINITY"
-# done
-
 PGSQLD_RSC_OPTS=(
     "ocf:heartbeat:pgsqlms"
     "bindir=/usr/pgsql-${PGVER}/bin"
@@ -96,13 +87,16 @@ if [ "$PCMK_VER" -eq 1 ]; then
     pcs -f cluster1.xml resource master pgsqld-clone pgsqld notify=true
 fi
 
-pcs -f cluster1.xml resource create pgsql-master-ip           \
-    "ocf:heartbeat:IPaddr2" "ip=${MASTER_IP}" cidr_netmask=24 \
+pcs -f cluster1.xml resource create pgsql-pri-ip         \
+    "ocf:heartbeat:IPaddr2" "ip=${PRIM_IP}" cidr_netmask=24 \
     op monitor interval=10s
 
-pcs -f cluster1.xml constraint colocation add pgsql-master-ip with master pgsqld-clone INFINITY
-pcs -f cluster1.xml constraint order promote pgsqld-clone "then" start pgsql-master-ip symmetrical=false
-pcs -f cluster1.xml constraint order demote pgsqld-clone "then" stop pgsql-master-ip symmetrical=false
+pcs -f cluster1.xml constraint colocation \
+    add pgsql-pri-ip with master pgsqld-clone INFINITY
+pcs -f cluster1.xml constraint order      \
+    promote pgsqld-clone "then" start pgsql-pri-ip symmetrical=false
+pcs -f cluster1.xml constraint order      \
+    demote pgsqld-clone  "then" stop  pgsql-pri-ip symmetrical=false
 
 pcs cluster cib-push scope=configuration cluster1.xml --wait
 
