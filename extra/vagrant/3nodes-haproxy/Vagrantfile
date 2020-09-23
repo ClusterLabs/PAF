@@ -5,17 +5,18 @@ require 'yaml'
 ENV["LANG"]   = "C"
 ENV["LC_ALL"] = "C"
 
-boxname   = 'centos/7'     # vagrant box to use
-pgver     = '11'     # pg version to use
-hapass    = 'hapass' # password for sys user hacluster
-ssh_login = 'root' # ssh login to connect to the host when fencing a VM.
-                     # put "./provision/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
-base_ip   = '10.20.30.5' # Base IP address to compute other ones
-pg_nodes  = 'srv1', 'srv2', 'srv3' # first will be primary
-log_node  = 'log-sink' # name of the node receiving logs
-vm_prefix = 'paf_vm'   # VM prefix in libvrit
-rhel_user = ''         # RHEL user account
-rhel_pass = ''         # RHEL user account password
+boxname   = 'centos/7'  # vagrant box to use
+pgver     = '12'        # pg version to use
+hapass    = 'hapass'    # password for sys user hacluster
+ssh_login = 'root'      # ssh login to connect to the host when fencing a VM.
+                        # put "./provision/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
+base_ip   = '10.20.30.50' # Base IP address to compute other ones
+vm_prefix = 'paf_3nHP' # VM prefix in libvrit
+rhel_user = ''          # RHEL user account
+rhel_pass = ''          # RHEL user account password
+pg_nodes  = 'srv1', 'srv2', 'srv3'  # first will be primary
+log_node  = 'log-sink'  # name of the node receiving logs
+
 
 if File.file?('vagrant.yml') and ( custom = YAML.load_file('vagrant.yml') )
     boxname   = custom['boxname']   if custom.has_key?('boxname')
@@ -33,7 +34,7 @@ end
 Vagrant.configure(2) do |config|
 
     ############################################################################
-    # computes variables
+    # computes IPs
 
     pgdata     = "/var/lib/pgsql/#{pgver}/data"
     next_ip    = IPAddr.new(base_ip).succ
@@ -47,6 +48,13 @@ Vagrant.configure(2) do |config|
 
     ############################################################################
     # general vagrant setup
+
+    # RHEL registration when needed
+    if Vagrant.has_plugin?('vagrant-registration')
+        config.registration.unregister_on_halt = false
+        config.registration.username = rhel_user
+        config.registration.password = rhel_pass
+    end
 
     # don't mind about insecure ssh key
     config.ssh.insert_key = false
@@ -63,91 +71,56 @@ Vagrant.configure(2) do |config|
         lv.qemu_use_session = false
     end
 
-    # disable default share
+    # sync the root of sources
     config.vm.synced_folder ".", "/vagrant", disabled: true
-
     config.vm.synced_folder "../../..", "/vagrant", type: "rsync",
         rsync__exclude: [ ".git/" ]
+
+    config.vm.define pg_nodes.first, primary: true
 
     ############################################################################
     # system setup for all nodes
 
-    config.vm.define pg_nodes.first, primary: true
+    config.vm.provision 'file', source: 'provision/id_rsa', destination: '/home/vagrant/.ssh/id_rsa'
+    config.vm.provision 'file', source: 'provision/id_rsa.pub', destination: '/home/vagrant/.ssh/id_rsa.pub'
 
     (pg_nodes + [log_node]).each do |node|
         config.vm.define node do |conf|
             conf.vm.network 'private_network', ip: nodes_ips[node]
-            conf.vm.provision 'system-setup', type: 'shell',
+            conf.vm.provision 'system', type: 'shell',
                 path: 'provision/system.bash',
-                args: [ node, rhel_user, rhel_pass ] + nodes_ips.keys.map {|n| "#{n}=#{nodes_ips[n]}"},
-                preserve_order: true
-        end
-    end
-
-
-    ############################################################################
-    # setup rsyslog to collect logs
-    (pg_nodes + [log_node]).each do |node|
-        config.vm.define node do |conf|
-            conf.vm.provision 'rsyslog-setup', type: 'shell',
-                path: 'provision/rsyslog.bash',
-                args: [ log_node ],
+                args: [ node, pgver, hapass, log_node ] +
+                      nodes_ips.keys.map {|n| "#{n}=#{nodes_ips[n]}"},
                 preserve_order: true
         end
     end
 
     ############################################################################
-    # setup haproxy
+    # build pgsql instances
     pg_nodes.each do |node|
         config.vm.define node do |conf|
-            conf.vm.provision 'haproxy-setup', type: 'shell',
-                path: 'provision/haproxy.bash',
+            conf.vm.provision 'pgsql', type: 'shell',
+                path: 'provision/pgsql.bash',
+                args: [ node, pgver, pgdata, pg_nodes.first ],
                 preserve_order: true
         end
     end
 
     ############################################################################
-    # postgresql installation and setup
-    pg_nodes.each do |node|
-        config.vm.define node do |conf|
-            conf.vm.provision 'postgresql', type: 'shell',
-                path: 'provision/postgresql.bash',
-                args: [ pgver, pg_nodes.first, pgdata ],
-                preserve_order: true
-        end
-    end
-
-    # replicas setup. Use "vagrant up --provision-with=pgsql-replicas"
-    pg_nodes[1..-1].each do |node|
-        config.vm.define node do |conf|
-            conf.vm.provision 'pgsql-replicas', type: 'shell',
-                path: 'provision/pgsql-replicas.bash',
-                args: [ pgver, node, pgdata ],
-                run: 'never'
-        end
-    end
-
-    ############################################################################
-    # cluster setup. Use "vagrant up --provision-with=pacemaker"
+    # cluster setup
     pg_nodes.each do |node|
         config.vm.define node do |conf|
             conf.vm.provision 'pacemaker', type: 'shell',
                 path: 'provision/pacemaker.bash',
-                args: [ hapass ],
-                run: 'never'
+                args: [ pgver, hapass, ssh_login,
+                        vm_prefix, host_ip, pgdata ] + pg_nodes,
+                preserve_order: true
         end
     end
 
-    # create the cluster. Use "vagrant up --provision-with=cluster-setup"
-    pg_nodes.each do |node|
-        config.vm.define node do |conf|
-            conf.vm.provision 'cluster-setup', type: 'shell',
-                path: 'provision/cluster.bash',
-                args: [ pgver, ssh_login, vm_prefix, host_ip, pgdata, hapass ] + pg_nodes,
-                run: 'never'
-        end
-    end
-
-    # cluster test suite setup. Use "vagrant up --provision-with=cts"
-    config.vm.provision 'cts', type: 'shell', path: 'provision/cts.bash', run: 'never'
+    ############################################################################
+    # cluster test suite setup. Use "vagrant provision --provision-with=cts"
+    config.vm.provision 'cts', type: 'shell',
+        path: 'provision/cts.bash',
+        run: 'never'
 end

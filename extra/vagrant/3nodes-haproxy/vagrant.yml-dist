@@ -4,11 +4,11 @@
 # ssh_login: "user"       # ssh login to connect to the host when fencing a VM.
 #                         # put "./provision/id_rsa.pub" in your "~<ssh_login>/.ssh/authorized_keys"
 # base_ip: "10.20.30.5"   # Base IP address to compute other ones
-# pg_nodes:                  # servers to create.
-#   - "srv1"              # First one will be master
+# pg_nodes:               # servers to create.
+#   - "srv1"              # First one will be primary
 #   - "srv2"
 #   - "srv3"
 # log_node: "log-sink"
-# vm_prefix: "paf_vm"
+# vm_prefix: "paf_3nHP"
 # rhel_user: ""           # RHEL user account
 # rhel_pass: ""           # RHEL user account password

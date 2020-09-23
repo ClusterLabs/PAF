@@ -4,43 +4,99 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-HAPASS="$1"
+declare PCMK_VER
+declare -a PGSQLD_RSC_OPTS
+declare -r PGVER="$1"
+declare -r HAPASS="$2"
 
-# shellcheck disable=SC1091
-source "/etc/os-release"
-OS_ID="$ID"
-YUM_INSTALL="yum install --nogpgcheck --quiet -y -e 0"
+declare -r SSH_LOGIN="$3"
+declare -r VM_PREFIX="$4"
+declare -r HOST_IP="$5"
+declare -r PGDATA="$6"
+shift 6
+declare -r -a NODES=( "$@" )
 
-# install required packages
-if [ "$OS_ID" = "rhel" ]; then
-    # use yum instead of dnf for compatibility between EL 7 and 8
-    yum-config-manager --enable "*highavailability-rpms"
+declare -r CUSTOMDIR="${PGDATA}/conf.d"
+
+# extract pacemaker major version
+PCMK_VER=$(yum info --quiet pacemaker|grep ^Version)
+PCMK_VER="${PCMK_VER#*: }" # extract x.y.z
+PCMK_VER="${PCMK_VER:0:1}" # extract x
+
+if [ "$PCMK_VER" -ge 2 ]; then
+    # if pacemaker version is 2.x, we suppose pcs support it (pcs >= 0.10)
+    # from pcs 0.10, pcs host auth must be exec'ed on each node
+    pcs host auth -u hacluster -p "${HAPASS}" "${NODES[@]}"
+else
+    # this could be run on one node, but it doesn't hurt if it runs everywhere,
+    # so we keep this piece of code with the one dedicated to pacemaker 2.x
+    pcs cluster auth -u hacluster -p "${HAPASS}" "${NODES[@]}"
 fi
 
-PACKAGES=(
-    pacemaker pcs resource-agents fence-agents-virsh sbd perl-Module-Build
+if [ "$(hostname -s)" != "${NODES[0]}" ]; then
+    exit 0
+fi
+
+# WARNING:
+# Starting from here, everything is executed on first node only!
+
+if [ "$PCMK_VER" -ge 2 ]; then
+    pcs cluster setup cluster_pgsql --force "${NODES[@]}"
+else
+    pcs cluster setup --name cluster_pgsql --wait --force "${NODES[@]}"
+fi
+
+pcs stonith sbd enable
+
+pcs cluster start --all --wait
+
+pcs cluster cib cluster1.xml
+
+pcs -f cluster1.xml resource defaults migration-threshold=5
+pcs -f cluster1.xml resource defaults resource-stickiness=10
+pcs -f cluster1.xml property set stonith-watchdog-timeout=10s
+
+for VM in "${NODES[@]}"; do
+    FENCE_ID="fence_vm_${VM}"
+    VM_PORT="${VM_PREFIX}_${VM}"
+    pcs -f cluster1.xml stonith create "${FENCE_ID}" fence_virsh    \
+        pcmk_host_check=static-list "pcmk_host_list=${VM}" \
+        "port=${VM_PORT}" "ipaddr=${HOST_IP}" "login=${SSH_LOGIN}"  \
+        "identity_file=/root/.ssh/id_rsa"
+    pcs -f cluster1.xml constraint location "fence_vm_${VM}" \
+        avoids "${VM}=INFINITY"
+done
+
+PGSQLD_RSC_OPTS=(
+    "ocf:heartbeat:pgsqlms"
+    "pgport=5434"
+    "bindir=/usr/pgsql-${PGVER}/bin"
+    "pgdata=${PGDATA}"
+    "recovery_template=${CUSTOMDIR}/recovery.conf.pcmk"
+    "op" "start"   "timeout=60s"
+    "op" "stop"    "timeout=60s"
+    "op" "promote" "timeout=30s"
+    "op" "demote"  "timeout=120s"
+    "op" "monitor" "interval=15s" "timeout=10s" "role=Master"
+    "op" "monitor" "interval=16s" "timeout=10s" "role=Slave"
+    "op" "notify"  "timeout=60s"
 )
 
-$YUM_INSTALL "${PACKAGES[@]}"
+# NB: pcs 0.10.2 doesn't support to set the id of the clone XML node
+# the id is built from the rsc id to clone using "<rsc-id>-clone"
+# As a matter of cohesion and code simplicity, we use the same
+# convention to create the master resource with pcs 0.9.x for
+# Pacemaker 1.1
+if [ "$PCMK_VER" -ge 2 ]; then
+    PGSQLD_RSC_OPTS+=( "promotable" "notify=true" )
+fi
 
-# install PAF
-cd /vagrant
-[ -f Build ] && perl Build distclean
-sudo -u vagrant perl Build.PL --quiet >/dev/null 2>&1
-sudo -u vagrant perl Build --quiet
-perl Build --quiet install
+pcs -f cluster1.xml resource create pgsqld "${PGSQLD_RSC_OPTS[@]}"
 
-# firewall setup
-firewall-cmd --quiet --permanent --add-service=high-availability
-firewall-cmd --quiet --reload
+if [ "$PCMK_VER" -eq 1 ]; then
+    pcs -f cluster1.xml resource master pgsqld-clone pgsqld notify=true
+fi
 
-# pcsd setup
-systemctl --quiet --now enable pcsd
-echo "${HAPASS}"|passwd --stdin hacluster > /dev/null 2>&1
+pcs cluster cib-push scope=configuration cluster1.xml --wait
 
-# Pacemaker setup
-cp /etc/sysconfig/pacemaker /etc/sysconfig/pacemaker.dist
-cat<<'EOF' > /etc/sysconfig/pacemaker
-PCMK_debug=yes
-PCMK_logpriority=debug
-EOF
+crm_mon -Dn1

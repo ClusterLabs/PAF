@@ -1,28 +1,18 @@
 export VAGRANT_BOX_UPDATE_CHECK_DISABLE=1
 export VAGRANT_CHECKPOINT_DISABLE=1
 
-.PHONY: all create_vm postgresql pgsql_replicas pacemaker prov clean check validate cts pcmk-stop
+.PHONY: all up pgsql pacemaker cts clean check validate pcmk-stop
 
+all: up
 
-all: create_vm postgresql pgsql_replicas pacemaker cluster
-
-create_vm:
+up:
 	vagrant up
 
-postgresql: pcmk-stop
-	vagrant up --provision-with=postgresql
-
-pgsql_replicas: pcmk-stop
-	vagrant up --provision-with=pgsql-replicas
+pgsql: pcmk-stop
+	vagrant provision --provision-with=pgsql
 
 pacemaker:
-	vagrant up --provision-with=pacemaker
-
-cluster:
-	vagrant up --provision-with=cluster-setup
-
-prov:
-	vagrant up --provision
+	vagrant provision --provision-with=pacemaker
 
 clean:
 	vagrant destroy -f
@@ -37,7 +27,7 @@ validate:
 	fi
 
 cts:
-	vagrant up --provision-with=cts
+	vagrant provision --provision-with=cts
 
 pcmk-stop:
 	vagrant ssh -c 'if [ -f "/etc/corosync/corosync.conf" ]; then sudo pcs cluster stop --all --wait; fi'
