@@ -22,3 +22,5 @@ nytprof.out
 _site
 .vagrant/
 vagrant.yml
+/lib/OCF_Directories.pm
+/ocf_heartbeat_pgsqlms.7
