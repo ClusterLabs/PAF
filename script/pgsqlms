@@ -2096,7 +2096,6 @@ sub pgsql_notify_post_promote {
 # This is called before a demote occurs.
 sub pgsql_notify_pre_demote {
     my $rc;
-    my %cdata;
 
     # do nothing if the local node will not be demoted
     return $OCF_SUCCESS unless scalar
@@ -2128,11 +2127,18 @@ sub pgsql_notify_pre_demote {
     # Either the instance managed to start or it couldn't.
     # We rely on the pg_ctl '-w' switch to take care of this. If it couldn't
     # start, this error will be catched up later during the various checks
-    _pg_ctl_start();
+    if( _pg_ctl_start() == 0 ) {
+        my %cdata = _get_controldata();
 
-    %cdata = _get_controldata();
+        ocf_log( 'info', 'Recovery of %s succeed', $OCF_RESOURCE_INSTANCE );
+        ocf_log( 'info', 'State is "%s" after recovery attempt',
+            $cdata{'state'} );
+    }
+    else {
+        ocf_log( 'err', 'Could not recover failing primary %s',
+            $OCF_RESOURCE_INSTANCE );
+    }
 
-    ocf_log( 'info', 'State is "%s" after recovery attempt', $cdata{'state'} );
 
     # whatever the result, it is ignored by pacemaker.
     return $OCF_SUCCESS;
