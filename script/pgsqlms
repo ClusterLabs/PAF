@@ -1347,7 +1347,7 @@ sub pgsql_validate_all {
         }
 
         $guc = qx{ $POSTGRES -C primary_conninfo -D "$pgdata" $start_opts};
-        unless ($guc =~ /\bapplication_name=$nodename\b/) {
+        unless ($guc =~ /\bapplication_name='?$nodename'?\b/) {
             ocf_exit_reason(
                 q{Parameter "primary_conninfo" MUST contain 'application_name=%s'. }.
                 q{It is currently set to '%s'}, $nodename, $guc );
