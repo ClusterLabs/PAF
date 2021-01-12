@@ -83,14 +83,14 @@ if [ "$NODENAME" == "$PRIM_NODE" ]; then
 
     chown -R postgres:postgres "$PGDATA"
 
-    # create master ip
+    # create primary ip
     ip -o addr show to "${PRIM_IP}" | if ! grep -q "${PRIM_IP}"
     then
         DEV=$(ip route show to "${PRIM_IP}/24"|grep -Eo 'dev \w+')
         ip addr add "${PRIM_IP}/24" dev "${DEV/dev }"
     fi
 
-    # restart master pgsql
+    # restart primary pgsql
     systemctl --quiet start "postgresql-${PGVER}"
 
     exit
