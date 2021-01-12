@@ -207,7 +207,7 @@ sub _get_last_received_lsn {
     return undef;
 }
 
-# Get the master score for each connected standby
+# Get the primary score for each connected standby
 # Returns directly the result set of the query or exit with an error.
 # Exits with OCF_ERR_GENERIC if the query failed
 sub _get_lag_scores {
@@ -349,7 +349,7 @@ sub _delete_priv_attr {
     return;
 }
 
-# Get, parse and return the resource master score on given node.
+# Get, parse and return the resource primary score on given node.
 # Returns an empty string if not found.
 # Returns undef on crm_master call on error
 sub _get_master_score {
@@ -417,7 +417,7 @@ sub _is_master_recover {
     );
 }
 
-# Check if the current transition is a recover of a slave clone on given node.
+# Check if the current transition is a recover of a secondary clone on given node.
 sub _is_slave_recover {
     my ( $n ) = @_;
 
@@ -706,19 +706,19 @@ sub _controldata_to_ocf {
     return $OCF_ERR_INSTALLED ;
 }
 
-# Check the write_location of all secondaries, and adapt their master score so
-# that the instance closest to the master will be the selected candidate should
+# Check the write_location of all secondaries, and adapt their primary score so
+# that the instance closest to the primary will be the selected candidate should
 # a promotion be triggered.
 # NOTE: This is only a hint to pacemaker! The selected candidate to promotion
 # actually re-check it is the best candidate and force a re-election by failing
 # if a better one exists. This avoid a race condition between the call of the
-# monitor action and the promotion where another slave might have catchup faster
-# with the master.
+# monitor action and the promotion where another secondary might have catchup faster
+# with the primary.
 # NOTE: we cannot directly use the write_location, neither a lsn_diff value as
 # promotion score as Pacemaker considers any value greater than 1,000,000 as
 # INFINITY.
 #
-# This sub must be executed from a master monitor action.
+# This sub must be executed from a primary monitor action.
 #
 sub _check_locations {
     my $partition_nodes;
@@ -743,7 +743,7 @@ sub _check_locations {
     ocf_log( 'warning', 'No secondary connected to the master' )
         if $row_num == 0;
 
-    # For each standby connected, set their master score based on the following
+    # For each standby connected, set their primary score based on the following
     # rule: the first known node/application, with the highest priority and
     # an acceptable state.
     while ( $row = shift @rs ) {
@@ -820,9 +820,9 @@ sub _check_locations {
 
 # _check_switchover
 # check if the pgsql switchover to the localnode is safe.
-# This is supposed to be called **after** the master has been stopped or demoted.
+# This is supposed to be called **after** the primary has been stopped or demoted.
 # This sub checks if the local standby received the shutdown checkpoint from the
-# old master to make sure it can take over the master role and the old master
+# old primary to make sure it can take over the primary role and the old primary
 # will be able to catchup as a standby after.
 #
 # Returns 0 if switchover is safe
@@ -843,20 +843,20 @@ sub _check_switchover {
         .' Need to check the last record in WAL',
         $OCF_NOTIFY_ENV{'demote'}[0]{'uname'}, $nodename );
 
-    # check if we received the shutdown checkpoint of the master during its
+    # check if we received the shutdown checkpoint of the primary during its
     # demote process.
     # We need the last local checkpoint LSN and the last received LSN from
-    # master to check in the WAL between these adresses if we have a
+    # primary to check in the WAL between these adresses if we have a
     # "checkpoint shutdown" using pg_xlogdump/pg_waldump.
     #
     # Force a checkpoint to make sure the controldata shows the very last TL
-    # and the master's shutdown checkpoint
+    # and the primaries shutdown checkpoint
     _query( q{ CHECKPOINT }, {} );
     %cdata     = _get_controldata();
     $tl        = $cdata{'tl'};
     $last_redo = $cdata{'redo'};
 
-    # Get the last received LSN from master
+    # Get the last received LSN from primary
     $last_lsn = _get_last_received_lsn();
 
     unless ( defined $last_lsn ) {
@@ -877,12 +877,12 @@ sub _check_switchover {
     if ( $rc == 0 and
          $ans =~ m{^rmgr: XLOG.*desc: (?i:checkpoint)(?::|_SHUTDOWN) redo [0-9A-F/]+; tli $tl;.*; shutdown$}m
     ) {
-        ocf_log( 'info', 'Slave received the shutdown checkpoint' );
+        ocf_log( 'info', 'Secondary received the shutdown checkpoint' );
         return 0;
     }
 
     ocf_exit_reason(
-        'Did not receive the shutdown checkpoint from the old master!' );
+        'Did not receive the shutdown checkpoint from the old primary!' );
 
     return 1;
 }
@@ -909,7 +909,7 @@ sub _confirm_role {
         elsif ( $is_in_recovery eq 'f' ) {
             # The instance is a primary.
             ocf_log( 'debug', "_confirm_role: instance $OCF_RESOURCE_INSTANCE is a primary");
-            # Check lsn diff with current slaves if any
+            # Check lsn diff with current secondaries if any
             _check_locations() if $__OCF_ACTION eq 'monitor';
             return $OCF_RUNNING_MASTER;
         }
@@ -947,7 +947,7 @@ sub _confirm_stopped {
     my $pgctlstatus_rc;
     my $controldata_rc;
 
-    # Check the postmaster process status.
+    # Check the postprimary process status.
     $pgctlstatus_rc = _pg_ctl_status();
 
     if ( $pgctlstatus_rc == 0 ) {
@@ -1061,9 +1061,9 @@ parameter is set or a template file is found.
 
 =item B<maxlag>
 
-Maximum lag allowed on a standby before we set a negative master score on it.
+Maximum lag allowed on a standby before we set a negative primary score on it.
 The calculation is based on the difference between the current xlog location on
-the master and the write location on the standby.
+the primary and the write location on the standby.
 
 (optional, integer, default "0" disables this feature)
 
@@ -1155,8 +1155,8 @@ sub ocf_meta_data {
 
            <parameter name="maxlag" unique="0" required="0">
               <longdesc lang="en">
-                Maximum lag allowed on a standby before we set a negative master score on it. The calculation
-                is based on the difference between the current LSN on the master and the LSN
+                Maximum lag allowed on a standby before we set a negative primary score on it. The calculation
+                is based on the difference between the current LSN on the primary and the LSN
                 written on the standby.
                 This parameter must be a valid positive number as described in PostgreSQL documentation.
                 See: https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS-NUMERIC
@@ -1168,7 +1168,7 @@ sub ocf_meta_data {
             <parameter name="recovery_template" unique="1" required="0">
               <longdesc lang="en">
                 Path to the recovery.conf template. This file is simply copied to \$PGDATA
-                before starting the instance as slave.
+                before starting the instance as secondary.
                 ONLY for PostgreSQL 11 and bellow. This parameter is IGNORED for
                 PostgreSQL 12 and higher. The cluster will refuse to start if a template
                 file is found.
@@ -1229,11 +1229,11 @@ Suggested minimum timeout: 20.
 
 =item B<promote>
 
-Promotes the resource to the Master role. Suggested minimum timeout: 30.
+Promotes the resource to the primary role. Suggested minimum timeout: 30.
 
 =item B<demote>
 
-Demotes the resource to the Slave role. Suggested minimum timeout: 120.
+Demotes the resource to the secondary role. Suggested minimum timeout: 120.
 
 =item B<monitor (Master role)>
 
@@ -1308,7 +1308,7 @@ sub pgsql_validate_all {
     chomp $ans;
     unless ( lc($ans) =~ /^true$|^on$|^yes$|^y$|^1$/ ) {
         ocf_exit_reason(
-            'You must set meta parameter notify=true for your master resource'
+            'You must set meta parameter notify=true for your primary resource'
         );
         return $OCF_ERR_INSTALLED;
     }
@@ -1478,16 +1478,16 @@ sub pgsql_start {
         if ( $rc == $OCF_SUCCESS ) {
             ocf_log( 'info', 'Instance "%s" started', $OCF_RESOURCE_INSTANCE );
 
-            # Check if a master score exists in the cluster.
-            # During the very first start of the cluster, no master score will
-            # exists on any of the existing slaves, unless an admin designated
-            # one of them using crm_master. If no master exists the cluster will
-            # not promote a master among the slaves.
-            # To solve this situation, we check if there is at least one master
+            # Check if a primary score exists in the cluster.
+            # During the very first start of the cluster, no primary score will
+            # exists on any of the existing secondaries, unless an admin designated
+            # one of them using crm_primary. If no primary exists the cluster will
+            # not promote a primary among the secondaries.
+            # To solve this situation, we check if there is at least one primary
             # score existing on one node in the cluster. Do nothing if at least
-            # one master score is found among the clones of the resource. If no
-            # master score exists, set a score of 1 only if the resource was a
-            # shut downed master before the start.
+            # one primary score is found among the clones of the resource. If no
+            # primary score exists, set a score of 1 only if the resource was a
+            # shut downed primary before the start.
             if ( $prev_state eq "shut down" and not _master_score_exists() ) {
                 ocf_log( 'info', 'No master score around. Set mine to 1' );
 
@@ -1498,7 +1498,7 @@ sub pgsql_start {
         }
 
         ocf_exit_reason(
-            'Instance "%s" is not running as a slave (returned %d)',
+            'Instance "%s" is not running as a secondary (returned %d)',
              $OCF_RESOURCE_INSTANCE, $rc );
 
         return $OCF_ERR_GENERIC;
@@ -1719,9 +1719,9 @@ sub pgsql_demote {
         return $OCF_ERR_GENERIC;
     }
 
-    # TODO we need to make sure at least one slave is connected!!
+    # TODO we need to make sure at least one secondary is connected!!
 
-    # WARNING if the resource state is stopped instead of master, the ocf ra dev
+    # WARNING if the resource state is stopped instead of primary, the ocf ra dev
     # rsc advises to return OCF_ERR_GENERIC, misleading the CRM in a loop where
     # it computes transitions of demote(failing)->stop->start->promote actions
     # until failcount == migration-threshold.
@@ -1792,12 +1792,12 @@ sub pgsql_promote {
     $rc = pgsql_monitor();
 
     if ( $rc == $OCF_SUCCESS ) {
-        # Running as slave. Normal, expected behavior.
+        # Running as secondary. Normal, expected behavior.
         ocf_log( 'debug', 'pgsql_promote: "%s" currently running as a standby',
             $OCF_RESOURCE_INSTANCE );
     }
     elsif ( $rc == $OCF_RUNNING_MASTER ) {
-        # Already a master. Unexpected, but not a problem.
+        # Already a primary. Unexpected, but not a problem.
         ocf_log( 'info', '"%s" already running as a primary',
             $OCF_RESOURCE_INSTANCE );
         return $OCF_SUCCESS;
@@ -1837,24 +1837,24 @@ sub pgsql_promote {
                               # internal error during _check_switchover
     }
 
-    # Do not check for a better candidate if we try to recover the master
-    # Recover of a master is detected during the pre-promote action. It sets the
-    # private attribute 'recover_master' to '1' if this is a master recover.
+    # Do not check for a better candidate if we try to recover the primary
+    # Recover of a primary is detected during the pre-promote action. It sets the
+    # private attribute 'recover_master' to '1' if this is a primary recover.
     if ( _get_priv_attr( 'recover_master' ) eq '1' ) {
         ocf_log( 'info', 'Recovering old master, no election needed');
     }
     else {
 
         # The promotion is occurring on the best known candidate (highest
-        # master score), as chosen by pacemaker during the last working monitor
-        # on previous master (see pgsql_monitor/_check_locations subs).
+        # primary score), as chosen by pacemaker during the last working monitor
+        # on previous primary (see pgsql_monitor/_check_locations subs).
         # To avoid any race condition between the last monitor action on the
-        # previous master and the **real** most up-to-date standby, we
+        # previous primary and the **real** most up-to-date standby, we
         # set each standby location during the "pre-promote" action, and stored
         # them using the "lsn_location" resource attribute.
         #
         # The best standby to promote would have the highest known LSN. If the
-        # current resource is not the best one, we need to modify the master
+        # current resource is not the best one, we need to modify the primary
         # scores accordingly, and abort the current promotion.
         ocf_log( 'debug',
             'pgsql_promote: checking if current node is the best candidate for promotion' );
@@ -1931,17 +1931,17 @@ sub pgsql_promote {
             }
         }
 
-        # If any node has been selected, we adapt the master scores accordingly
+        # If any node has been selected, we adapt the primary scores accordingly
         # and break the current promotion.
         if ( $node_to_promote ne '' ) {
             ocf_exit_reason(
                 '%s is the best candidate to promote, aborting current promotion',
                 $node_to_promote );
 
-            # Reset current node master score.
+            # Reset current node primary score.
             _set_master_score( '1' );
 
-            # Set promotion candidate master score.
+            # Set promotion candidate primary score.
             _set_master_score( '1000', $node_to_promote );
 
             # We fail the promotion to trigger another promotion transition
@@ -1972,8 +1972,8 @@ sub pgsql_promote {
     return $OCF_SUCCESS;
 }
 
-# This action is called **before** the actual promotion when a failing master is
-# considered unreclaimable, recoverable or a new master must be promoted
+# This action is called **before** the actual promotion when a failing primary
+# is considered unreclaimable, recoverable or a new primary must be promoted
 # (switchover or first start).
 # As every "notify" action, it is executed almost simultaneously on all
 # available nodes.
@@ -1988,9 +1988,9 @@ sub pgsql_notify_pre_promote {
     ocf_log( 'info', 'Promoting instance on node "%s"',
         $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} );
 
-    # No need to do an election between slaves if this is recovery of the master
+    # No need to do an election between secondarys if this is recovery of the primary
     if ( _is_master_recover( $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} ) ) {
-        ocf_log( 'warning', 'This is a master recovery!' );
+        ocf_log( 'warning', 'This is a primary recovery!' );
 
         _set_priv_attr( 'recover_master', '1' )
             if $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} eq $nodename;
@@ -2000,12 +2000,12 @@ sub pgsql_notify_pre_promote {
 
     # Environment cleanup!
     _delete_priv_attr( 'lsn_location'      );
-    _delete_priv_attr( 'recover_master'    );
+    _delete_priv_attr( 'recover_primary'    );
     _delete_priv_attr( 'nodes'             );
     _delete_priv_attr( 'cancel_switchover' );
 
-    # check for the last received entry of WAL from the master if we are
-    # the designated slave to promote
+    # check for the last received entry of WAL from the primary if we are
+    # the designated secondary to promote
     if ( _is_switchover( $nodename ) and scalar
          grep { $_->{'uname'} eq $nodename } @{ $OCF_NOTIFY_ENV{'promote'} }
     ) {
@@ -2021,7 +2021,7 @@ sub pgsql_notify_pre_promote {
         # If the sub keeps going, that means the switchover is safe.
         # Keep going with the election process in case the switchover was
         # instruct to the wrong node.
-        # FIXME: should we allow a switchover to a lagging slave?
+        # FIXME: should we allow a switchover to a lagging secondary?
     }
 
     # We need to trigger an election between existing slaves to promote the best
@@ -2031,7 +2031,7 @@ sub pgsql_notify_pre_promote {
     # During the following promote action, The designated standby for
     # promotion use these attributes to check if the instance to be promoted
     # is the best one, so we can avoid a race condition between the last
-    # successful monitor on the previous master and the current promotion.
+    # successful monitor on the previous primary and the current promotion.
 
     # As we can not break the transition from a notification action, we check
     # during the promotion if each node TL and LSN are valid.
@@ -2058,12 +2058,12 @@ sub pgsql_notify_pre_promote {
     ocf_log( 'warning', 'Could not set the current node LSN' )
         if $? != 0 ;
 
-    # If this node is the future master, keep track of the slaves that
+    # If this node is the future primary, keep track of the secondaries that
     # received the same notification to compare our LSN with them during
     # promotion
     if ( $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} eq $nodename ) {
         # Build the list of active nodes:
-        #   master + slave + start - stop
+        #   primary + secondary + start - stop
         # FIXME: Deal with rsc started during the same transaction but **after**
         #        the promotion ?
         $active_nodes{ $_->{'uname'} }++ foreach @{ $OCF_NOTIFY_ENV{'active'} },
@@ -2082,7 +2082,7 @@ sub pgsql_notify_pre_promote {
 # This action is called after a promote action.
 sub pgsql_notify_post_promote {
 
-    # We have a new master (or the previous one recovered).
+    # We have a new primary (or the previous one recovered).
     # Environment cleanup!
     _delete_priv_attr( 'lsn_location'      );
     _delete_priv_attr( 'recover_master'    );
@@ -2103,12 +2103,12 @@ sub pgsql_notify_pre_demote {
 
     $rc = pgsql_monitor();
 
-    # do nothing if this is not a master recovery
+    # do nothing if this is not a primary recovery
     return $OCF_SUCCESS unless _is_master_recover( $nodename )
                            and $rc == $OCF_FAILED_MASTER;
 
-    # in case of master crash, we need to detect if the CRM tries to recover
-    # the master clone. The usual transition is to do:
+    # in case of primary crash, we need to detect if the CRM tries to recover
+    # the primary clone. The usual transition is to do:
     #   demote->stop->start->promote
     #
     # There are multiple flaws with this transition:
@@ -2121,7 +2121,7 @@ sub pgsql_notify_pre_demote {
     # If it success, at least it will be demoted correctly with a normal
     # status. If it fails, it will be catched up in next steps.
 
-    ocf_log( 'info', 'Trying to start failing master "%s"...',
+    ocf_log( 'info', 'Trying to start failing primary "%s"...',
         $OCF_RESOURCE_INSTANCE );
 
     # Either the instance managed to start or it couldn't.
@@ -2147,12 +2147,12 @@ sub pgsql_notify_pre_stop {
 
     $rc = _controldata_to_ocf();
 
-    # do nothing if this is not a slave recovery
+    # do nothing if this is not a secondary recovery
     return $OCF_SUCCESS unless _is_slave_recover( $nodename )
                            and $rc == $OCF_RUNNING_SLAVE;
 
-    # in case of slave crash, we need to detect if the CRM tries to recover
-    # the slaveclone. The usual transition is to do: stop->start
+    # in case of secondary crash, we need to detect if the CRM tries to recover
+    # the secondary clone. The usual transition is to do: stop->start
     #
     # This transition can no twork because the instance is in
     # OCF_ERR_GENERIC step. So the stop action will fail, leading most
@@ -2162,7 +2162,7 @@ sub pgsql_notify_pre_stop {
     # If it success, at least it will be stopped correctly with a normal
     # status. If it fails, it will be catched up in next steps.
 
-    ocf_log( 'info', 'Trying to start failing slave "%s"...',
+    ocf_log( 'info', 'Trying to start failing secondary "%s"...',
         $OCF_RESOURCE_INSTANCE );
 
     # Either the instance managed to start or it couldn't.
