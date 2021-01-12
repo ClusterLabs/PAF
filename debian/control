@@ -17,4 +17,4 @@ Description: PostgreSQL resource agent for Pacemaker
  the Pacemaker administration and the PostgreSQL one, to keep things simple,
  documented and yet powerful.
  .
- It only supports multi-state (Master-Slave) PostgreSQL clusters.
+ It only supports multi-state (Primary-Secondary) PostgreSQL clusters.
