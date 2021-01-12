@@ -83,7 +83,7 @@ if [ "$NODENAME" == "$PRIM_NODE" ]; then
 
     chown -R postgres:postgres "$PGDATA"
 
-    # create master ip
+    # create primary ip
     ip -o addr show to "${PRIM_IP}" | if ! grep -q "${PRIM_IP}"
     then
         DEV=$(ip route show to "${PRIM_IP}/24"|grep -Eo 'dev \w+')
