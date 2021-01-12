@@ -24,11 +24,11 @@ yet powerful.
 
 Once your PostgreSQL cluster built using internal streaming replication, PAF is
 able to expose to Pacemaker what is the current status of the PostgreSQL
-instance on each node: master, slave, stopped, catching up, etc. Should a
-failure occurs on the master, Pacemaker will try to recover it by default.
-Should the failure be non-recoverable, PAF allows the slaves to be able to
-elect the best of them (the closest one to the old master) and promote it as
-the new master. All of this thanks to the robust, feature-full and most
+instance on each node: primary, secondary, stopped, catching up, etc. Should a
+failure occurs on the primary, Pacemaker will try to recover it by default.
+Should the failure be non-recoverable, PAF allows the secondaries to be able to
+elect the best of them (the closest one to the old primary) and promote it as
+the new primary. All of this thanks to the robust, feature-full and most
 importantly experienced project: Pacemaker.
 
 For information about how to install this agent, see `INSTALL.md`.
@@ -40,10 +40,10 @@ CentOS 6 and 7 in various scenario.
 
 PAF has been written to give to the administrator the maximum control
 over their PostgreSQL configuration and architecture. Thus, you are 100%
-responsible for the master/slave creations and their setup. The agent
+responsible for the primary/secondary creations and their setup. The agent
 will NOT edit your setup. It only requires you to follow these pre-requisites:
 
-  * slave __must__ be in hot_standby (accept read-only connections) ;
+  * secondary __must__ be in hot_standby (accept read-only connections) ;
   * the following parameters __must__ be configured in the appropriate place :
     * `standby_mode = on` (for PostgreSQL 11 and before)
     * `recovery_target_timeline = 'latest'`
@@ -66,7 +66,7 @@ can set:
   * `pghost`: the socket directory or IP address to use to connect to the
     local instance (default: `/tmp` or `/var/run/postgresql` for DEBIAN)
   * `pgport`:  the port to connect to the local instance (default: `5432`)
-  * `recovery_template`: __only__ for PostgreSQL 11 and before. The local 
+  * `recovery_template`: __only__ for PostgreSQL 11 and before. The local
     template that will be copied as the `PGDATA/recovery.conf` file. This
     file must not exist on any node for PostgreSQL 12 and after.
     (default: `$PGDATA/recovery.conf.pcmk`)
@@ -76,11 +76,10 @@ can set:
     `-c config_file=/etc/postgresql/9.3/main/postgresql.conf`
   * `system_user`: the system owner of your instance's process (default:
     `postgres`)
-  * `maxlag`: maximum lag allowed on a standby before we set a negative master
+  * `maxlag`: maximum lag allowed on a standby before we set a negative primary
     score on it. The calculation is based on the difference between the current
-    xlog location on the master and the write location on the standby.
+    xlog location on the primary and the write location on the standby.
     (default: 0, which disables this feature)
 
 For a demonstration about how to setup a cluster, see
 [http://clusterlabs.github.io/PAF/documentation.html](http://clusterlabs.github.io/PAF/documentation.html).
-
