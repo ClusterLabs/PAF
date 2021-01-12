@@ -123,7 +123,7 @@ resource-agents-paf (2.0~beta1-1) unstable; urgency=low
   * 2.0_beta1 beta release
   * fix: do not use crm_node --partition to discover resources
   * fix: unknown argument --query when calling crm_master
-  * fix: perl warning when master score has never been set on the master
+  * fix: perl warning when master score has never been set on the primary
   * fix: remove wrong info message during post-promote notify
   * fix: race condition when setting attributes during actions
   * fix: bug where pgport and pghost where ignored in _query
@@ -133,7 +133,7 @@ resource-agents-paf (2.0~beta1-1) unstable; urgency=low
   * fix: check on application_name in validate_all
   * change: do not start standby with a master score of 1
   * change: choose the clone to promote when no master score exist
-  * new: detect and deal master/slave recovery transition
+  * new: detect and deal primary/secondary recovery transition
   * new: detect and enforce reliability of a switchover
   * new: set next best secondaries base on their lag
   * misc: code cleanup and refactoring
@@ -144,7 +144,7 @@ resource-agents-paf (2.0~beta1-1) unstable; urgency=low
 resource-agents-paf (1.0.1-1) unstable; urgency=low
 
   * 1.0.1 minor release
-  * fix: forbid the master to decrease its own score (gh #19)
+  * fix: forbid the primary to decrease its own score (gh #19)
   * fix: bad LSN decimal converstion (gh #20)
   * fix: support PostgreSQL 9.5 controldata output (gh #12)
   * fix: set group id of given system_user before executing commands (gh #11)
@@ -153,7 +153,7 @@ resource-agents-paf (1.0.1-1) unstable; urgency=low
   * fix: OCF tests when PostgreSQL does not listen in /tmp
   * change: do not update score outside of a monitor action (gh #18)
   * new: add parameter 'start_opts', usefull for debian and derivated (gh #11)
-  * new: add specific timeout for master and slave roles in meta-data (gh #14)
+  * new: add specific timeout for primary and secondary roles in meta-data (gh #14)
   * new: add debian packaging related files
 
  -- Jehan-Guillaume (ioguix) de Rorthais <jgdr@dalibo.com>  Wed, 27 Apr 2016 13:22:50 +0200
