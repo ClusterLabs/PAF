@@ -207,7 +207,7 @@ sub _get_last_received_lsn {
     return undef;
 }
 
-# Get the primary score for each connected standby
+# Get the promotion score for each connected standby
 # Returns directly the result set of the query or exit with an error.
 # Exits with OCF_ERR_GENERIC if the query failed
 sub _get_lag_scores {
@@ -349,7 +349,7 @@ sub _delete_priv_attr {
     return;
 }
 
-# Get, parse and return the resource primary score on given node.
+# Get, parse and return the promotion score on given node.
 # Returns an empty string if not found.
 # Returns undef on crm_master call on error
 sub _get_master_score {
@@ -417,7 +417,7 @@ sub _is_master_recover {
     );
 }
 
-# Check if the current transition is a recover of a secondary clone on given node.
+# Check if the current transition is a recover of a standby on given node.
 sub _is_slave_recover {
     my ( $n ) = @_;
 
@@ -706,19 +706,19 @@ sub _controldata_to_ocf {
     return $OCF_ERR_INSTALLED ;
 }
 
-# Check the write_location of all secondaries, and adapt their primary score so
+# Check the write_location of all secondaries, and adapt their promotion score so
 # that the instance closest to the primary will be the selected candidate should
 # a promotion be triggered.
 # NOTE: This is only a hint to pacemaker! The selected candidate to promotion
 # actually re-check it is the best candidate and force a re-election by failing
 # if a better one exists. This avoid a race condition between the call of the
-# monitor action and the promotion where another secondary might have catchup faster
-# with the primary.
+# monitor action and the promotion where another secondary might have catchup
+# faster with the primary.
 # NOTE: we cannot directly use the write_location, neither a lsn_diff value as
 # promotion score as Pacemaker considers any value greater than 1,000,000 as
 # INFINITY.
 #
-# This sub must be executed from a primary monitor action.
+# This sub must be executed from a monitor action on a primary.
 #
 sub _check_locations {
     my $partition_nodes;
@@ -743,9 +743,9 @@ sub _check_locations {
     ocf_log( 'warning', 'No secondary connected to the master' )
         if $row_num == 0;
 
-    # For each standby connected, set their primary score based on the following
-    # rule: the first known node/application, with the highest priority and
-    # an acceptable state.
+    # For each standby connected, set their promotion score based on the
+    # following rule: the first known node/application, with the highest
+    # priority and an acceptable state.
     while ( $row = shift @rs ) {
 
         if ( $partition_nodes !~ /$row->[0]/ ) {
@@ -846,7 +846,7 @@ sub _check_switchover {
     # check if we received the shutdown checkpoint of the primary during its
     # demote process.
     # We need the last local checkpoint LSN and the last received LSN from
-    # primary to check in the WAL between these adresses if we have a
+    # the primary to check in the WAL between these adresses if we have a
     # "checkpoint shutdown" using pg_xlogdump/pg_waldump.
     #
     # Force a checkpoint to make sure the controldata shows the very last TL
@@ -947,7 +947,7 @@ sub _confirm_stopped {
     my $pgctlstatus_rc;
     my $controldata_rc;
 
-    # Check the postprimary process status.
+    # Check the main postgresql process status.
     $pgctlstatus_rc = _pg_ctl_status();
 
     if ( $pgctlstatus_rc == 0 ) {
@@ -1061,7 +1061,7 @@ parameter is set or a template file is found.
 
 =item B<maxlag>
 
-Maximum lag allowed on a standby before we set a negative primary score on it.
+Maximum lag allowed on a standby before we set a negative promotion score on it.
 The calculation is based on the difference between the current xlog location on
 the primary and the write location on the standby.
 
@@ -1155,7 +1155,7 @@ sub ocf_meta_data {
 
            <parameter name="maxlag" unique="0" required="0">
               <longdesc lang="en">
-                Maximum lag allowed on a standby before we set a negative primary score on it. The calculation
+                Maximum lag allowed on a standby before we set a negative promotion score on it. The calculation
                 is based on the difference between the current LSN on the primary and the LSN
                 written on the standby.
                 This parameter must be a valid positive number as described in PostgreSQL documentation.
@@ -1229,11 +1229,11 @@ Suggested minimum timeout: 20.
 
 =item B<promote>
 
-Promotes the resource to the primary role. Suggested minimum timeout: 30.
+Promotes the standby to production. Suggested minimum timeout: 30.
 
 =item B<demote>
 
-Demotes the resource to the secondary role. Suggested minimum timeout: 120.
+Demotes the primary instance as a standby. Suggested minimum timeout: 120.
 
 =item B<monitor (Master role)>
 
@@ -1478,18 +1478,19 @@ sub pgsql_start {
         if ( $rc == $OCF_SUCCESS ) {
             ocf_log( 'info', 'Instance "%s" started', $OCF_RESOURCE_INSTANCE );
 
-            # Check if a primary score exists in the cluster.
+            # Check if a promotion score exists in the cluster.
             # During the very first start of the cluster, no primary score will
-            # exists on any of the existing secondaries, unless an admin designated
-            # one of them using crm_primary. If no primary exists the cluster will
-            # not promote a primary among the secondaries.
-            # To solve this situation, we check if there is at least one primary
-            # score existing on one node in the cluster. Do nothing if at least
-            # one primary score is found among the clones of the resource. If no
-            # primary score exists, set a score of 1 only if the resource was a
-            # shut downed primary before the start.
+            # exists on any of the existing secondaries, unless an admin
+            # designated one of them using the "crm_master" command. If no
+            # primary exists the cluster will not promote a primary among the
+            # secondaries.
+            # To solve this situation, we check if there is at least one
+            # promotion score existing on one node in the cluster. Do nothing if
+            # at least one promotion score is found among the clones of the
+            # resource. If none exists, set a score of 1 only if the
+            # resource was a shut downed primary before the start.
             if ( $prev_state eq "shut down" and not _master_score_exists() ) {
-                ocf_log( 'info', 'No master score around. Set mine to 1' );
+                ocf_log( 'info', 'No promotion score around. Set mine to 1' );
 
                 _set_master_score( '1' );
             }
@@ -1846,7 +1847,7 @@ sub pgsql_promote {
     else {
 
         # The promotion is occurring on the best known candidate (highest
-        # primary score), as chosen by pacemaker during the last working monitor
+        # promotion score), as chosen by pacemaker during the last working monitor
         # on previous primary (see pgsql_monitor/_check_locations subs).
         # To avoid any race condition between the last monitor action on the
         # previous primary and the **real** most up-to-date standby, we
@@ -1854,7 +1855,7 @@ sub pgsql_promote {
         # them using the "lsn_location" resource attribute.
         #
         # The best standby to promote would have the highest known LSN. If the
-        # current resource is not the best one, we need to modify the primary
+        # current resource is not the best one, we need to modify the promotion
         # scores accordingly, and abort the current promotion.
         ocf_log( 'debug',
             'pgsql_promote: checking if current node is the best candidate for promotion' );
@@ -1931,17 +1932,17 @@ sub pgsql_promote {
             }
         }
 
-        # If any node has been selected, we adapt the primary scores accordingly
-        # and break the current promotion.
+        # If any node has been selected, we adapt the promotion scores
+        # accordingly and break the current promotion.
         if ( $node_to_promote ne '' ) {
             ocf_exit_reason(
                 '%s is the best candidate to promote, aborting current promotion',
                 $node_to_promote );
 
-            # Reset current node primary score.
+            # Reset current node promotion score.
             _set_master_score( '1' );
 
-            # Set promotion candidate primary score.
+            # Set candidate promotion score.
             _set_master_score( '1000', $node_to_promote );
 
             # We fail the promotion to trigger another promotion transition
@@ -1988,7 +1989,7 @@ sub pgsql_notify_pre_promote {
     ocf_log( 'info', 'Promoting instance on node "%s"',
         $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} );
 
-    # No need to do an election between secondarys if this is recovery of the primary
+    # No need to do an election if this is recovery of the primary
     if ( _is_master_recover( $OCF_NOTIFY_ENV{'promote'}[0]{'uname'} ) ) {
         ocf_log( 'warning', 'This is a primary recovery!' );
 
@@ -2000,7 +2001,7 @@ sub pgsql_notify_pre_promote {
 
     # Environment cleanup!
     _delete_priv_attr( 'lsn_location'      );
-    _delete_priv_attr( 'recover_primary'    );
+    _delete_priv_attr( 'recover_master'    );
     _delete_priv_attr( 'nodes'             );
     _delete_priv_attr( 'cancel_switchover' );
 

@@ -375,9 +375,9 @@ sub ocf_is_clone {
         and $ENV{'OCF_RESKEY_CRM_meta_clone_max'} > 0 );
 }
 
-# returns true if the resource is configured as a multistate
-# (primary/secondary) resource. This is defined as a resource where the
-# master-max meta attribute is present, and set to greater than zero.
+# returns true if the resource is promotable.
+# This is defined as a resource where the master-max meta attribute is present,
+# and set to greater than zero.
 sub ocf_is_ms {
     return ( defined $ENV{'OCF_RESKEY_CRM_meta_master_max'}
         and  $ENV{'OCF_RESKEY_CRM_meta_master_max'} > 0 );

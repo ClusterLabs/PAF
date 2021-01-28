@@ -24,7 +24,7 @@ yet powerful.
 
 Once your PostgreSQL cluster built using internal streaming replication, PAF is
 able to expose to Pacemaker what is the current status of the PostgreSQL
-instance on each node: primary, secondary, stopped, catching up, etc. Should a
+instance on each node: primary, secondary, stopped, etc. Should a
 failure occurs on the primary, Pacemaker will try to recover it by default.
 Should the failure be non-recoverable, PAF allows the secondaries to be able to
 elect the best of them (the closest one to the old primary) and promote it as
@@ -76,10 +76,10 @@ can set:
     `-c config_file=/etc/postgresql/9.3/main/postgresql.conf`
   * `system_user`: the system owner of your instance's process (default:
     `postgres`)
-  * `maxlag`: maximum lag allowed on a standby before we set a negative primary
-    score on it. The calculation is based on the difference between the current
-    xlog location on the primary and the write location on the standby.
-    (default: 0, which disables this feature)
+  * `maxlag`: maximum lag allowed on a standby before we set a negative
+    promotion score on it. The calculation is based on the difference between
+    the current xlog location on the primary and the write location on the
+    standby. (default: 0, which disables this feature)
 
 For a demonstration about how to setup a cluster, see
 [http://clusterlabs.github.io/PAF/documentation.html](http://clusterlabs.github.io/PAF/documentation.html).
