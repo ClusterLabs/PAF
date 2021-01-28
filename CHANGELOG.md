@@ -43,7 +43,7 @@ Pacemaker 1.1.13 using a corosync 2.x stack.
 Changelog since 2.1:
 
 * new: support PostgreSQL 10
-* new: add the maxlag parameter to exclude lagging slaves from promotion, Thomas Reiss
+* new: add the maxlag parameter to exclude lagging secondaries from promotion, Thomas Reiss
 * new: support for multiple pgsqlms resources in the same cluster
 * new: provide comprehensive error messages to crm_mon
 * fix: follow the resource agent man page naming policy and section
@@ -93,7 +93,7 @@ Pacemaker 1.1.13 using a corosync 2.x stack.
 * fix: check on application_name in validate_all
 * change: do not start standby with a master score of 1
 * change: choose the clone to promote when no master score exist
-* new: detect and deal master/slave recovery transition
+* new: detect and deal priamry/secondary recovery transition
 * new: detect and enforce reliability of a switchover
 * new: set next best secondaries base on their lag
 * misc: code cleanup and refactoring
@@ -126,7 +126,7 @@ Release date: 2016-04-27
 * fix: OCF tests when PostgreSQL does not listen in /tmp
 * change: do not update score outside of a monitor action (gh #18)
 * new: add parameter 'start_opts', usefull for debian and derivated (gh #11)
-* new: add specific timeout for master and slave roles in meta-data (gh #14)
+* new: add specific timeout for primary and secondary roles in meta-data (gh #14)
 * new: add debian packaging related files
 
 
@@ -136,4 +136,3 @@ Release date: 2016-04-27
 Release date: 2016-03-02
 
 * First public release
-

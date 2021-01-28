@@ -85,7 +85,7 @@ PGSQLD_RSC_OPTS=(
 # NB: pcs 0.10.2 doesn't support to set the id of the clone XML node
 # the id is built from the rsc id to clone using "<rsc-id>-clone"
 # As a matter of cohesion and code simplicity, we use the same
-# convention to create the master resource with pcs 0.9.x for
+# convention to create the primary resource with pcs 0.9.x for
 # Pacemaker 1.1
 if [ "$PCMK_VER" -ge 2 ]; then
     PGSQLD_RSC_OPTS+=( "promotable" "notify=true" )

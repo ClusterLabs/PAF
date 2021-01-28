@@ -83,7 +83,7 @@ if [ "$NODENAME" == "$PRIM_NODE" ]; then
 
     chown -R postgres:postgres "$PGDATA"
 
-    # restart master pgsql
+    # restart primary pgsql
     systemctl --quiet start "postgresql-${PGVER}"
 
     exit

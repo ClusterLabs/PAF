@@ -12,7 +12,7 @@ OCF_Functions - helper subroutines for OCF agent
 
   use FindBin;
   use lib "$FindBin::RealBin/../../lib/heartbeat/";
-  
+
   use OCF_Functions;
 
 =head1 DESCRIPTION
@@ -257,7 +257,7 @@ sub ha_debug {
         else {
             printf STDERR "%s\n", join ' ', @ARG;
         }
-        
+
         return 0;
     }
 
@@ -375,9 +375,9 @@ sub ocf_is_clone {
         and $ENV{'OCF_RESKEY_CRM_meta_clone_max'} > 0 );
 }
 
-# returns true if the resource is configured as a multistate
-# (master/slave) resource. This is defined as a resource where the
-# master-max meta attribute is present, and set to greater than zero.
+# returns true if the resource is promotable.
+# This is defined as a resource where the master-max meta attribute is present,
+# and set to greater than zero.
 sub ocf_is_ms {
     return ( defined $ENV{'OCF_RESKEY_CRM_meta_master_max'}
         and  $ENV{'OCF_RESKEY_CRM_meta_master_max'} > 0 );
@@ -394,7 +394,7 @@ sub ocf_is_ver {
 
 sub ocf_ver2num {
     my $v = 0;
-    
+
     $v = $v * 1000 + $1 while $ARG[0] =~ /(\d+)/g;
 
     return $v;
@@ -431,7 +431,7 @@ sub ocf_version_cmp {
     my $v1_level;
     my $v2_level;
     my $level_diff;
-    
+
     return 3 unless ocf_is_ver( $v1 );
     return 3 unless ocf_is_ver( $v2 );
 
