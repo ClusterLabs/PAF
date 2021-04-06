@@ -43,7 +43,7 @@ repository and enable the official CentOS "HighAvailability" repository:
 
 ~~~bash
 dnf module disable -y postgresql
-dnf config-manager --enable "HighAvailability"
+dnf config-manager --enable ha
 ~~~
 
 > **NOTE**: you can install PostgreSQL from official CentOS repository if you
