@@ -359,7 +359,7 @@ sub _get_master_score {
 
     $node_arg = sprintf '--node "%s"', $node if defined $node and $node ne '';
 
-    $score = qx{ $CRM_MASTER --quiet --get-value $node_arg 2> /dev/null };
+    $score = qx{ $CRM_MASTER --quiet --query $node_arg 2> /dev/null };
 
     return '' unless $? == 0 and defined $score;
 
