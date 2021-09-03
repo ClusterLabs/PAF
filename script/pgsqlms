@@ -1097,12 +1097,15 @@ sub ocf_meta_data {
     print qq{<?xml version="1.0"?>
         <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
         <resource-agent name="pgsqlms">
-          <version>1.0</version>
+          <version>$VERSION</version>
 
           <longdesc lang="en">
-            Resource script for PostgreSQL in replication. It manages PostgreSQL servers using streaming replication as an HA resource.
+            Resource script for PostgreSQL in replication. It manages PostgreSQL
+            servers using streaming replication as an HA resource.
           </longdesc>
-          <shortdesc lang="en">Manages PostgreSQL servers in replication</shortdesc>
+          <shortdesc lang="en">
+            Manages PostgreSQL servers in replication
+          </shortdesc>
           <parameters>
             <parameter name="system_user" unique="0" required="0">
               <longdesc lang="en">
@@ -1114,7 +1117,8 @@ sub ocf_meta_data {
 
             <parameter name="bindir" unique="0" required="0">
               <longdesc lang="en">
-                Path to the directory storing the PostgreSQL binaries. The agent uses psql, pg_isready, pg_controldata and pg_ctl.
+                Path to the directory storing the PostgreSQL binaries. The agent
+                uses psql, pg_isready, pg_controldata and pg_ctl.
               </longdesc>
               <shortdesc lang="en">Path to the PostgreSQL binaries</shortdesc>
               <content type="string" default="$bindir_default" />
@@ -1130,17 +1134,23 @@ sub ocf_meta_data {
 
             <parameter name="datadir" unique="1" required="0">
               <longdesc lang="en">
-                Path to the directory set in data_directory from your postgresql.conf file. This parameter
-                has the same default than PostgreSQL itself: the pgdata parameter value. Unless you have a
-                special PostgreSQL setup and you understand this parameter, ignore it.
+                Path to the directory set in data_directory from your
+                postgresql.conf file. This parameter has the same default than
+                PostgreSQL itself: the pgdata parameter value. Unless you have a
+                special PostgreSQL setup and you understand this parameter,
+                ignore it.
               </longdesc>
-              <shortdesc lang="en">Path to the directory set in data_directory from your postgresql.conf file</shortdesc>
+              <shortdesc lang="en">
+                Path to the directory set in data_directory from your
+                postgresql.conf file
+              </shortdesc>
               <content type="string" default="PGDATA" />
             </parameter>
 
             <parameter name="pghost" unique="0" required="0">
               <longdesc lang="en">
-                Host IP address or unix socket folder the instance is listening on.
+                Host IP address or unix socket folder the instance is listening
+                on.
               </longdesc>
               <shortdesc lang="en">Instance IP or unix socket folder</shortdesc>
               <content type="string" default="$pghost_default" />
@@ -1156,25 +1166,31 @@ sub ocf_meta_data {
 
            <parameter name="maxlag" unique="0" required="0">
               <longdesc lang="en">
-                Maximum lag allowed on a standby before forbidding any promotion on it. The calculation
-                is based on the difference between the current LSN on the primary and the LSN
-                written on the standby.
-                This parameter must be a valid positive number as described in PostgreSQL documentation.
+                Maximum lag allowed on a standby before forbidding any promotion
+                on it. The calculation is based on the difference between the
+                current LSN on the primary and the LSN written on the standby.
+                This parameter must be a valid positive number as described in
+                PostgreSQL documentation.
                 See: https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS-NUMERIC
               </longdesc>
-              <shortdesc lang="en">Maximum write lag before we mark a standby as inappropriate to promote</shortdesc>
+              <shortdesc lang="en">
+                Maximum write lag before we mark a standby as inappropriate to
+                promote
+              </shortdesc>
               <content type="integer" default="$maxlag_default" />
             </parameter>
 
             <parameter name="recovery_template" unique="1" required="0">
               <longdesc lang="en">
-                Path to the recovery.conf template. This file is simply copied to \$PGDATA
-                before starting the instance as standby.
+                Path to the recovery.conf template. This file is simply copied
+                to \$PGDATA before starting the instance as standby.
                 ONLY for PostgreSQL 11 and bellow. This parameter is IGNORED for
-                PostgreSQL 12 and higher. The cluster will refuse to start if a template
-                file is found.
+                PostgreSQL 12 and higher. The cluster will refuse to start if a
+                template file is found.
               </longdesc>
-              <shortdesc lang="en">Path to the recovery.conf template for PostgreSQL 11 and older.</shortdesc>
+              <shortdesc lang="en">
+                Path to the recovery.conf template for PostgreSQL 11 and older.
+              </shortdesc>
               <content type="string" default="PGDATA/recovery.conf.pcmk" />
             </parameter>
 
@@ -1185,7 +1201,9 @@ sub ocf_meta_data {
                 postgresql.conf file is not in the data directory (PGDATA), eg.:
                 "-c config_file=/etc/postgresql/9.3/main/postgresql.conf".
               </longdesc>
-              <shortdesc lang="en">Additionnal arguments given to the postgres process on startup.</shortdesc>
+              <shortdesc lang="en">
+                Additionnal arguments given to the postgres process on startup.
+              </shortdesc>
               <content type="string" default="$start_opts_default" />
             </parameter>
 
