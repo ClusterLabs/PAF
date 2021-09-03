@@ -16,10 +16,12 @@ In regard with PAF, make sure to read carefully documentation from
 This tutorial is based on CentOS 8.1, using Pacemaker 2.0.1, the `pcs` command,
 PostgreSQL 12 and PAF 2.3.
 
-> **WARNING**: Do not test with Pacemaker 2.1.0.
+
+> **WARNING**: Do not test with Pacemaker 2.1.0.  
+> 
 > Pacemaker 2.1.0 introduced some regressions that break the PAF resource
 > agent. This has been fixed in Pacemaker 2.1.1.
-> {: .warning}
+{: .warning}
 
 Table of contents:
 
