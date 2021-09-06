@@ -18,6 +18,7 @@ rm -rf "${PGDATA}"
 
 if [ "$NODENAME" == "$PRIM_NODE" ]; then
     # init instance
+    PGSETUP_INITDB_OPTIONS="--data-checksums"
     "/usr/pgsql-${PGVER}/bin/postgresql-${PGVER}-setup" initdb
 
     # pg_hba setup
@@ -51,13 +52,23 @@ if [ "$NODENAME" == "$PRIM_NODE" ]; then
 	max_wal_senders = 10
 	hot_standby = on
 	hot_standby_feedback = on
-	wal_keep_segments = 256
 	log_destination = 'syslog,stderr'
 	log_checkpoints = on
 	log_min_duration_statement = 0
 	log_autovacuum_min_duration = 0
 	log_replication_commands = on
 	EOC
+
+    if [ "${PGVER%%.*}" -lt 13 ]; then
+        # recovery.conf setup
+        cat <<-'EOC' >> "${CUSTOMDIR}/custom.conf"
+		wal_keep_segments = 64
+		EOC
+    else
+        cat <<-'EOC' >> "${CUSTOMDIR}/custom.conf"
+		wal_keep_size = 1GB
+		EOC
+    fi
 
     if [ "${PGVER%%.*}" -lt 12 ]; then
         # recovery.conf setup

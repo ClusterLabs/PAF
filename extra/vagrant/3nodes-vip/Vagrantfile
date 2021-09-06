@@ -81,8 +81,12 @@ Vagrant.configure(2) do |config|
     ############################################################################
     # system setup for all nodes
 
-    config.vm.provision 'file', source: 'provision/id_rsa', destination: '/home/vagrant/.ssh/id_rsa'
-    config.vm.provision 'file', source: 'provision/id_rsa.pub', destination: '/home/vagrant/.ssh/id_rsa.pub'
+    config.vm.provision 'ssh-prv', type: 'file',
+        source: 'provision/id_rsa',
+        destination: '/home/vagrant/.ssh/id_rsa'
+    config.vm.provision 'ssh-pub', type: 'file',
+        source: 'provision/id_rsa.pub',
+        destination: '/home/vagrant/.ssh/id_rsa.pub'
 
     (pg_nodes + [log_node]).each do |node|
         config.vm.define node do |conf|
@@ -110,7 +114,7 @@ Vagrant.configure(2) do |config|
     # cluster setup
     pg_nodes.each do |node|
         config.vm.define node do |conf|
-            conf.vm.provision 'pacemaker', type: 'shell',
+            conf.vm.provision 'pcmk', type: 'shell',
                 path: 'provision/pacemaker.bash',
                 args: [ pgver, hapass, base_ip, ssh_login,
                         vm_prefix, host_ip, pgdata ] + pg_nodes,
