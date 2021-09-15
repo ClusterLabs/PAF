@@ -226,10 +226,13 @@ sub _get_lag_scores {
 
     # We check locations of connected standbies by querying the
     # "pg_stat_replication" view.
-    # The row_number applies on the result set ordered on write_location ASC so
-    # the highest row_number should be given to the closest node from the
-    # primary, then the lowest node name (alphanumeric sort) in case of
-    # equality. The result set itself is order by priority DESC to process best
+    # The row_number applies on the result set ordered on write_location DESC so
+    # the smallest row_number should be given to the closest node from the
+    # primary (1), then the lowest node name (alphanumeric sort) in case of
+    # equality. This row_number - 1 is then used to decrease the priority (score) by
+    # step of 10 units starting from 1000.
+    # E.g. row_number = 1 and maxlag = 0, ( 1000 - (row_number - 1) * 10 ) * 1 = 1000
+    # The result set itself is order by priority DESC to process best
     # known candidate first.
     $query = qq{
       SELECT application_name, priority, location, state, current_lag
@@ -238,7 +241,7 @@ sub _get_lag_scores {
           (1000 - (
             row_number() OVER (
               PARTITION BY state IN ('startup', 'backup')
-              ORDER BY location ASC, application_name ASC
+              ORDER BY location DESC, application_name ASC
             ) - 1
            ) * 10
           ) * CASE WHEN ( $maxlag > 0
