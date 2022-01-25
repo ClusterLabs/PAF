@@ -621,37 +621,64 @@ The use of `pcsd` and `pcs` is now full operationnal in Debian. See:
 
 -----
 
-# Premiers pas avec Pacemaker
+# First steps with Pacemaker
 
-Ce chapitre aborde l'installation et démarrage de Pacemaker. L'objectif est de
-créer rapidement un cluster vide que nous pourrons étudier plus en détail
-dans la suite du workshop.
+FR Ce chapitre aborde l'installation et démarrage de Pacemaker. L'objectif est de
+FR créer rapidement un cluster vide que nous pourrons étudier plus en détail
+FR dans la suite du workshop.
+FR
+This chapter takes up the installation and start-up of Pacemaker. The objective
+is to quickly create an empty cluster that we will be using in the rest of this
+workshop.
 
 -----
 
 ## Installation
 
-Paquets essentiels:
+FR Paquets essentiels:
+FR
+FR * `corosync` : communication entre les nœuds
+FR * `pacemaker` : orchestration du cluster
+FR * `pcs` : administration du cluster
+FR
+Important packages:
 
-* `corosync` : communication entre les nœuds
-* `pacemaker` : orchestration du cluster
-* `pcs` : administration du cluster
+* `corosync`: messaging layer
+* `pacemaker`: cluster orchestration
+* `pcs`: administration of the cluster
 
-::: notes
+:::notes
 
-L'installation de Pacemaker se fait très simplement depuis les dépôts
-officiels de CentOS 7 en utilisant les paquets `pacemaker`. notez que
-les paquets `corosync` et `resource-agents` sont installés aussi par dépendance.
+FR L'installation de Pacemaker se fait très simplement depuis les dépôts
+FR officiels de CentOS 7 en utilisant les paquets `pacemaker`. notez que
+FR les paquets `corosync` et `resource-agents` sont installés aussi par dépendance.
+FR
+FR Voici le détail de ces paquets :
+FR
+FR * `corosync` : gère la communication entre les nœuds, la gestion du groupe, du quorum
+FR * `pacemaker` : orchestration du cluster, réaction aux événements, prise de
+FR   décision et actions
+FR * `resource-agents`: collection de _resource agents_ (_RA_) pour divers services
+FR
+The installation of Pacemaker is made simple by using the `pacemaker` package
+available from the CentOS 7 official repositories. Please note that the
+`corosync` and the `resource-agents` packages are also installed as
+dependencies.
 
-Voici le détail de ces paquets :
+More details about the packages:
 
-* `corosync` : gère la communication entre les nœuds, la gestion du groupe, du quorum
-* `pacemaker` : orchestration du cluster, réaction aux événements, prise de
-  décision et actions
-* `resource-agents`: collection de _resource agents_ (_RA_) pour divers services
+* `corosync`: manages the communication between nodes, the cluster and the
+  quorum
+* `pacemaker`: orchestrates the cluster, reacts to events, makes decisions an
+  performs actions
+* `resource-agents` (_RA_): are a collection of scripts that share a comon API
+  and allow Pacemaker to control and monitor different kind of resources.
 
-Le paquet `corosync` installe un certain nombre d'outils commun à toutes les
-distributions et que nous aborderons plus loin:
+FR Le paquet `corosync` installe un certain nombre d'outils commun à toutes les
+FR distributions et que nous aborderons plus loin:
+FR
+The `corosync` package installs several tools common to all Linux
+distributions. We will describe them later on:
 
 * `corosync-cfgtool`
 * `corosync-cmapctl`
@@ -659,9 +686,13 @@ distributions et que nous aborderons plus loin:
 * `corosync-keygen`
 * `corosync-quorumtool`
 
-Pacemaker aussi installe un certain nombre de binaires commun à toutes les
-distributions, dont les suivants que vous pourriez rencontrer dans ce workshop
-ou dans certaines discussions :
+FR Pacemaker aussi installe un certain nombre de binaires commun à toutes les
+FR distributions, dont les suivants que vous pourriez rencontrer dans ce workshop
+FR ou dans certaines discussions :
+FR
+Pacemaker also installs it's share of binaries that are common across all Linux
+distributions. Some of them are listed below as they will be used in the rest
+of this workshop or are commonly discussed in Pacemaler related topics:
 
 * `crm_attribute`
 * `crm_node`
@@ -675,52 +706,80 @@ ou dans certaines discussions :
 * `crm_verify`
 * `stonith_admin`
 
-Beaucoup d'autres outils sont installés sur toutes les distributions, mais sont
-destinés à des utilisations très pointues, de debug ou aux agents eux-même.
+FR Beaucoup d'autres outils sont installés sur toutes les distributions, mais sont
+FR destinés à des utilisations très pointues, de debug ou aux agents eux-même.
+FR
+A lots of other tools are installed on all distributions, but their use cases
+are limited to some debug activities or used only by the agents.
 
-Les outils d'administration `pcs` et `crm` reposent fortement sur l'ensemble de
-ces binaires et permettent d'utiliser une interface unifiée et commune à
-ceux-ci. Bien que l'administration du cluster peut se faire entièrement sans
-ces outils, ils sont très pratiques au quotidien et facilitent grandement la
-gestion du cluster. De plus, ils intègrent toutes les bonnes pratiques
-relatives aux commandes supportées.
+FR Les outils d'administration `pcs` et `crm` reposent fortement sur l'ensemble de
+FR ces binaires et permettent d'utiliser une interface unifiée et commune à
+FR ceux-ci. Bien que l'administration du cluster peut se faire entièrement sans
+FR ces outils, ils sont très pratiques au quotidien et facilitent grandement la
+FR gestion du cluster. De plus, ils intègrent toutes les bonnes pratiques
+FR relatives aux commandes supportées.
+FR
+The administration tools `pcs` and `crm` build upon these tools and create a
+unified interface to manage the cluster. Even thought cluster admnistration
+tasks can be performed without these tools, they are very usefull and ease
+cluster management to a great degree. Moreover, they apply all the best
+practices for the supported commands.
 
-Tout au long de cette formation, nous utilisons le couple `pcs` afin de
-simplifier le déploiement et l'administration du cluster Pacemaker. Il est
-disponible sur la plupart des distributions Linux et se comportent de la même
-façon, notamment sur Debian et EL et leurs dérivés.
+FR Tout au long de cette formation, nous utilisons le couple `pcs` afin de
+FR simplifier le déploiement et l'administration du cluster Pacemaker. Il est
+FR disponible sur la plupart des distributions Linux et se comportent de la même
+FR façon, notamment sur Debian et EL et leurs dérivés.
+FR
+<!-- FIXME "le couple" sans rien après -->
 
-Ce paquet installe le CLI `pcs` et le daemon `pcsd`. Ce dernier s'occupe
-seulement de propager les configurations et commandes sur tous les nœuds.
+During this workshop, we will be using pcs to simplify the deployement and the
+administration of the cluster. In addition to it's simplicity, the tool works
+the same on all Linux distributions, most notably Debian, EL and their
+derivatives.
+
+FR Ce paquet installe le CLI `pcs` et le daemon `pcsd`. Ce dernier s'occupe
+FR seulement de propager les configurations et commandes sur tous les nœuds.
+FR
+The packages install both the CLI `pcs` and the daemon `pcsd`. The latter is
+responsible for the propagation of the configuration and commands across nodes.
 
 :::
 
 -----
 
-### TP: Installation de Pacemaker
+### Practical work: Installation of Pacemaker
 
 ::: notes
 
-1. installer les paquets nécessaires et suffisants
-2. vérifier les dépendances installées
+FR 1. installer les paquets nécessaires et suffisants
+FR 2. vérifier les dépendances installées
+FR
+1. install the required packages
+2. verify which dependencies were installed
 
 :::
 
 -----
 
-### Correction: Installation de Pacemaker
+### Correction: Installation of Pacemaker
 
 ::: notes
 
-1. Installer les paquets nécessaires et suffisants
+FR 1. Installer les paquets nécessaires et suffisants
+FR
+1. Install the required packages
 
 ~~~console
 # yum install -y pacemaker
 ~~~
 
-2. vérifier les dépendances installées
+FR 2. vérifier les dépendances installées
+FR
+FR À la fin de la commande précédente:
+FR
+2. verify which dependencies were installed
 
-À la fin de la commande précédente:
+After the execution of the previous command:
 
 ~~~
 Dependency Installed:
@@ -730,11 +789,17 @@ Dependency Installed:
   resource-agents.x86_64 0:4.1.1-30.el7_7.4
 ~~~
 
-Les paquets `corosync`, `resource-agents` et `pacemaker-cli` ont été installés en tant que
-dépendance de `pacemaker`.
+FR Les paquets `corosync`, `resource-agents` et `pacemaker-cli` ont été installés en tant que
+FR dépendance de `pacemaker`.
+FR
+FR Tous les outils nécessaires et suffisants à l'administration d'un cluster
+FR Pacemaker sont présents. Notamment:
+FR
+The packages `corosync`, `resource-agents` and `pacemaker-cli` have been
+installed as dependencies of `pacemaker`.
 
-Tous les outils nécessaires et suffisants à l'administration d'un cluster
-Pacemaker sont présents. Notamment:
+All the requiered tools for the administration of a Pacemaker cluster are
+present. In particular:
 
 ~~~console
 # ls /sbin/crm* /sbin/corosync*
@@ -754,34 +819,44 @@ Pacemaker sont présents. Notamment:
 
 -----
 
-### TP: Installation de `pcs`
+### Practical work: Installation of `pcs`
 
 ::: notes
 
-1. installer le paquet `pcs`
-2. activer le daemon `pcsd` au démarrage de l'instance et le démarrer
+FR 1. installer le paquet `pcs`
+FR 2. activer le daemon `pcsd` au démarrage de l'instance et le démarrer
+FR
+<!-- FIXME: du serveur ? -->
 
+1. install the `pcs` package
+2. enable the `pcsd` daemon so that it starts when the server boots, then start
+   it.
 
 :::
 -----
 
-### Correction: Installation de `pcs`
+### Correction: Installation of `pcs`
 
 ::: notes
 
-1. installer le paquet `pcs`
+FR 1. installer le paquet `pcs`
+FR
+1. install the `pcs` package
 
 ~~~console
 # yum install -y pcs
 ~~~
 
-2. activer `pcsd` au démarrage de l'instance et le démarrer
+FR 2. activer `pcsd` au démarrage de l'instance et le démarrer
+FR
+2. enable the `pcsd` daemon so that it starts when the server boots, then start
+   it.
 
 ~~~console
 # systemctl enable --now pcsd
 ~~~
 
-ou 
+or
 
 ~~~console
 # systemctl enable pcsd
@@ -792,71 +867,115 @@ ou
 
 -----
 
-## Création du cluster
+## Cluster creation
 
-* authentification des daemons `pcsd` entre eux
-* création du cluster à l'aide de `pcs`
-  - crée la configuration corosync sur tous les serveurs
-* configuration de Pacemaker des _processus_ de Pacemaker
+FR * authentification des daemons `pcsd` entre eux
+FR * création du cluster à l'aide de `pcs`
+FR   - crée la configuration corosync sur tous les serveurs
+FR * configuration de Pacemaker des _processus_ de Pacemaker
+FR
+<!-- FIXME y a des mots en trop -->
+
+* authenticate all `pcsd` daemons among each other
+* create the cluster with `pcs`
+   - creates the corosync configuration on all servers
+* configures the behavior of Pacemaker's processes
 
 ::: notes
 
-La création du cluster se résume à créer le fichier de configuration de
-Corosync, puis à démarrer de Pacemaker.
+FR La création du cluster se résume à créer le fichier de configuration de
+FR Corosync, puis à démarrer de Pacemaker.
+FR
+Cluster creation is done by creating the relevant configuration file for
+Corosync and starting Pacemaker.
 
-L'utilisation de `pcs` nous permet de ne pas avoir à éditer la configuration de
-Corosync manuellement. Néanmoins, un pré-requis à l'utilisation de `pcs` est
-que tous les daemons soient authentifiés les uns auprès des autres pour
-s'échanger des commandes au travers de leur API HTTP. Cela se fait grâce à la
-commande `pcs cluster auth [...]`.
+FR L'utilisation de `pcs` nous permet de ne pas avoir à éditer la configuration de
+FR Corosync manuellement. Néanmoins, un pré-requis à l'utilisation de `pcs` est
+FR que tous les daemons soient authentifiés les uns auprès des autres pour
+FR s'échanger des commandes au travers de leur API HTTP. Cela se fait grâce à la
+FR commande `pcs cluster auth [...]`.
+FR
+Using `pcs` simplifies this process since it does the configuration file
+creation for you. However, it's necessary that all `pcsd` dameon are
+authenticated among each other to enable the exchange of commands using the
+HTTP API. This can be done with the command `pcs cluster auth [...]`.
 
-Il est ensuite aisé de créer le cluster grâce à la commande `pcs cluster
-setup [...]`.
+FR Il est ensuite aisé de créer le cluster grâce à la commande `pcs cluster
+FR setup [...]`.
+FR
+Once this is done, it's easy to create the cluster using `pcs cluster setup
+[...]`.
 
-Le fichier de configuration de Pacemaker ne concerne que le comportement des
-processus, pas la gestion du cluster. Notamment, où sont les journaux
-applicatifs et leur contenu. Pour la famille des distributions EL, son
-emplacement est `/etc/sysconfig/pacemaker`. Pour la famille des distributions
-Debian, il sont emplacement est `/etc/default/pacemaker`. Ce fichier en
-concerne QUE l'instance locale de Pacemaker. Chaque instance peut avoir un
-paramétrage différent, mais cela est bien entendu déconseillé.
+FR Le fichier de configuration de Pacemaker ne concerne que le comportement des
+FR processus, pas la gestion du cluster. Notamment, où sont les journaux
+FR applicatifs et leur contenu. Pour la famille des distributions EL, son
+FR emplacement est `/etc/sysconfig/pacemaker`. Pour la famille des distributions
+FR Debian, il sont emplacement est `/etc/default/pacemaker`. Ce fichier en
+FR concerne QUE l'instance locale de Pacemaker. Chaque instance peut avoir un
+FR paramétrage différent, mais cela est bien entendu déconseillé.
+FR
+
+The Pacemaker configuration file deals with the behavior of Pacemaker's
+processes, not the cluster management. Information such as where are the traces
+and what is logged can be found there. On the EL familly, the file is stored in
+the `/etc/sysconfig/pacemaker` directory. On Debian, it's located in
+`/etc/default/pacemaker`. This file is relevant only for the local instance of
+Pacemaker. Each node can have a different configuration, but this practice is
+discouraged.
 
 :::
 
 -----
 
-### TP: Authentification de pcs
+### Practical work: pcs authentication
 
 ::: notes
 
-1. positionner un mot de passe pour l'utilisateur `hacluster` sur chaque nœud
+FR 1. positionner un mot de passe pour l'utilisateur `hacluster` sur chaque nœud
+FR
+FR L'outil `pcs` se sert de l'utilisateur système `hacluster` pour s'authentifier
+FR auprès de `pcsd`. Puisque les commandes de gestion du cluster peuvent être
+FR exécutées depuis n'importe quel membre du cluster, il est recommandé de
+FR configurer le même mot de passe pour cet utilisateur sur tous les nœuds pour
+FR éviter les confusions.
+FR
+1. create a password for the `hacluster` user on each node.
 
-L'outil `pcs` se sert de l'utilisateur système `hacluster` pour s'authentifier
-auprès de `pcsd`. Puisque les commandes de gestion du cluster peuvent être
-exécutées depuis n'importe quel membre du cluster, il est recommandé de
-configurer le même mot de passe pour cet utilisateur sur tous les nœuds pour
-éviter les confusions.
+The `pcs` tool uses the `hacluster` system user for the authentication with
+`pcsd`.  Since the cluster management commands can be executed for any member
+of the cluster, it is advised to configure the same password on all node to
+avoid mixing them up.
 
-2. authentifier les membres du cluster entre eux
 
-Remarque: à partir de Pacemaker 2, cette commande doit être exécutée sur chaque
-nœud du cluster.
+FR 2. authentifier les membres du cluster entre eux
+FR
+FR Remarque: à partir de Pacemaker 2, cette commande doit être exécutée sur chaque
+FR nœud du cluster.
+FR
+2. authenticate all cluster members among each other
+
+Note: since Pacemaker 2, the command must be executed on each node of the
+cluster.
 
 :::
 
 -----
 
-### Correction: Authentification de pcs
+### Correction: pcs authentiation
 
 ::: notes
 
-1. positionner un mot de passe pour l'utilisateur `hacluster` sur chaque nœud
+FR 1. positionner un mot de passe pour l'utilisateur `hacluster` sur chaque nœud
+FR
+1. create a password for the `hacluster` user on each node.
 
 ~~~console
 # passwd hacluster
 ~~~
 
-2. authentifier les membres du cluster entre eux
+FR 2. authentifier les membres du cluster entre eux
+FR
+2. authenticate all cluster members among each other
 
 ~~~console
 # pcs cluster auth hanode1 hanode2 hanode3 -u hacluster
@@ -866,46 +985,70 @@ nœud du cluster.
 
 -----
 
-### TP: Création du cluster avec pcs
+### Practical work: Cluster creation with pcs
 
 ::: notes
 
-Les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+FR Les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+FR
+FR 1. créer un cluster nommé `cluster_tp` incluant les trois nœuds `hanode1`,
+FR    `hanode2` et `hanode3`
+FR 2. trouver le fichier de configuration de corosync sur les trois nœuds
+FR 3. vérifier que le fichier de configuration de corosync est identique partout
+FR 4. activer le mode debug de Pacemaker pour les sous processus `crmd`,
+FR `pengine`, `attrd` et `lrmd`
+FR
+The `pcs` commands can be executed from any node.
 
-1. créer un cluster nommé `cluster_tp` incluant les trois nœuds `hanode1`,
-   `hanode2` et `hanode3`
-2. trouver le fichier de configuration de corosync sur les trois nœuds
-3. vérifier que le fichier de configuration de corosync est identique partout
-4. activer le mode debug de Pacemaker pour les sous processus `crmd`,
-`pengine`, `attrd` et `lrmd`
+1. create the cluster `cluster_tp` with three node `hanode1`, `hanode2` and
+   `hanode3`
+2. find the corosync configuration file on all three nodes
+3. check that the configuration file is identical on all three nodes
+4. activate the debug mode in Pacemaker for the `crmd`, `pengone`, `attrd` and
+   `lrmd` sub processes.
 
-Afin de pouvoir mieux étudier Pacemaker, nous activons le mode debug de des
-sous processus `crmd`, `pengine`, `attrd` et `lrmd` que nous aborderons dans la suite de
-cette formation.
+FR Afin de pouvoir mieux étudier Pacemaker, nous activons le mode debug de des
+FR sous processus `crmd`, `pengine`, `attrd` et `lrmd` que nous aborderons dans la suite de
+FR cette formation.
+FR
+We activate the debug mode for the `crmd`, `pengine`, `attrd` and `lrmd` in
+order to have an easier tume studying Pacemaker. This will be very usefull in
+the rest of the workshop.
 
 :::
 
 -----
 
-### Correction: Création du cluster avec pcs
+### Correction: Cluster creation with pcs
 
 ::: notes
 
-Les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+FR Les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+FR
+FR 1. créer un cluster nommé `cluster_tp` incluant les trois nœuds `hanode1`,
+FR    `hanode2` et `hanode3`
+FR
+The `pcs` commands can be executed from any node.
 
-1. créer un cluster nommé `cluster_tp` incluant les trois nœuds `hanode1`,
-   `hanode2` et `hanode3`
+1. create the cluster `cluster_tp` with three node `hanode1`, `hanode2` and
+   `hanode3`
 
 ~~~console
 # pcs cluster setup --name cluster_tp hanode1 hanode2 hanode3
 ~~~
 
-2. trouver le fichier de configuration de corosync sur les trois nœuds
+FR 2. trouver le fichier de configuration de corosync sur les trois nœuds
+FR
+FR Le fichier de configuration de Corosync se situe à l'emplacement
+FR `/etc/corosync/corosync.conf`.
+FR
+2. find the corosync configuration file on all three nodes
 
-Le fichier de configuration de Corosync se situe à l'emplacement
-`/etc/corosync/corosync.conf`.
+Corosync's configuration file is located here: `/etc/corosync/corosync.conf`.
 
-3. vérifier que le fichier de configuration de corosync est identique partout
+FR 3. vérifier que le fichier de configuration de corosync est identique partout
+FR
+3. check that the configuration file is identical on all three nodes
 
 ~~~console
 root@hanode1# md5sum /etc/corosync/corosync.conf
@@ -918,133 +1061,201 @@ root@hanode3# md5sum /etc/corosync/corosync.conf
 564b9964bc03baecf42e5fa8a344e489  /etc/corosync/corosync.conf
 ~~~
 
-4. activer le mode debug de Pacemaker pour les sous processus `crmd`, `pengine`
-   et `lrmd`
+FR 4. activer le mode debug de Pacemaker pour les sous processus `crmd`, `pengine`
+FR    et `lrmd`
+FR
+FR Éditer la variable `PCMK_debug` dans le fichier de configuration
+FR `/etc/sysconfig/pacemaker` :
+FR
+4. activate the debug mode in Pacemaker for the `crmd`, `pengine`, `attrd` and
+   `lrmd` sub processes.
 
-Éditer la variable `PCMK_debug` dans le fichier de configuration
-`/etc/sysconfig/pacemaker` :
+Edit the `PCMK_debug` variable in the configuration file `/etc/sysconfig/pacemaker`:
 
 ~~~console
 PCMK_debug=crmd,pengine,lrmd,attrd
 ~~~
 
-Pour obtenir l'ensemble des messages de debug de tous les processus,
-positionner ce paramètre à `yes`.
+FR Pour obtenir l'ensemble des messages de debug de tous les processus,
+FR positionner ce paramètre à `yes`.
+FR
+
 
 :::
 
 -----
 
-## Démarrage du cluster
+## Cluster startup
 
-* cluster créé mais pas démarré
-* désactiver Pacemaker au démarrage des serveurs
-* utilisation de `pcs` pour démarrer le cluster
+FR * cluster créé mais pas démarré
+FR * désactiver Pacemaker au démarrage des serveurs
+FR * utilisation de `pcs` pour démarrer le cluster
+FR
+* the cluster is created but not started
+* disable Pacemaker on server startup
+* use `pcs` to start the cluster
 
 ::: notes
 
-Une fois le cluster créé, ce dernier n'est pas démarré automatiquement. Il est
-déconseillé de démarrer Pacemaker automatiquement au démarrage des serveurs. En
-cas d'incident et de fencing, un nœud toujours défaillant pourrait déstabiliser
-le cluster et provoquer des interruptions de services suite à un retour
-automatique prématuré. En forçant l'administrateur à devoir démarrer Pacemaker
-manuellement, celui-ci a alors tout le loisir d'intervenir, d'analyser
-l'origine du problème et éventuellement d'effectuer des actions correctives
-avant de réintégrer le nœud, sain, dans le cluster.
+FR Une fois le cluster créé, ce dernier n'est pas démarré automatiquement. Il est
+FR déconseillé de démarrer Pacemaker automatiquement au démarrage des serveurs. En
+FR cas d'incident et de fencing, un nœud toujours défaillant pourrait déstabiliser
+FR le cluster et provoquer des interruptions de services suite à un retour
+FR automatique prématuré. En forçant l'administrateur à devoir démarrer Pacemaker
+FR manuellement, celui-ci a alors tout le loisir d'intervenir, d'analyser
+FR l'origine du problème et éventuellement d'effectuer des actions correctives
+FR avant de réintégrer le nœud, sain, dans le cluster.
+FR
+The cluster is not automatically started once it's creation. It's discouraged
+to enable Pacemaker's startup at boot time. In case of outage or fencing, a
+failing node could destabilize the cluster and provoque a downtime because
+it joined the cluster prematurely. By forcing the administrator to start
+Pacemaker manually, we give him time to intervene, analyze the origin of the
+problem and conduct corrective mesure if necessary, before reintroducing the
+node into the cluster.
 
-Le démarrage du cluster nécessite la présence des deux services Corosync et
-Pacemaker sur tous les nœuds. Démarrer d'abord les services Corosync puis
-Pacemaker. À noter que démarrer Pacemaker suffit souvent sur de nombreuses
-distributions Linux, Corosync étant démarré automatiquement comme dépendance.
+FR Le démarrage du cluster nécessite la présence des deux services Corosync et
+FR Pacemaker sur tous les nœuds. Démarrer d'abord les services Corosync puis
+FR Pacemaker. À noter que démarrer Pacemaker suffit souvent sur de nombreuses
+FR distributions Linux, Corosync étant démarré automatiquement comme dépendance.
+FR
+Cluster startup requires the presence of the Corosync and Pacemaker services on
+all nodes. Corosync should be started first then Pacemaker. On most Linux
+distribution, starting Pacemaker is enough, since Corosync  will be started
+automatically as a dependency.
 
-Plutôt que de lancer manuellement Pacemaker sur chaque nœud, il est possible
-de sous traiter cette tâche aux daemons `pcsd` avec une unique commande `pcs`.
+FR Plutôt que de lancer manuellement Pacemaker sur chaque nœud, il est possible
+FR de sous traiter cette tâche aux daemons `pcsd` avec une unique commande `pcs`.
+FR
+Instead of starting Pacemaker manually on each node, it's possible to delagate
+this task to the `pcsd` daemons thanks to a single `pcs` command.
 
 :::
 
 -----
 
-### TP: Démarrage du cluster
+### Practical work: Starting the cluster
 
 ::: notes
 
-1. désactiver Pacemaker et Corosync au démarrage du serveur
-2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
-3. vérifier l'état de Pacemaker et Corosync
+FR 1. désactiver Pacemaker et Corosync au démarrage du serveur
+FR 2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
+FR 3. vérifier l'état de Pacemaker et Corosync
+FR
+1. deactivate Pacemaker and Corosync at server startup
+2. start Pacemaker and Corosync on all nodes using `pcs`
+3. verify the state of Pacemaker and Corosync
 
 :::
 
 -----
 
-### Correction: Démarrage du cluster
+### Correction: Starting the cluster
 
 ::: notes
 
-1. désactiver Pacemaker et Corosync au démarrage du serveur
+FR 1. désactiver Pacemaker et Corosync au démarrage du serveur
+FR
+FR Sur tous les serveurs:
+FR
+1. deactivate Pacemaker and Corosync at server startup
 
-Sur tous les serveurs:
+On all servers:
 
 ~~~console
 # systemctl disable corosync pacemaker
 ~~~
 
-Ou, depuis un seul des serveurs:
+FR Ou, depuis un seul des serveurs:
+FR
+Or from one of the servers:
 
 ~~~console
 # pcs cluster disable --all
 ~~~
 
-2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
+FR 2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
+FR
+2. start Pacemaker and Corosync on all nodes using `pcs`
 
 ~~~console
 # pcs cluster start --all
 ~~~
 
-3. vérifier l'état de Pacemaker et Corosync
+FR 3. vérifier l'état de Pacemaker et Corosync
+FR
+FR Sur chaque serveur, exécuter:
+FR
+3. verify the state of Pacemaker and Corosync
 
-Sur chaque serveur, exécuter:
+On each server, execute:
 
 ~~~
 # systemctl status pacemaker corosync
 ~~~
 
-Ou:
+Or:
 
 ~~~
 # pcs status
 ~~~
 
-Nous observons que les deux services sont désactivés au démarrage des
-serveurs et actuellement démarrés.
+FR Nous observons que les deux services sont désactivés au démarrage des
+FR serveurs et actuellement démarrés.
+FR
+We can see that both services are running and have been disabled at server
+startup.
 
 :::
 
 -----
 
-## Visualiser l'état du cluster
+## Visualize the cluster state
 
-Pour visualiser l'état du cluster :
+FR Pour visualiser l'état du cluster :
+FR
+FR * `crm_mon`: commande livrée avec Pacemaker
+FR * `pcs`
+FR
+To visualize the cluster state:
 
-* `crm_mon`: commande livrée avec Pacemaker
+* `crm_mon`: a command provided with Pacemaker
 * `pcs`
 
 ::: notes
 
-L'outil `crm_mon` permet de visualiser l'état complet du cluster et des
-ressources. Voici le détail des arguments disponibles :
+FR L'outil `crm_mon` permet de visualiser l'état complet du cluster et des
+FR ressources. Voici le détail des arguments disponibles :
+FR
+FR * `-1`: affiche l'état du cluster et quitte
+FR * `-n`: regroupe les ressources par nœuds
+FR * `-r`: affiche les ressources non actives
+FR * `-f`: affiche le nombre fail count pour chaque ressource
+FR * `-t`: affiche les dates des événements
+FR * `-c`: affiche les tickets du cluster (utile pour les cluster étendus sur réseau WAN)
+FR * `-L`: affiche les contraintes de location négatives
+FR * `-A`: affiche les attributs des nœuds
+FR * `-R`: affiche plus de détails (node IDs, individual clone instances)
+FR * `-D`: cache l'entête
+FR
+FR Voici des exemples d'utilisation:
+FR
+The `crm_mon` tool is geared to the visualisation of the state of the cluster
+as a whole, including it's resources. Here is the detail of the available
+arguments:
 
-* `-1`: affiche l'état du cluster et quitte
-* `-n`: regroupe les ressources par nœuds
-* `-r`: affiche les ressources non actives
-* `-f`: affiche le nombre fail count pour chaque ressource
-* `-t`: affiche les dates des événements
-* `-c`: affiche les tickets du cluster (utile pour les cluster étendus sur réseau WAN)
-* `-L`: affiche les contraintes de location négatives
-* `-A`: affiche les attributs des nœuds
-* `-R`: affiche plus de détails (node IDs, individual clone instances)
-* `-D`: cache l'entête
+* `-1`: displays the state of the cluster and exits
+* `-n`: gathers resources on a per node basis
+* `-r`: displays the active resources
+* `-f`: displays the fail count for each node
+* `-t`: displays the dates of the events
+* `-c`: displays the tickets of the cluster (useful for extended clusters on WAN networks)
+* `-L`: displays the negative location constraints
+* `-A`: displays the node attributes
+* `-R`: displays mode detailed information (node IDs, individual clone instances)
+* `-D`: hide the header
 
-Voici des exemples d'utilisation:
+Here are some examples:
 
 ~~~console
 # crm_mon -DnA
@@ -1052,12 +1263,20 @@ Voici des exemples d'utilisation:
 # crm_mon -1frntcLAR
 ~~~
 
-À noter que ces différents arguments peuvent être aussi activés ou désactivés
-dans le mode interactif.
+FR À noter que ces différents arguments peuvent être aussi activés ou désactivés
+FR dans le mode interactif.
+FR
+FR L'outil `pcs` contient quelques commandes utiles pour consulter l'état d'un
+FR cluster, mais n'a pas de mode interactif. Voici quelques exemples
+FR d'utilisation:
+FR
 
-L'outil `pcs` contient quelques commandes utiles pour consulter l'état d'un
-cluster, mais n'a pas de mode interactif. Voici quelques exemples
-d'utilisation:
+Please note that these arguments can also be toggle on and off in interactive
+mode.
+
+The `pcs` tool comes equiped with several commands that are useful to display
+the cluster state, but it doesn't have an interactive mode. Here are few
+examples of their usage:
 
 ~~~console
 # pcs cluster status
@@ -1070,11 +1289,13 @@ d'utilisation:
 
 -----
 
-### TP: Visualiser l'état du cluster
+### Practical work: Cluster state visualization
 
 ::: notes
 
-Expérimenter avec les commandes vues précédemment et leurs arguments.
+FR Expérimenter avec les commandes vues précédemment et leurs arguments.
+FR
+Experiment with the commands listed before and their arguments.
 
 :::
 
