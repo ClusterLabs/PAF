@@ -1302,33 +1302,56 @@ Experiment with the commands listed before and their arguments.
 
 # Corosync
 
-Rapide tour d'horizon sur Corosync.
+FR Rapide tour d'horizon sur Corosync.
+FR
+A Quick overview of Corosync.
 
 -----
 
-## Présentation
+## Presentation
 
-* couche de communication bas niveau du cluster
-* créé en 2004
-* dérivé de OpenAIS
-* avec des morceaux de CMAN dedans ensuite (à vérifier)
+FR * couche de communication bas niveau du cluster
+FR * créé en 2004
+FR * dérivé de OpenAIS
+FR * avec des morceaux de CMAN dedans ensuite (à vérifier)
+FR 
+* communication layer of the clusterware
+* created in 2004
+* derived from OpenAIS
+* with some components from CMAN
+<!-- Vérifier le a vérifier -->
 
 ::: notes
 
-Corosync est un système de communication de groupe (`GCS`). Il fournit
-l'infrastructure nécessaire au fonctionnement du cluster en mettant à
-disposition des APIs permettant la communication et d'adhésion des membres au
-sein du cluster. Corosync fournit notamment des notifications de gain ou de
-perte du quorum qui sont utilisés pour mettre en place la haute disponibilité.
+FR Corosync est un système de communication de groupe (`GCS`). Il fournit
+FR l'infrastructure nécessaire au fonctionnement du cluster en mettant à
+FR disposition des APIs permettant la communication et d'adhésion des membres au
+FR sein du cluster. Corosync fournit notamment des notifications de gain ou de
+FR perte du quorum qui sont utilisés pour mettre en place la haute disponibilité.
+FR
+Corosync is a group communication system (_GCS_). It provides the
+infrastructure necessary for the cluster to operate by providing API for
+communication and cluster membership. Among other features, it also provides
+notification for the gain or loss of quorum which is important to archive high
+availability.
 
-Son fichier de configuration se trouve à l'emplacement
-`/etc/corosync/corosync.conf`. En cas de modification manuelle, il faut
-__ABSOLUMENT__ veiller à conserver une configuration identique sur tous les
-nœuds. Cela peut être fait manuellement ou avec la commande `pcs cluster sync`.
+FR Son fichier de configuration se trouve à l'emplacement
+FR `/etc/corosync/corosync.conf`. En cas de modification manuelle, il faut
+FR __ABSOLUMENT__ veiller à conserver une configuration identique sur tous les
+FR nœuds. Cela peut être fait manuellement ou avec la commande `pcs cluster sync`.
+FR 
+It's configuration is located in `/etc/corosync/corosync.conf`. In case of
+manual update, it is paramount to propagate the modifications on all nodes and
+ensure that all nodes have the same configuration. This can be done manually
+or with the command `pcs cluster sync`.
 
-La configuration de corosync est décrite dans la page de manuel
-`corosync.conf`. Ses fonctionnalités liées au quorum sont décrites dans le
-manuel nommé `votequorum`.
+FR La configuration de corosync est décrite dans la page de manuel
+FR `corosync.conf`. Ses fonctionnalités liées au quorum sont décrites dans le
+FR manuel nommé `votequorum`.
+FR 
+The Corosync configuration is described in length in the man page for
+`corosync.conf`. The parameters describing quorum are described in the man page
+for `votequorum`.
 
 :::
 
@@ -1336,160 +1359,280 @@ manuel nommé `votequorum`.
 
 ## Architecture
 
-* corosync expose ses fonctionnalités sous forme de services, eg. :
-  * `cgp` : API de gestion de groupe de processus ;
-  * `cmap` : API de gestion de configuration ;
-  * `votequorum` : API de gestion du quorum.
+FR * corosync expose ses fonctionnalités sous forme de services, eg. :
+FR   * `cgp` : API de gestion de groupe de processus ;
+FR   * `cmap` : API de gestion de configuration ;
+FR   * `votequorum` : API de gestion du quorum.
+FR
+* corosync exposes it's functionnalities as servises, e.g.:
+  * `cpg` (closed process group): process group & membership management API;
+  * `cmap`: configuration management API;
+  * `votequorum`: quorum managment API.
+<!-- pas sur pour cpg -->
 
 ::: notes
 
-Corosync s'appuie sur une ensemble de services internes pour proposer plusieurs APIs aux applications
-qui l'utilisent.
+FR Corosync s'appuie sur une ensemble de services internes pour proposer plusieurs APIs aux applications
+FR qui l'utilisent.
+FR
+FR Corosync expose notamment l'api `cpg` dont l'objet est d'assurer le moyen de
+FR communication d'une applications distribuées. Cette api permet de gérer :
+FR 
+FR * l'entrée et la sortie des membres dans un ou plusieurs groupes ;
+FR * la propagation des messages à l'ensemble des membres des groupes ;
+FR * la propagation des changements de configuration ;
+FR * l'ordre de délivrance des messages.
+FR
+Corosync relies on a set of internal services to propose several API to its
+client applications.
 
-Corosync expose notamment l'api `cpg` dont l'objet est d'assurer le moyen de
-communication d'une applications distribuées. Cette api permet de gérer :
+One of those API is `cpg` whose role is to provide means of communication for
+distributed applications. This API can manage:
 
-* l'entrée et la sortie des membres dans un ou plusieurs groupes ;
-* la propagation des messages à l'ensemble des membres des groupes ;
-* la propagation des changements de configuration ;
-* l'ordre de délivrance des messages.
+* the entry or exit of members in one or more groups;
+* the propagation of messages to all members of said groups;
+* the propagation of configuration changes;
+* the order of delivery of messages.
 
-Corosync utilise `cmap` pour gérer et stocker sa configuration sous forme de stockage
-clé-valeur. Cette API est également mise à disposition des applications qui utilisent corosync.
-Pacemaker s'en sert notamment pour récupérer certaines informations sur le cluster et
-ses membres.
+FR Corosync utilise `cmap` pour gérer et stocker sa configuration sous forme de stockage
+FR clé-valeur. Cette API est également mise à disposition des applications qui utilisent corosync.
+FR Pacemaker s'en sert notamment pour récupérer certaines informations sur le cluster et
+FR ses membres.
+FR
+Corosync uses `cmap` to manage and store it's configuration in the form of a
+key value store. This API is also available for the client applications of
+Corosync. For example, Pacemaker uses it to fetch some information from the
+cluster and it's members.
 
-Le service `votequorum` permet à corosync de fournir des notifications sur la gain ou la
-perte du quorum dans le cluster, le nombre de vote courant, etc.
+FR Le service `votequorum` permet à corosync de fournir des notifications sur la gain ou la
+FR perte du quorum dans le cluster, le nombre de vote courant, etc.
+FR 
+The `votequorum` service is designed to provide notification when quorum is
+archived or lost in the cluster, about the number of nodes in the cluster,
+etc.
 
 :::
 
 -----
 
-## Fonctionnalités de corosync 3
+## Corosync 3 features
 
-Nouvelle librairie `kronosnet` (`knet`):
+FR Nouvelle librairie `kronosnet` (`knet`):
+FR 
+FR * évolution du chiffrement
+FR * redondance des canaux de communications
+FR * compression
+FR
 
-* évolution du chiffrement
-* redondance des canaux de communications
+New library `kronosnet` (`knet`):
+
+* cryptography
+* redundancy of channels
 * compression
 
 ::: notes
 
-Corosync3 utilise la librairie kronosnet (`knet`). Cette libraire :
+FR Corosync3 utilise la librairie kronosnet (`knet`). Cette libraire :
+FR
+FR * remplace les modes de transport `multicast` et `unicast` ;
+FR * remplace le protocole `RRP` (_Redundant Ring Protocole_).
+FR
+Corosync 3 uses the `kronosnet` (`knet`) library, which:
 
-* remplace les modes de transport `multicast` et `unicast` ;
-* remplace le protocole `RRP` (_Redundant Ring Protocole_).
+* replaces the `multicast` and `unicast` method,
+* replaces the `RRP` protocol (_Redundant Ring Protocol_)
 
-Corosync implémente le protocole _Totem Single Ring Ordering and Membership_ pour la gestion
-des messages et des groupes. Il est possible de redonder les canaux de communications ou liens
-en créant plusieurs interfaces (option `totem` > `interface` > `linknumber`) qui seront
-utilisés comme support des rings (option `nodelist` > `node` > `ringX_addr`). `knet` permet
-de créer jusqu'à 8 liens avec des protocoles et des priorités différentes.
+FR Corosync implémente le protocole _Totem Single Ring Ordering and Membership_ pour la gestion
+FR des messages et des groupes. Il est possible de redonder les canaux de communications ou liens
+FR en créant plusieurs interfaces (option `totem` > `interface` > `linknumber`) qui seront
+FR utilisés comme support des rings (option `nodelist` > `node` > `ringX_addr`). `knet` permet
+FR de créer jusqu'à 8 liens avec des protocoles et des priorités différentes.
+FR
+FR Le chiffrement peut être configuré soit avec l'option `totem` > `secauth` soit avec les
+FR paramètres `totem` > `crypto_model`, `totem` > `crypto_cipher` et `totem` > `crypto_hash`.
+FR
+FR Il est également possible d'utiliser la compression.
+FR 
+Corosync implements the _Totem Single Ring Ordering and Membership_ protocol
+for its message and group management. It's possible to add redundancy for
+communication channels and network links by creating several interfaces
+(`totem` > `interface` > `linknumer` option) which will be used by the rings
+(`nodelist` > `node` > `ringX_addr`). `knet` allows for the creation of
+up to 8 links with different protocols and priorities.
 
-Le chiffrement peut être configuré soit avec l'option `totem` > `secauth` soit avec les
-paramètres `totem` > `crypto_model`, `totem` > `crypto_cipher` et `totem` > `crypto_hash`.
+Cryptography can be configured either with the option `totem` > `secauth` or
+the parameters `totem` > `crypto_model`, `totem` > `crypto_cipher` and `totem`
+> `crypto_hash`.
 
-Il est également possible d'utiliser la compression.
-
-:::
-
------
-
-## Clusters à deux nœuds
-
-* paramètre dédié : `two_node: 1`
-* option héritée de CMAN
-* requiers `expected-votes: 2`
-* implique `wait_for_all: 1`
-* requiers un fencing hardware configuré sur la même interface que le heartbeat
-
-::: notes
-
-Considérons un cluster à deux nœuds avec un vote par nœud. Le nombre de vote
-attendu est 2 (`expected-votes`), il n'est donc pas possible d'avoir une
-majorité en cas de partition du cluster. La configuration `two_node` permet de
-fixer artificiellement le quorum à 1 et de résoudre ce problème.
-
-Ce paramétrage, implique `wait_for_all : 1` qui empêche le cluster d'établir
-une majorité tant que l'ensemble des nœuds n'est pas présent. Ce qui évite une
-partition au démarrage du cluster.
-
-En cas de partition réseau, les deux nœuds font la course pour fencer l'autre.
-Le nœud vainqueur conserve alors le quorum grâce au paramètre `two_node: 1`.
-Quand au second nœud, après redémarrage de Pacemaker, si la partition réseau
-existe toujours, ce dernier n'obtient donc pas le quorum grâce au paramètre
-`wait_for_all: 1` et en conséquence ne peut démarrer aucune ressource.
-
-Même si elle fonctionne, ce genre de configuration n'est cependant pas
-optimale. Comme en témoigne
-[cet article du blog de clusterlabs](http://blog.clusterlabs.org/blog/2018/two-node-problems).
+It's also possible to use compression.
 
 :::
 
 -----
 
-## Outils
+## Two node clusters
 
-Corosync installe plusieurs outils:
-
-* `corosync-cfgtool` : administration, paramétrage
-* `corosync-cpgtool` : visualisation des différents groupes CPG
-* `corosync-cmapctl` : administration de la base d'objets
-* `corosync-quorumtool` : gestion du quorum
+FR * paramètre dédié : `two_node: 1`
+FR * option héritée de CMAN
+FR * requiers `expected-votes: 2`
+FR * implique `wait_for_all: 1`
+FR * requiers un fencing hardware configuré sur la même interface que le heartbeat
+FR 
+* dedicated parameter: `two_node: 1`
+* inherited from CMAN
+* requires: `expected-votes: 2`
+* implies: `wait_for_all: 1`
+* requiers a fencing hardware configured on the same interface as the
+  heartbeat.
 
 ::: notes
 
-`corosync-cfgtool` permet de :
+FR Considérons un cluster à deux nœuds avec un vote par nœud. Le nombre de vote
+FR attendu est 2 (`expected-votes`), il n'est donc pas possible d'avoir une
+FR majorité en cas de partition du cluster. La configuration `two_node` permet de
+FR fixer artificiellement le quorum à 1 et de résoudre ce problème.
+FR
+Given a two cluster node with one vote per node, the number of expected vote is
+2 (`expected-votes`). Therefore, it's not possible to have a majority in case
+of cluster partition. The `two_node` parameter fixes this problem by fixing the
+quorum at a value of 1.
 
-* arrêter corosync sur le serveur ;
-* récupérer l'IP d'un nœud ;
-* tuer un nœud ;
-* récupérer des informations sur les rings et réinitialiser leur statut ;
-* demander à l'ensemble des nœuds de recharger leur configuration.
+CR Ce paramétrage, implique `wait_for_all : 1` qui empêche le cluster d'établir
+CR une majorité tant que l'ensemble des nœuds n'est pas présent. Ce qui évite une
+CR partition au démarrage du cluster.
+CR 
+This configuration implies the usage of `wait_for_all: 1`, which forbids the
+cluster from establishing a majority unless all members of the cluster are
+present. This restriction is designed to avoid a partition during cluster
+startup.
 
-`corosync-cpgtool` permet d'afficher les groupes cpg et leurs membres.
+CR En cas de partition réseau, les deux nœuds font la course pour fencer l'autre.
+CR Le nœud vainqueur conserve alors le quorum grâce au paramètre `two_node: 1`.
+CR Quand au second nœud, après redémarrage de Pacemaker, si la partition réseau
+CR existe toujours, ce dernier n'obtient donc pas le quorum grâce au paramètre
+CR `wait_for_all: 1` et en conséquence ne peut démarrer aucune ressource.
+CR
+In case of network partition, both nodes race to fence the other node. The
+winner keeps the quorum thanks to the parameter `two_node: 1`. If the second
+node is restarted while the partition is still present, it will not be able to
+archive the quorum thanks to the parameter `wait_for_all: 1`. As a result it
+will bot be able to start any ressource.
 
-`corosync-cmapctl` permet de manipuler et consulter la base d'objet de corosync,
-les actions possibles sont :
-
-* lister les valeurs associées aux clés : directement (ex: totem.secauth), par
-préfix(ex: totem.) ou sans filtre ;
-* définir ou supprimer des valeurs ;
-* changer la configuration depuis un fichier externe ;
-* suivre les modifications des clés stockées dans `cmap` en temps réel en filtrant
-sur un préfix ou directement sur un clé.
-
-`corosync-quorumtool` permet d'accéder au service de quorum pour par exemple:
-
-* modifier la configuration des votes (nombre, nombre attendu) ;
-* suivre les modifications de quorum ;
-* lister les nœuds avec leurs nom, id et IPs .
+FR Même si elle fonctionne, ce genre de configuration n'est cependant pas
+FR optimale. Comme en témoigne
+FR [cet article du blog de clusterlabs](http://blog.clusterlabs.org/blog/2018/two-node-problems).
+FR 
+Even though this kind of configuration works, it's not optimal as explained in
+[this clusterlab blog
+post](http://blog.clusterlabs.org/blog/2018/two-node-problems).
 
 :::
 
 -----
 
-## TP: utilisation de Corosync
+## Tools
+
+FR Corosync installe plusieurs outils:
+FR 
+FR * `corosync-cfgtool` : administration, paramétrage
+FR * `corosync-cpgtool` : visualisation des différents groupes CPG
+FR * `corosync-cmapctl` : administration de la base d'objets
+FR * `corosync-quorumtool` : gestion du quorum
+FR 
+Corosync installs several tools:
+
+* `corosync-cfgtool` : administration, configuration
+* `corosync-cpgtool` : cpg group visualization
+* `corosync-cmapctl` : administration of the cmap key value store
+* `corosync-quorumtool` : quorum managment
+<!-- pas sur d'avoir bien compris la ligne cmap --> 
 
 ::: notes
 
-1. afficher le statut du ring local avec `corosync-cfgtool`
-2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
-3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
-4. afficher la configuration des nœuds dans la base CMAP avec
-   `corosync-cmapctl` (clé `nodelist`)
-5. afficher l'état du quorum avec `corosync-quorumtool`
+FR `corosync-cfgtool` permet de :
+FR 
+FR * arrêter corosync sur le serveur ;
+FR * récupérer l'IP d'un nœud ;
+FR * tuer un nœud ;
+FR * récupérer des informations sur les rings et réinitialiser leur statut ;
+FR * demander à l'ensemble des nœuds de recharger leur configuration.
+FR
+`corosync-cfgtool` can be used to:
+
+* stop corosync on the server;
+* retrieve the IP of a node;
+* kill a node;
+* retrieve information about rings and reinitialize their status;
+* ask all nodes to reload their configuration.
+
+FR `corosync-cpgtool` permet d'afficher les groupes cpg et leurs membres.
+FR
+`corosync-cpgtool` can be used to display cpg groups and members.
+
+FR `corosync-cmapctl` permet de manipuler et consulter la base d'objet de corosync,
+FR les actions possibles sont :
+FR 
+FR * lister les valeurs associées aux clés : directement (ex: totem.secauth), par
+FR préfix(ex: totem.) ou sans filtre ;
+FR * définir ou supprimer des valeurs ;
+FR * changer la configuration depuis un fichier externe ;
+FR * suivre les modifications des clés stockées dans `cmap` en temps réel en filtrant
+FR sur un préfix ou directement sur un clé.
+FR
+`corosync-cmapctl` can be used to read and modify data in the key value store
+of corosync, possible actions are:
+
+* list the values for given keys: directrly (e.g.: totem.secauth), using a
+  prefix (e.g.: totem.) or without filters;
+* define or delete values;
+* change the configuration using an external file;
+* follow the modification of keys sorted in `cmap` in realtime.
+
+FR `corosync-quorumtool` permet d'accéder au service de quorum pour par exemple:
+FR 
+FR * modifier la configuration des votes (nombre, nombre attendu) ;
+FR * suivre les modifications de quorum ;
+FR * lister les nœuds avec leurs nom, id et IPs .
+FR
+`corosync-quorumtool` can be used to access the quorum service in order to:
+
+* modify the configuration of votes (number & avaited number);
+* follow quorum evolution;
+* list nodes with their name, id and ips.
 
 :::
 
 -----
 
-## Correction: utilisation de Corosync
+## Practice work: Corosync utilisation
 
 ::: notes
 
-1. afficher le statut du ring local avec `corosync-cfgtool`
+FR 1. afficher le statut du ring local avec `corosync-cfgtool`
+FR 2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
+FR 3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
+FR 4. afficher la configuration des nœuds dans la base CMAP avec
+FR    `corosync-cmapctl` (clé `nodelist`)
+FR 5. afficher l'état du quorum avec `corosync-quorumtool`
+FR 
+1. display the local ring status with `corosync-cfgtool`
+2. display the IP of each node with `corosync-cfgtool`
+3. display CPG groups and members with `corosync-cpgtool`
+4. display the configuration of each node from the CMAP base with
+   `corosync-cmapctl` (key: `nodelist`)
+5. display the state of the quorum with `corosync-quorumtool`
+
+:::
+
+-----
+
+## Correction: Corosync utilisation
+
+::: notes
+
+FR 1. afficher le statut du ring local avec `corosync-cfgtool`
+FR
+1. display the local ring status with `corosync-cfgtool`
 
 ~~~console
 # corosync-cfgtool -s
@@ -1500,7 +1643,9 @@ RING ID 0
   status  = ring 0 active with no faults
 ~~~
 
-2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
+FR 2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
+FR
+2. display the IP of each node with `corosync-cfgtool`
 
 ~~~console
 # corosync-cfgtool -a 1
@@ -1513,7 +1658,9 @@ RING ID 0
 10.20.30.8
 ~~~
 
-3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
+FR 3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
+FR
+3. display CPG groups and members with `corosync-cpgtool`
 
 ~~~console
 # corosync-cpgtool -e
@@ -1540,11 +1687,17 @@ pacemakerd
 		      6721	         2 (10.20.30.7)
 ~~~
 
-Chaque sous-processus de pacemaker est associé à un groupe de communication
-avec leur équivalents sur les autres nœuds du cluster.
+FR Chaque sous-processus de pacemaker est associé à un groupe de communication
+FR avec leur équivalents sur les autres nœuds du cluster.
+FR 
+Each sub process of pacemaker is part of a communication group with it's
+counterpart on the other nodes.
 
-4. afficher la configuration des nœuds dans la base CMAP avec
-   `corosync-cmapctl` (clé `nodelist`)
+FR 4. afficher la configuration des nœuds dans la base CMAP avec
+FR    `corosync-cmapctl` (clé `nodelist`)
+FR
+4. display the configuration of each node from the CMAP base with
+   `corosync-cmapctl` (key: `nodelist`)
 
 ~~~console
 # corosync-cmapctl -b nodelist
@@ -1557,7 +1710,9 @@ nodelist.node.2.nodeid (u32) = 3
 nodelist.node.2.ring0_addr (str) = hanode3
 ~~~
 
-5. afficher l'état du quorum avec `corosync-quorumtool`
+FR 5. afficher l'état du quorum avec `corosync-quorumtool`
+FR
+5. display the state of the quorum with `corosync-quorumtool`
 
 ~~~console
 # corosync-quorumtool
