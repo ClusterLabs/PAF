@@ -55,14 +55,14 @@ FR * supervision de l'ensemble
 ::: notes
 
 FR La résistance d'une chaîne repose sur son maillon le plus faible.
-
+FR
 The resiliance of a chain is based on the resiliance of it's weakest link.
 
 FR Un pré-requis à une architecture de haute disponibilité est d'utiliser du
 FR matériel de qualité, fiable, éprouvé, maîtrisé et répandu.  Fonder son
 FR architecture sur une technologie peu connue et non maîtrisée est la recette
 FR parfaite pour une erreur humaine et une indisponibilité prolongée.
-
+FR
 One prerequisite for an high availability architecture is to use quality
 hardware i.e. reliable, tested, mastered and wide spread. Building an
 architecture on a lesser known technology that is not mastered is the recipe
@@ -72,7 +72,7 @@ FR De même, chaque élément doit être redondé.  La loi de Murphy énonce que
 FR ce qui peut mal tourner, tournera mal ».  Cette loi se vérifie très
 FR fréquemment.  Les incidents se manifestent rarement là où on ne les attend le
 FR plus.  Il faut réellement tout redonder :
-
+FR
 Likewise, each element must have it's replacement. Murphy's Law states that "if
 something can go wrong, it will". This law is very ofter proven true.  Problems
 rarely arise where we await them the most. Everything in the architectyre must
@@ -89,7 +89,7 @@ FR * climatisation redondée
 FR * plusieurs équipements de fencing (et chemins pour accéder)
 FR * plusieurs administrateurs comprenant et maîtrisant chaque brique du cluster
 FR * ...
-
+FR
 * each application or sevice must have a failover procedure
 * CPU (multi-socket), memory (multi-slotn ECC, disks (RAID levels)
 * SAN 
@@ -102,7 +102,7 @@ FR * ...
 
 FR S'il reste un seul _Single Point of Failure_, ou _SPoF_, dans l'architecture,
 FR ce point subira un jour une défaillance.
-
+FR
 If there is one _Single Point of Failure_, or _SPoF_,  in the architecture,
 it will fail one day or another.
 
@@ -110,7 +110,7 @@ FR Concernant le synchronisme des horloges des serveurs entre eux, celui-ci est
 FR important pour les besoins applicatifs et la qualité des données.  Suite à une
 FR bascule, les dates pourraient être incohérentes entre celles écrites par la
 FR précédente instance primaire et la nouvelle.
-
+FR
 It is paramount that all server clocks are synchronized for the applications
 and their data to be safe. For example: after a failover of a database,
 inconsistancies must be avoided between the dates provided by the old primary
@@ -121,7 +121,7 @@ FR l'horodatage des journaux applicatifs entre les serveurs.  La compréhension
 FR rapide et efficace d'un incident dépend directement de ce point.  À noter qu'il
 FR est aussi possible de centraliser les logs sur une architecture dédiée à part
 FR (attention aux _SPoF_ ici aussi).
-
+FR
 This synchronization is also important to have coherent timestamps in the
 application logs across all servers. This is very important to understand and
 fix problems in a quick and reliable way. It's also possible to centralize logs
@@ -130,7 +130,7 @@ another SPOF.
 
 FR Le synchronisme des horloges est d'autant plus important dans les
 FR environnements virtualisés où les horloges ont facilement tendance à dévier.
-
+FR
 Finally, clock synchronization is very important in virtualized environnemnt
 where clock can easily drift.
 
@@ -144,7 +144,7 @@ FR * difficulté de déterminer l'origine d'un incident de façon logicielle
 FR * chaque brique doit toujours être dans un état déterminé
 FR * garantie de pouvoir sortir du système un élément défaillant
 FR * implémenté dans Pacemaker au travers du _daemon_ `stonithd`
-
+FR
 * complexity to diagnose the origin of a problem with software
 * each element must be in a defined state
 * guaranty to be able to exclude a failing element from the system
@@ -155,7 +155,7 @@ FR * implémenté dans Pacemaker au travers du _daemon_ `stonithd`
 FR Lorsqu'un serveur n'est plus accessible au sein d'un cluster, il est impossible
 FR aux autres nœuds de déterminer l'état réel de ce dernier.  A-t-il crashé ?
 FR Est-ce un problème réseau ?  Subit-il une forte charge temporaire ?
-
+FR
 When a server is not accessible from the rest of the cluster, it's not possible
 for the other server to determine it's real state. Did it crash ? Was it a
 network problem ? Is it temporarily under stress ?
@@ -163,7 +163,7 @@ network problem ? Is it temporarily under stress ?
 FR Le seul moyen de répondre à ces questions est d'éteindre ou d'isoler le serveur
 FR fantôme d'autorité.  Cette action permet de déterminer de façon certaine son
 FR statut : le serveur est hors _cluster_ et ne reviendra pas sans action humaine.
-
+FR
 The only way to answer these questions is to shutdown or isolate the ghost
 server. After this action, we are sure of the state of the server and we
 know it cannot come back into the cluster without human intevention.
@@ -171,14 +171,14 @@ know it cannot come back into the cluster without human intevention.
 FR Une fois cette décision prise et appliquée avec succès, le _cluster_ peut
 FR mettre en œuvre les actions nécessaires pour rendre les services en HA de
 FR nouveau disponibles.
-
+FR
 Once this decision to fence a server is taken and applied, the cluster can take
 some actions to make sure the HA services are available.
 
 FR Passer outre ce mécanisme, c'est s'exposer de façon certaine à des situations
 FR dites de _split brain_, où plusieurs sous-partitions du _cluster_ initial
 FR continuent à fonctionner de façon autonomes.
-
+FR
 Disregarding this safety mecanism will expose the system to _split brain_
 issues, where several partitions of the cluster continue to operate on their
 own.
@@ -194,7 +194,7 @@ FR certaine quantité de données n'a pas été répliquée de l'ancien primaire
 FR nouveau avant la bascule.  En conséquence, plusieurs jours ont été nécessaires
 FR afin de réintégrer et réconcilier les données dans le _cluster_ fraîchement
 FR reconstruit.
-
+FR
 In the specific case where the cluster is managing databases with a replication
 setup, a _split brain_ scenario would entail several instances of the database
 available in read/write mode at the sametime without any form of replication
@@ -209,7 +209,7 @@ lost data in the newly build cluster.
 FR Ne sous-estimez jamais le pouvoir d'innovation en terme d'incident des briques
 FR de votre _cluster_ pour provoquer une partition des nœuds entre eux.  En voici
 FR quelques exemples : <https://aphyr.com/posts/288-the-network-is-reliable>
-
+FR
 Never underestimate the inovative nature of incidents, and the likelihood that
 they will provoque a parition in your cluster. Here are some more examples:
 <https://aphyr.com/posts/288-the-network-is-reliable>.
@@ -217,7 +217,7 @@ they will provoque a parition in your cluster. Here are some more examples:
 FR À noter que PAF est pensé et construit pour les _clusters_ configurés avec le
 FR _fencing_.  En cas d'incident, il y a de fortes chances qu'une bascule n'ait
 FR jamais lieu pour un _cluster_ dépourvu de _fencing_.
-
+FR
 Please note that PAF is build with fencing enabled clusters in mind. In case of
 incident, a failover might not occur if your cluster is not equipped with the
 relevant fencing ressources.
@@ -231,7 +231,7 @@ relevant fencing ressources.
 FR * quelle partie du cluster doit fonctionner en cas de partition réseau ?
 FR  * un vote à chaque élément du _cluster_
 FR  * le _cluster_ ne fonctionne que s'il a la majorité des votes
-
+FR
 * which part of the cluster should keep operating in case of network partition
   ?
   * one vote per cluster member
@@ -242,7 +242,7 @@ FR  * le _cluster_ ne fonctionne que s'il a la majorité des votes
 FR Le quorum est le nombre minimum de votes qu'une transaction distribuée doit
 FR obtenir pour être autorisée à effectuer une opération dans le système.  Son
 FR objectif est d'assurer la cohérence du système distribué.
-
+FR
 The quorum is the minimum number of votes requiered for a distributed
 transaction to be authorized to execute an opération on the system. It's goal
 is to guaranty the coherence of the distributed system.
@@ -251,7 +251,7 @@ FR Pour ce faire, chaque nœud du système se voit assigner un nombre de votes. 
 FR faut au moins que `(N / 2) + 1` votes soient présents pour que le quorum soit
 FR atteint, avec `N` le nombre de votes possible.  Le _cluster_ ne fonctionne que
 FR si la majorité des nœuds sont présents.
-
+FR
 To archive this goal, each node is granted some votes. A minimum of `(N / 2) +
 1` votes are requiered for the quorum to be archived (`N` being the maximum number
 of vote possible). The cluster will be able to operate only if the majority
@@ -260,7 +260,7 @@ is archived.
 FR Suite à une partition réseau, le quorum permet au cluster de savoir quelle
 FR partition doit conserver les services actifs, celle(s) où il doit les
 FR interrompre, et qui peut déclencher des opérations de fencing si nécessaire.
-
+FR
 After a network partition, the cluster uses the quorum information to know
 which partition must keep the services active, and which partition must stop
 all the services. Fencing operation can be started if necessary. 
@@ -268,9 +268,9 @@ all the services. Fencing operation can be started if necessary.
 FR En plus d'arrêter ses services locaux, une partition du cluster n'atteignant
 FR pas le quorum ne peut notamment pas actionner le fencing des nœuds de la
 FR partition distante.
-
+FR
 FR Ce mécanisme est donc indispensable au bon fonctionnement du cluster.
-
+FR
 In addition to stopping local services, a cluster partition who doesn't meet
 the quorum cannot use fencing on the node of the other partition.
 
@@ -289,7 +289,7 @@ FR   * de mise en œuvre (risque de _SPOF_)
 FR   * de maintenance
 FR   * de documentation
 FR * il est préférable de toujours aller au plus simple
-
+FR
 * complex architechture pose complex problems
   * to build (avoid a _SPOF_)
   * to maintain
@@ -301,11 +301,11 @@ FR * il est préférable de toujours aller au plus simple
 
 FR Augmenter la complexité d'un cluster augmente aussi le nombre de défaillances possibles. Entre deux solutions, la
 FR solution la plus simple sera souvent la meilleure et la plus pérenne.
-
+FR
 FR L'incident décrit par de Gocardless dans le lien ci-après est un bon exemple. L'article indique que l'automatisation
 FR réduit la connaissance de l'architecture. Au fil du temps il est difficile de maintenir une documentation à jour, des
 FR équipes correctement formées :
-
+FR
 Increasing the complexity of a cluster also increases the number of failures
 scenarios. Given two cluster implementations, the simplest one will usually be
 the best and most sustainable.
@@ -342,7 +342,7 @@ FR   * "Cluster Services" de Red Hat
 FR * 2007 : Pacemaker apparaît
 FR   * issu de Linux-HA
 FR   * 1er point de convergence
-
+FR
 * several projects on different platforms 
   * Linux HA project led by SUSE
   * "Cluster Services" by Red Hat
@@ -354,15 +354,15 @@ FR   * 1er point de convergence
 
 FR Un historique complet est disponible
 FR [ici](https://www.alteeve.com/w/High-Availability_Clustering_in_the_Open_Source_Ecosystem).
-
+FR
 FR Plusieurs sociétés se sont forgées une longue expérience dans le domaine de la Haute Disponibilité en maintenant chacun
 FR leur plate-forme.
-
+FR
 FR SUSE d'abord, avec son projet Linux-HA. Red Hat ensuite avec "Cluster Services".
-
+FR
 FR En 2007, issu d'une première collaboration, Pacemaker apparaît pour gérer les clusters peu importe la couche de
 FR communication utilisée : OpenAIS (Red Hat) ou Heartbeat (SUSE).
-
+FR
 The complete history is available 
 [here](https://www.alteeve.com/w/High-Availability_Clustering_in_the_Open_Source_Ecosystem).
 
@@ -386,7 +386,7 @@ FR * 2009 : Corosync apparaît
 FR   * issu de OpenAIS
 FR   * 2ème point de convergence
 FR * 2014 : début de l'harmonisation
-
+FR
 * 2009 : Corosync
   * based on OpenAIS
   * 2nd convergence
@@ -395,10 +395,10 @@ FR * 2014 : début de l'harmonisation
 ::: notes
 
 FR En 2009 apparaît l'uniformisation des couches de communication grâce à Corosync.
-
+FR
 FR Une collaboration forte étant désormais née, Pacemaker et Corosync deviennent petit à petit la référence et chaque
 FR distribution tend vers cette plate-forme commune.
-
+FR
 In 2009, an effort to standarize the communication layers leads the birth of
 Corosync.
 
@@ -415,7 +415,7 @@ include these tools in their packaging.
 FR * 2017: les principales distributions ont convergé
 FR   * Corosync 2.x et Pacemaker 1.1.x
 FR * 2018: corosync 3 et Pacemaker 2.0.x
-
+FR
 * 2017: the main distribution have converged
   * Corosync 2.x and Pacemaker 1.1.x
 * 2018: corosync 3 and Pacemaker 2.0.x
@@ -425,20 +425,20 @@ FR * 2018: corosync 3 et Pacemaker 2.0.x
 FR En 2017, les dernières versions des principales distributions Linux avaient toutes fini leur convergence vers Corosync
 FR 2.x et Pacemaker 1.1.x. Seul le client d'administration de haut niveau varie en fonction de la politique de la
 FR distribution.
-
+FR
 In 2017, the latest versions of the main Linux distributions are done
 converging to Corosync 2.x and Pacemaker 1.1.x. The last divergence lies with
 the administration client.
 
 FR Début 2018, Pacemaker 2.0 et Corosync 3.0 font leur apparition. Coté Pacemaker, les principaux changements concernent:
-
+FR
 FR * la suppression de beaucoup de code consacré aux anciennes architectures devenues obsolètes : incompatibilité avec
 FR   OpenAIS, CMAN, Corosync 1.x, Heartbeat
 FR * plusieurs paramètres de configuration ont été supprimés ou remplacés par des équivalents pour une configuration plus
 FR   cohérente
-
+FR
 FR Pour plus de détails, voir: <https://wiki.clusterlabs.org/wiki/Pacemaker_2.0_Changes>
-
+FR
 A the beginning of 2018, Pacemaker 2.0 and Corosync 3.0 are release. One the
 Pacemaker side, the main changes are :
 
@@ -453,15 +453,15 @@ FR Concernant Corosync, la principale nouveauté est le support du projet "Krono
 FR sein du cluster. Cette librairie permet d'ajouter beaucoup de souplesse, de fonctionnalités, de visibilité sur
 FR l'activité de Corosync et surtout une latence plus faible que l'actuel protocole. Entre autre nouveautés, nous
 FR trouvons :
-
+FR
 FR * le support de un à huit liens réseaux
 FR * l'ajout de liens réseaux à chaud
 FR * le mélange de protocoles entre les liens si nécessaire
 FR * plusieurs algorithmes de gestions de ces liens (active/passive ou active/active)
 FR * la capacité de gérer la compression et/ou le chiffrement
-
+FR
 FR Pour plus de détails, voir: [Kronosnet:The new face of Corosync communications](http://build.clusterlabs.org/corosync/presentations/2017-Kronosnet-The-new-face-of-corosync-communications.pdf)
-
+FR
 As far as Corosync is concerned, the main novelty is the support for the
 project "Kronosnet" as the communication protocol. This library allows for more
 flexibility, adds more fonctionalities, facilitates the supervision of Corosync
@@ -488,7 +488,7 @@ FR * `pcs`
 FR   * introduit par Red Hat
 FR   * supporte également Corosync
 FR   * utilisé dans ce workshop
-
+FR
 * `crmsh`
   * original tool
   * management and configuration of the cluster
@@ -503,7 +503,7 @@ FR A l'origine du projet Pacemaker, un outil apparaît : `crmsh`. Cet outil perm
 FR sans toucher aux fichiers de configuration. Il est principalement maintenu par Suse et présente parfois des
 FR incompatibilités avec les autres distributions pour la création du cluster lui-même, son démarrage ou son arrêt.
 FR Néanmoins, l'outil évolue très vite et plusieurs de ces incompatibilités sont corrigées.
-
+FR
 The tool `cmrsh` originates to the beginning of the Pacemaker project. This
 tool is designed to managed and configure the cluster without requiering to
 modify the configuration files. It's mostly maintained by SUSE, and sometimes
@@ -514,7 +514,7 @@ several incompatibilities hav been fixed.
 FR Lorsque Red Hat intègre Pacemaker, un nouvel outil est créé : `pcs`. En plus de regrouper les commandes de Pacemaker,
 FR il supporte également Corosync (et CMAN pour les versions EL 6) et inclut un service HTTP permettant (entre autre) la
 FR configuration et la maintenance du cluster via un navigateur web.
-
+FR
 When Red Hat adopted Pacemaker, a new tool was created: `pcs`. It regroups all
 the Pacemaker commands along with those for Corosync (and CMAN in the versions
 for EL 6). It includes an HTTP service to configure and maintain the cluster
@@ -522,19 +522,19 @@ via a web browser.
 
 FR Concernant le contrôle du cluster, `crmsh` repose sur SSH et csync2 pour l'exécution de commandes sur les serveurs
 FR distants (via la librairie python `parallax`) et la gestion de la configuration sur tous les serveurs.
-
+FR
 `crmsh` uses SSH and csync2 to execute commands on the remote servers (via the
 `parallax` python library) and manage the configuration across all servers.
 
 FR Pour ces mêmes tâches, les daemons `pcsd` échangent des commandes entre eux via leur service web. Le daemon `pcsd` gère
 FR à la fois une API HTTP pour la communication de commandes inter-serveurs ou l'interface HTTP à destination de
 FR l'administrateur.
-
+FR
 FR Lorsqu'une commande nécessite une action côté système (donc hors Pacemaker), les daemon `pcsd` communiquent entre eux
 FR et s'échangent les commandes à exécuter localement au travers de cette API HTTP. Les commandes sollicitant cette API
 FR peuvent être la création du cluster lui-même, son démarrage, son arrêt, sa destruction, l'ajout ou la suppression d'un
 FR nœud, etc.
-
+FR
 To archive the same tasks, the `pcsd` daemons exchange commands via their web
 services. The `pcsd` daemon manages the communication for the HTTP API
 dedicated to inter-server commands and the administration.
@@ -547,14 +547,14 @@ starting or stopping process and the addition or removal a node, etc.
 FR En 2018, `pcs` a fini d'être intégré à Debian. `crmsh` est encore utilisé en priorité sous Suse, mais reste souvent
 FR utilisé sur les Debian et Ubuntu par choix historique et reste un très bon choix, pour peu que l'administrateur ne
 FR l'utilise pas pour interagir avec le système lui même.
-
+FR
 In 2018, `pcs` is fully integrated into Debian. `crmsh` is still used in
 piority in SUSE, it's also often used in Debian and Ubuntu since it's the
 historic choice for thoses platforms. It remains a good choise as long as the
 administrator doesn't need to interact with the system.
 
 FR **Ce workshop se base sur une distribution CentOS 7 et sur l'outil `pcs`**.
-
+FR
 **This workshop is based on Centos 7 and uses the `pcs` tool.**
 
 :::
@@ -575,7 +575,7 @@ FR **Ce workshop se base sur une distribution CentOS 7 et sur l'outil `pcs`**.
 ::: notes
 
 FR L'installation recommandée (et supportée) suivant les distributions de RHEL et dérivés :
-
+FR
 The recommanded (and supported ) version depending on the distribution are:
 
 | OS        | Corosync | Pacemaker | Administration               |
@@ -591,7 +591,7 @@ FR versions des composants à temps pour la version 8 de Debian. Il a été déc
 FR d'utiliser officiellement le dépôt backport de Debian pour distribuer ces
 FR paquets dans Debian 8. Les versions 8 et 9 de Debian partagent donc les mêmes
 FR versions des paquets concernant Pacemaker.
-
+FR
 The maintenace team in charge of the Pacemaker packaging couldn't include the
 last versions of it's components in time for version 8 of Debian. It was
 decided to use the debian backport repository to distribute thoses packages in
@@ -603,7 +603,7 @@ FR et ne devrait pas être corrigée, la branche 3.x étant désormais la branch
 FR principale du projet. La version 3.0 de `crmsh` supporte l'initialisation d'un
 FR cluster sous Debian mais avec un peu d'aide manuelle et quelques erreurs
 FR d'intégration.
-
+FR
 The initialisation of the cluster with `crmsh` 2.x is still not working but
 should be fixed, the 3.x branch of the project is now it's main branch. The 3.0
 version of `crmsh` supports the cluster initialisation with some manual
@@ -612,8 +612,7 @@ intervention and intergration errors.
 FR L'utilisation de `pcsd` et `pcs` est désormais pleinement fonctionne sous
 FR Debian. Voir à ce propos:
 FR <https://clusterlabs.github.io/PAF/Quick_Start-Debian-9-pcs.html>
-
-
+FR
 The use of `pcsd` and `pcs` is now full operationnal in Debian. See: 
 <https://clusterlabs.github.io/PAF/Quick_Start-Debian-9-pcs.html>
 
