@@ -274,7 +274,7 @@ FR
 In addition to stopping local services, a cluster partition who doesn't meet
 the quorum cannot use fencing on the node of the other partition.
 
-<!-- TODO: test this !! --> 
+<!-- TODO: test this !! -->
 
 This mecanism is paramount for the cluster to operate correctly.
 
@@ -1314,7 +1314,7 @@ FR * couche de communication bas niveau du cluster
 FR * créé en 2004
 FR * dérivé de OpenAIS
 FR * avec des morceaux de CMAN dedans ensuite (à vérifier)
-FR 
+FR
 * communication layer of the clusterware
 * created in 2004
 * derived from OpenAIS
@@ -1339,7 +1339,7 @@ FR Son fichier de configuration se trouve à l'emplacement
 FR `/etc/corosync/corosync.conf`. En cas de modification manuelle, il faut
 FR __ABSOLUMENT__ veiller à conserver une configuration identique sur tous les
 FR nœuds. Cela peut être fait manuellement ou avec la commande `pcs cluster sync`.
-FR 
+FR
 It's configuration is located in `/etc/corosync/corosync.conf`. In case of
 manual update, it is paramount to propagate the modifications on all nodes and
 ensure that all nodes have the same configuration. This can be done manually
@@ -1348,7 +1348,7 @@ or with the command `pcs cluster sync`.
 FR La configuration de corosync est décrite dans la page de manuel
 FR `corosync.conf`. Ses fonctionnalités liées au quorum sont décrites dans le
 FR manuel nommé `votequorum`.
-FR 
+FR
 The Corosync configuration is described in length in the man page for
 `corosync.conf`. The parameters describing quorum are described in the man page
 for `votequorum`.
@@ -1377,7 +1377,7 @@ FR qui l'utilisent.
 FR
 FR Corosync expose notamment l'api `cpg` dont l'objet est d'assurer le moyen de
 FR communication d'une applications distribuées. Cette api permet de gérer :
-FR 
+FR
 FR * l'entrée et la sortie des membres dans un ou plusieurs groupes ;
 FR * la propagation des messages à l'ensemble des membres des groupes ;
 FR * la propagation des changements de configuration ;
@@ -1406,7 +1406,7 @@ cluster and it's members.
 
 FR Le service `votequorum` permet à corosync de fournir des notifications sur la gain ou la
 FR perte du quorum dans le cluster, le nombre de vote courant, etc.
-FR 
+FR
 The `votequorum` service is designed to provide notification when quorum is
 archived or lost in the cluster, about the number of nodes in the cluster,
 etc.
@@ -1418,7 +1418,7 @@ etc.
 ## Corosync 3 features
 
 FR Nouvelle librairie `kronosnet` (`knet`):
-FR 
+FR
 FR * évolution du chiffrement
 FR * redondance des canaux de communications
 FR * compression
@@ -1452,7 +1452,7 @@ FR Le chiffrement peut être configuré soit avec l'option `totem` > `secauth` s
 FR paramètres `totem` > `crypto_model`, `totem` > `crypto_cipher` et `totem` > `crypto_hash`.
 FR
 FR Il est également possible d'utiliser la compression.
-FR 
+FR
 Corosync implements the _Totem Single Ring Ordering and Membership_ protocol
 for its message and group management. It's possible to add redundancy for
 communication channels and network links by creating several interfaces
@@ -1477,7 +1477,7 @@ FR * option héritée de CMAN
 FR * requiers `expected-votes: 2`
 FR * implique `wait_for_all: 1`
 FR * requiers un fencing hardware configuré sur la même interface que le heartbeat
-FR 
+FR
 * dedicated parameter: `two_node: 1`
 * inherited from CMAN
 * requires: `expected-votes: 2`
@@ -1521,7 +1521,7 @@ will bot be able to start any ressource.
 FR Même si elle fonctionne, ce genre de configuration n'est cependant pas
 FR optimale. Comme en témoigne
 FR [cet article du blog de clusterlabs](http://blog.clusterlabs.org/blog/2018/two-node-problems).
-FR 
+FR
 Even though this kind of configuration works, it's not optimal as explained in
 [this clusterlab blog
 post](http://blog.clusterlabs.org/blog/2018/two-node-problems).
@@ -1533,24 +1533,24 @@ post](http://blog.clusterlabs.org/blog/2018/two-node-problems).
 ## Tools
 
 FR Corosync installe plusieurs outils:
-FR 
+FR
 FR * `corosync-cfgtool` : administration, paramétrage
 FR * `corosync-cpgtool` : visualisation des différents groupes CPG
 FR * `corosync-cmapctl` : administration de la base d'objets
 FR * `corosync-quorumtool` : gestion du quorum
-FR 
+FR
 Corosync installs several tools:
 
 * `corosync-cfgtool` : administration, configuration
 * `corosync-cpgtool` : cpg group visualization
 * `corosync-cmapctl` : administration of the cmap key value store
 * `corosync-quorumtool` : quorum managment
-<!-- pas sur d'avoir bien compris la ligne cmap --> 
+<!-- pas sur d'avoir bien compris la ligne cmap -->
 
 ::: notes
 
 FR `corosync-cfgtool` permet de :
-FR 
+FR
 FR * arrêter corosync sur le serveur ;
 FR * récupérer l'IP d'un nœud ;
 FR * tuer un nœud ;
@@ -1571,7 +1571,7 @@ FR
 
 FR `corosync-cmapctl` permet de manipuler et consulter la base d'objet de corosync,
 FR les actions possibles sont :
-FR 
+FR
 FR * lister les valeurs associées aux clés : directement (ex: totem.secauth), par
 FR préfix(ex: totem.) ou sans filtre ;
 FR * définir ou supprimer des valeurs ;
@@ -1589,7 +1589,7 @@ of corosync, possible actions are:
 * follow the modification of keys sorted in `cmap` in realtime.
 
 FR `corosync-quorumtool` permet d'accéder au service de quorum pour par exemple:
-FR 
+FR
 FR * modifier la configuration des votes (nombre, nombre attendu) ;
 FR * suivre les modifications de quorum ;
 FR * lister les nœuds avec leurs nom, id et IPs .
@@ -1614,7 +1614,7 @@ FR 3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
 FR 4. afficher la configuration des nœuds dans la base CMAP avec
 FR    `corosync-cmapctl` (clé `nodelist`)
 FR 5. afficher l'état du quorum avec `corosync-quorumtool`
-FR 
+FR
 1. display the local ring status with `corosync-cfgtool`
 2. display the IP of each node with `corosync-cfgtool`
 3. display CPG groups and members with `corosync-cpgtool`
@@ -1689,7 +1689,7 @@ pacemakerd
 
 FR Chaque sous-processus de pacemaker est associé à un groupe de communication
 FR avec leur équivalents sur les autres nœuds du cluster.
-FR 
+FR
 Each sub process of pacemaker is part of a communication group with it's
 counterpart on the other nodes.
 
@@ -1746,16 +1746,21 @@ Membership information
 -----
 
 
-# Composants du cluster
+# Components of the cluster
 
 ![Diagramme complet](medias/pcmk-archi-all.png)
 
 ::: notes
 
-Dans ce chapitre, nous abordons rapidement l'architecture de Pacemaker en détaillant ses
-sous processus. Le but est de comprendre le rôle de chaque brique et ainsi mieux
-diagnostiquer l'état du cluster, son paramétrage et savoir interpréter les messages de
-log correctement. Voici les différents processus tel que démarrés par Pacemaker:
+FR Dans ce chapitre, nous abordons rapidement l'architecture de Pacemaker en détaillant ses
+FR sous processus. Le but est de comprendre le rôle de chaque brique et ainsi mieux
+FR diagnostiquer l'état du cluster, son paramétrage et savoir interpréter les messages de
+FR log correctement. Voici les différents processus tel que démarrés par Pacemaker:
+FR
+In this chapter, we will do an overview of Pacemaker's architecture and focus
+on it's sub processes. The objective is to understand the role of each part in
+order to have an easier time diagnosing the cluster state, understanding it's
+configuration and interpreting the log messages correctly.
 
 ~~~
 /usr/sbin/pacemakerd -f
@@ -1767,17 +1772,28 @@ log correctement. Voici les différents processus tel que démarrés par Pacemak
 \_ /usr/libexec/pacemaker/crmd
 ~~~
 
-Le diagramme présente les différents éléments de Pacemaker au sein d'un cluster à trois
-nœuds. Une vue plus détaillée mais centrée sur un seul nœud est présenté dans la
-documentation de Pacemaker. Voir:
+FR Le diagramme présente les différents éléments de Pacemaker au sein d'un cluster à trois
+FR nœuds. Une vue plus détaillée mais centrée sur un seul nœud est présenté dans la
+FR documentation de Pacemaker. Voir:
+FR
+FR [Schémas de l'architecture interne de Pacemaker](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_pacemaker_architecture.html#_internal_components)
+FR
+This diagram shows the different components of Pacemaker in a three node
+cluster. A more detailed view, focused on a single node is present in
+Pacemaker's documentation. See:
 
-[Schémas de l'architecture interne de Pacemaker](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_pacemaker_architecture.html#_internal_components)
+[Schemas of the internal architecture of Pacemaker](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_pacemaker_architecture.html#_internal_components)
 
-Cette architecture et le paramétrage de Pacemaker permet de supporter différents types de
-scénario de cluster dont certains (vieux) exemples sont présentés dans le wiki de
-Pacemaker:
+FR Cette architecture et le paramétrage de Pacemaker permet de supporter différents types de
+FR scénario de cluster dont certains (vieux) exemples sont présentés dans le wiki de
+FR Pacemaker:
+FR
+FR [Schémas des différentes configuration de nœuds possibles avec Pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
+FR
+This architecture is designed to support different types of clusters. Some
+(old) example are present in the Pacemaker wiki:
 
-[Schémas des différentes configuration de nœuds possibles avec Pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
+[Schemas of different cluster configuration in pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
 
 :::
 
@@ -1786,31 +1802,57 @@ Pacemaker:
 
 ## Cluster Information Base (CIB)
 
-* détient la configuration du cluster
-* l'état des différentes ressources
-* un historique des actions exécutées
-* stockage fichier au format XML
-* synchronisé automatiquement entre les nœuds
-* historisé
-* géré par le processus `cib`
-* renommé `pacemaker-based` depuis la version 2.0
+FR * détient la configuration du cluster
+FR * l'état des différentes ressources
+FR * un historique des actions exécutées
+FR * stockage fichier au format XML
+FR * synchronisé automatiquement entre les nœuds
+FR * historisé
+FR * géré par le processus `cib`
+FR * renommé `pacemaker-based` depuis la version 2.0
+FR
+* contains:
+  - the cluster configuration
+  - the state of the resources
+  - an history of the latest actions
+* stored in XML format
+* automatically synchronized between nodes
+* archived
+* managed by the `cib` process
+  - renamed `pacemaker-based` since version 2.0
 
 ::: notes
 
-La CIB est la représentation interne de la configuration et de l'état des composantes du
-cluster. C'est un fichier XML, créée par Pacemaker à l'initialisation du cluster et qui
-évolue ensuite au fil des configurations et évènements du cluster.
+FR La CIB est la représentation interne de la configuration et de l'état des composantes du
+FR cluster. C'est un fichier XML, créée par Pacemaker à l'initialisation du cluster et qui
+FR évolue ensuite au fil des configurations et évènements du cluster.
+FR
+The CIB is a internal representation of the configuration and state of the
+cluster's components and resources. It's an XML file, created by Pacemaker
+during cluster initialization. It evolves as the cluster configuration changes
+and events takes place in the cluster.
 
-En fonction de cet ensemble d'états et du paramétrage fourni, le cluster détermine l'état
-idéal de chaque ressource qu'il gère (démarré/arrêté/promu et sur quel serveur) et
-calcule les transitions permettant d'atteindre cet état.
+FR En fonction de cet ensemble d'états et du paramétrage fourni, le cluster détermine l'état
+FR idéal de chaque ressource qu'il gère (démarré/arrêté/promu et sur quel serveur) et
+FR calcule les transitions permettant d'atteindre cet état.
+FR
+From the component states and configuration, the cluster determines the ideal
+state for each managed resource (started/stopped/promoted and on which server)
+and computes the transitions necessary to reach this state.
 
-Le processus `cib` est chargé d'appliquer les modifications dans la CIB, de
-conserver les information transitoires en mémoire (statuts, certains scores, etc) et de
-notifier les autres processus de ces modifications si nécessaire.
+FR Le processus `cib` est chargé d'appliquer les modifications dans la CIB, de
+FR conserver les information transitoires en mémoire (statuts, certains scores, etc) et de
+FR notifier les autres processus de ces modifications si nécessaire.
+FR
+The `cib` process (`pacemaker-based`) is tasked to apply the modification
+inside the CIB, keep track of transient information (status, some scores, etc.)
+ad notify the other processes of the changes if it's necessary.
 
-Le contenu de la CIB est historisé puis systématiquement synchronisé entre les nœuds à
-chaque modification. Ces fichiers sont stockés dans `/var/lib/pacemaker/cib` :
+FR Le contenu de la CIB est historisé puis systématiquement synchronisé entre les nœuds à
+FR chaque modification. Ces fichiers sont stockés dans `/var/lib/pacemaker/cib` :
+FR
+The content of the CIB is archived and synchronized between all nodes after
+each modification. These files are stored in `/var/lib/pacemaker/cib`.
 
 ~~~
 ls /var/lib/pacemaker/cib/ -alh
@@ -1834,28 +1876,43 @@ drwxr-x--- 6 hacluster haclient 4.0K Feb  7 12:16 ..
 -rw------- 1 hacluster haclient   32 Feb  7 16:46 cib.xml.sig
 ~~~
 
-`cib.xml` correspond à la version courante de la CIB, les autres fichiers `cib-*.raw`,
-aux versions précédentes.
+FR `cib.xml` correspond à la version courante de la CIB, les autres fichiers `cib-*.raw`,
+FR aux versions précédentes.
+FR
+`cib.xml` is the current version of the CIB, the `cib-*.raw` files are older
+versions of it.
 
-Par défaut, Pacemaker conserve toutes les versions de la CIB depuis la création du
-cluster. Il est recommandé de limiter ce nombre de fichier grâce aux paramètres
-`pe-error-series-max`, `pe-warn-series-max` et `pe-input-series-max`.
+FR Par défaut, Pacemaker conserve toutes les versions de la CIB depuis la création du
+FR cluster. Il est recommandé de limiter ce nombre de fichier grâce aux paramètres
+FR `pe-error-series-max`, `pe-warn-series-max` et `pe-input-series-max`.
+FR
+By default, Pacemaker keep all the versions of the CIB since cluster creation.
+It's advised to limit the amount of files kept with the parameters:
+`pe-error-series-max`, `pe-warn-series-max` and `pe-input-series-max`.
 
-Il n'est pas recommandé d'éditer la CIB directement en XML. Préférez toujours utiliser
-les commandes de haut niveau proposées par `pcs` ou `crm`. En dernier recours, utilisez
-l'outil `cibadmin`.
+FR Il n'est pas recommandé d'éditer la CIB directement en XML. Préférez toujours utiliser
+FR les commandes de haut niveau proposées par `pcs` ou `crm`. En dernier recours, utilisez
+FR l'outil `cibadmin`.
+FR
+Making modification by editing the CIB directly is not recommanded. A better
+practice is to used the high level commands available in `pcs` or `crm`. As a
+last resort, the `cibadmin` tool is available.
 
 :::
 
 -----
 
-### TP: CIB
+### Practice work: CIB
 
 ::: notes
 
-1. consulter le contenu de ce répertoire où est stockée la CIB
-2. identifier la dernière version de la CIB
-3. comparer avec `cibadmin --query` et `pcs cluster cib`
+FR 1. consulter le contenu de ce répertoire où est stockée la CIB
+FR 2. identifier la dernière version de la CIB
+FR 3. comparer avec `cibadmin --query` et `pcs cluster cib`
+FR
+1. check the content of the directory where the CIB is stored
+2. identify the last version of the CIB
+3. compare the output of the commands `cibadmin --query` and `pcs cluster cib`
 
 :::
 
@@ -1865,154 +1922,275 @@ l'outil `cibadmin`.
 
 ::: notes
 
-1. consulter le contenu de ce répertoire où est stockée la CIB
+FR 1. consulter le contenu de ce répertoire où est stockée la CIB
+FR
+1. check the content of the directory where the CIB is stored
 
 ~~~
 # ls /var/lib/pacemaker/cib
 ~~~
 
-2. identifier la dernière version de la CIB
+FR 2. identifier la dernière version de la CIB
+FR
+FR La version courante de la CIB est stockée dans
+FR `/var/lib/pacemaker/cib/cib.xml`. Sa version est stockée dans
+FR `/var/lib/pacemaker/cib/cib.last`.
+FR
+2. identify the last version of the CIB
 
-La version courante de la CIB est stockée dans
-`/var/lib/pacemaker/cib/cib.xml`. Sa version est stockée dans
-`/var/lib/pacemaker/cib/cib.last`.
+The current version of the CIB is stored in `/var/lib/pacemaker/cib/cib.xml`.
+It's version is stored in `/var/lib/pacemaker/cib/cib.last`.
 
-3. comparer avec `cibadmin --query` et `pcs cluster cib`
+FR 3. comparer avec `cibadmin --query` et `pcs cluster cib`
+FR
+FR Vous observez une section `<status\>` supplémentaire dans le document
+FR XML présenté par `cibadmin`. Cette section contient l'état du cluster et est
+FR uniquement conservée en mémoire.
+FR
 
-Vous observez une section `<status\>` supplémentaire dans le document
-XML présenté par `cibadmin`. Cette section contient l'état du cluster et est
-uniquement conservée en mémoire.
+3. compare the output of the commands `cibadmin --query` and `pcs cluster cib`
+
+There is a additional `<status\>` section in the XML document presented by
+`cibadmin`.  This section contains the cluster state and is only kept in
+memory which explains why it's onlu visible with `cibadmin`.
 
 :::
 
 -----
 
-### Designated Controler (DC) - Diagramme global
+### Designated Controler (DC) - Global diagram
 
-![Diagramme DC](medias/pcmk-archi-dc.png)
+![DC diagram](medias/pcmk-archi-dc.png)
 
 -----
 
 ## Designated Controler (DC)
 
-* daemon `CRMd` désigné pilote principal sur un nœud uniquement
-* lit et écrit dans la CIB
-* invoque PEngine pour générer les éventuelles transitions
-* contrôle le déroulement des transitions
-* envoie les actions à réaliser aux daemons `CRMd` des autres nœuds
-* possède les journaux applicatifs les plus complets
+FR * daemon `CRMd` désigné pilote principal sur un nœud uniquement
+FR * lit et écrit dans la CIB
+FR * invoque PEngine pour générer les éventuelles transitions
+FR * contrôle le déroulement des transitions
+FR * envoie les actions à réaliser aux daemons `CRMd` des autres nœuds
+FR * possède les journaux applicatifs les plus complets
+FR
+
+* a `CRMd` daemon appointed as the manager of the cluster
+  - present only on one node
+* read and write from/to the CIB
+* calls the PEngine to generate the necessary transitions
+* control the proceeding of transitions
+* sends the actions to the daemons`CRMd` of other nodes
+* has the most complete traces of all nodes
 
 ::: notes
 
-Le *Designated Controler* est élu au sein du cluster une fois le groupe de communication
-établi au niveau de Corosync. Il pilote l'ensemble du cluster.
+FR Le *Designated Controler* est élu au sein du cluster une fois le groupe de communication
+FR établi au niveau de Corosync. Il pilote l'ensemble du cluster.
+FR
+FR Il est responsable de:
+FR
+FR * lire l'état courant dans la CIB
+FR * invoquer le `PEngine` en cas d'écart avec l'état
+FR   stable (changement d'état d'un service, changement de configuration, évolution des
+FR   scores ou des attributs, etc)
+FR * mettre à jour la CIB (mises à jour propagée aux autres nœuds)
+FR * transmettre aux `CRMd` distants une à une les actions à réaliser sur leur nœud
+FR
+FR C'est le DC qui maintient l'état primaire de la CIB ("master copy").
+FR
+<!-- saut a la ligne absent pour "invoquer le Pengine" dans la version en ligne -->
 
-Il est responsable de:
+The *Designated Controler* is elected once a communication group is established
+by Corosync. It manages the whole cluster.
 
-* lire l'état courant dans la CIB * invoquer le `PEngine` en cas d'écart avec l'état
-  stable (changement d'état d'un service, changement de configuration, évolution des
-  scores ou des attributs, etc)
-* mettre à jour la CIB (mises à jour propagée aux autres nœuds)
-* transmettre aux `CRMd` distants une à une les actions à réaliser sur leur nœud
+It's responsible for:
 
-C'est le DC qui maintient l'état primaire de la CIB ("master copy").
+* reading the current state in the CIB
+* invoking the `PEngine` if the state of the cluster is different from it's
+  expected state (service state change, configuration change, evolution of
+  scores or attributes, etc.)
+* updates the CIB (the updates sent to all nodes)
+* dictate the actions that have to be executed to the relevant remote `CRMd`
+  processes, theses changes are send one at a time
+
+The DC is responsible for the _master copy_ of the CIB.
+<!-- Est ce que master copy suffit a un anglais pour comprendre de quoi on parle la ? -->
 
 :::
 
 -----
 
-### PEngine - Diagramme global
+### PEngine - Global Diagram
 
-![Diagramme PEngine](medias/pcmk-archi-pengine.png)
+![PEngine diagram](medias/pcmk-archi-pengine.png)
 
 -----
 
 ## Policy Engine (PEngine)
 
-* reçoit en entrée les informations d'état des ressources et le paramétrage
-* décide de l'état idéal du cluster
-* génère un graphe de transition pour atteindre cet état
-* renommé `Scheduler` depuis la version 2.0
-* peut être consulté grâce à la commande `crm_simulate`
+FR * reçoit en entrée les informations d'état des ressources et le paramétrage
+FR * décide de l'état idéal du cluster
+FR * génère un graphe de transition pour atteindre cet état
+FR * renommé `Scheduler` depuis la version 2.0
+FR * peut être consulté grâce à la commande `crm_simulate`
+FR
+FR ![Diagramme Scheduler - calcul graphe de transition](medias/pcmk-archi-transition.png)
 
-![Diagramme Scheduler - calcul graphe de transition](medias/pcmk-archi-transition.png)
+* receives information about the state of resources and configuration
+* decides the ideal state for the cluster
+* creates a transition graph to reach the ideal state
+* renamed `Scheduler` in version 2.0
+* can be leveraged with the `crm_simulate` command
+
+![Diagramme Scheduler - transition graph calculation](medias/pcmk-archi-transition.png)
 
 ::: notes
 
-Le `PEngine` est la brique de Pacemaker qui calcule les transitions nécessaires pour
-passer d'un état à l'autre.
+FR Le `PEngine` est la brique de Pacemaker qui calcule les transitions nécessaires pour
+FR passer d'un état à l'autre.
+FR
+FR Il reçoit en entrée des informations d'état et de paramétrage au format XML (extrait de
+FR la CIB), détermine si un nouvel état est disponible pour les ressources du cluster, et
+FR calcule toutes les actions à mettre en œuvre pour l'atteindre.
+FR
+FR Toutes ces actions sont regroupées au sein d'un graph de transition que le
+FR `Designated Controller`, qui pilote le cluster, devra ensuite mettre en œuvre.
+FR
+The `PEngine` is the Pacemaker component responsible for the computation of the
+transition necessary to go from one state to another.
 
-Il reçoit en entrée des informations d'état et de paramétrage au format XML (extrait de
-la CIB), détermine si un nouvel état est disponible pour les ressources du cluster, et
-calcule toutes les actions à mettre en œuvre pour l'atteindre.
+It receives information about states and configuration in XML format (from the
+CIB), decides if a new state is available and computes all the actions
+necessary to reach it.
 
-Toutes ces actions sont regroupées au sein d'un graph de transition que le
-`Designated Controller`, qui pilote le cluster, devra ensuite mettre en œuvre.
+All theses actions are gathered in a transition graph which will be applied by
+the component responsible for decision making: the `Designated Controller`.
 
-Voici un exemple de transition complexe présentant une bascule maître-esclave DRBD:
-![Diagramme exemple de transition complexe](medias/Policy-Engine-big.png)
+FR Voici un exemple de transition complexe présentant une bascule maître-esclave DRBD:
+FR ![Diagramme exemple de transition complexe](medias/Policy-Engine-big.png)
+FR
+FR Ce diagramme vient de la documentation de Pacemaker. L'original est disponible à cette
+FR adresse:
+FR <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/images/Policy-Engine-big.png>
+FR
+FR Les explications sur les codes couleurs sont disponibles à cette adresse:
+FR <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/_visualizing_the_action_sequence.html>
+FR
+This is an example of complex transition graph involving a master slave DRBD
+switchover.
+![example diagram for a complex transition](medias/Policy-Engine-big.png)
 
-Ce diagramme vient de la documentation de Pacemaker. L'original est disponible à cette
-adresse:
+This diagram comes from the Pacemaker documentation. The original is available
+at:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/images/Policy-Engine-big.png>
 
-Les explications sur les codes couleurs sont disponibles à cette adresse:
+The explanation of the color code is available at this address:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/_visualizing_the_action_sequence.html>
 
-Dans cet exemple chaque flèche impose une dépendance et un ordre entre les actions. Pour
-qu'une action soit déclenchée, toutes les actions précédentes doivent être exécutées et
-réussies. Les textes en jaune sont des "actions virtuelles", simples points de passage
-permettant de synchroniser les actions entre elles avant de poursuivre les suivantes. Les
-textes en noir représentent des actions à exécuter sur l'un des nœuds du cluster.
+FR Dans cet exemple chaque flèche impose une dépendance et un ordre entre les actions. Pour
+FR qu'une action soit déclenchée, toutes les actions précédentes doivent être exécutées et
+FR réussies. Les textes en jaune sont des "actions virtuelles", simples points de passage
+FR permettant de synchroniser les actions entre elles avant de poursuivre les suivantes. Les
+FR textes en noir représentent des actions à exécuter sur l'un des nœuds du cluster.
+FR
+FR Le format des textes est le suivant: `<resource>_<action>_<interval>`
+FR
+FR Une action avec un intervalle à 0 est une action ponctuelle (`start`, `stop`, etc). Une
+FR action avec un intervalle supérieur à 0 est une action récurrente, tel que `monitor`.
+FR
+In this example each arrow represents a dependancy and forces an order of
+execution between actions. In an order for an action to be triggered, all the
+preceding actions must have been executed and have succeded. The yellow texts
+represent virtual actions, they act as synchronisation points when several
+actions are required before starting another one. The black texts represent
+actions that must be executed on a cluster node.
 
-Le format des textes est le suivant: `<resource>_<action>_<interval>`
+The format of the text is the following: `<resource>_<action>_<interval>`.
 
-Une action avec un intervalle à 0 est une action ponctuelle (`start`, `stop`, etc). Une
-action avec un intervalle supérieur à 0 est une action récurrente, tel que `monitor`.
+An action with an interval of zero is a one off action (`start`, `stop`, etc.).
+Actions with intervals superior to zero are recurring action such as `monitor`.
 
-Dans cet exemple:
+FR Dans cet exemple:
+FR
+FR * les actions 1 à 4 concernent l'exécution des actions `notify pre-demote` sur les nœuds
+FR   "frigg" et "odin" du cluster
+FR * l'action 1 déclenche en parallèle les deux actions 2 et 3
+FR * l'action 4 est réalisée une fois que les actions 1, 2 et 3 sont validées
+FR * l'action 5 est exécutée n'importe quand
+FR * l'action 5 interrompt l'exécution récurrente de l'action `monitor` sur la ressource
+FR   "drbd0:0" du serveur "frigg"
+FR * l'action 7 est exécutée après que 5 et 6 soient validées
+FR * l'action 7 effectue un `demote` de la ressource "drbd0:0" sur "frigg" (qui n'est donc
+FR   plus supervisée)
+FR * la pseudo action 8 est réalisée une fois que l'action `demote` est terminée
+FR * la pseudo action 9 initialise le déclenchement des actions `notify post-demote` et
+FR   dépend de la réalisation précédente de la notification "pre-demote" et de l'action
+FR   `demote` elle même
+FR * les actions 9 à 12 représentent l'exécution des notifications `post-demote` dans tout
+FR   le cluster
+FR * les actions 13 à 24 représentent les actions de `notify pre-promote`, `promote` de
+FR   drbd sur "odin" et `notify post-promote` au sein du cluster
+FR * les actions 25 et 27 peuvent alors être exécutées et redémarrent les actions de
+FR   monitoring récurrentes de drbd sur "odin" et "frigg"
+FR * les actions 26, 28 à 30 démarrent un groupe de ressource dépendant de la ressource
+FR   drbd
+FR
+In this example:
 
-* les actions 1 à 4 concernent l'exécution des actions `notify pre-demote` sur les nœuds
-  "frigg" et "odin" du cluster
-* l'action 1 déclenche en parallèle les deux actions 2 et 3
-* l'action 4 est réalisée une fois que les actions 1, 2 et 3 sont validées
-* l'action 5 est exécutée n'importe quand
-* l'action 5 interrompt l'exécution récurrente de l'action `monitor` sur la ressource
-  "drbd0:0" du serveur "frigg"
-* l'action 7 est exécutée après que 5 et 6 soient validées
-* l'action 7 effectue un `demote` de la ressource "drbd0:0" sur "frigg" (qui n'est donc
-  plus supervisée)
-* la pseudo action 8 est réalisée une fois que l'action `demote` est terminée
-* la pseudo action 9 initialise le déclenchement des actions `notify post-demote` et
-  dépend de la réalisation précédente de la notification "pre-demote" et de l'action
-  `demote` elle même
-* les actions 9 à 12 représentent l'exécution des notifications `post-demote` dans tout
-  le cluster
-* les actions 13 à 24 représentent les actions de `notify pre-promote`, `promote` de
-  drbd sur "odin" et `notify post-promote` au sein du cluster
-* les actions 25 et 27 peuvent alors être exécutées et redémarrent les actions de
-  monitoring récurrentes de drbd sur "odin" et "frigg"
-* les actions 26, 28 à 30 démarrent un groupe de ressource dépendant de la ressource
-  drbd
+* action 1 to 4 are `notify pre-demote` actions executed on the nodes "frigg"
+  and "odin"
+  - action 1 is used to start action 2 and 3 in parallel
+  - action 4 is done after action 1, 2 and 3 are completed sucessfully
+* action 5 is executed at any time
+* action 5 cancels the recurring execution of the `monitor` action on ressource
+  "drbd0:0" of server "frigg"
+* action 7 is executed after action 5 and 6 are deemed valid
+* action 7 `demotes` the ressource "drbd0:0" on server "frigg" (it is therefore
+  no longer monitored)
+* action 8 is a pseudo action triggered once the `demote` is finished
+* action 9 is a pseudo action responsible for starting the the two `notify
+  post-demote` actions. It requires the `pre-demote` notification and the
+  `demote` action
+* action 9 to 12 represent the execution of the `post-demote` actions in the
+  whole cluster
+* action 13 to 24 represent the execution of the `notify-pre-demote` and
+  `demote` action on the drbd resource of "odin". `notify post-demote` is a
+  cluster wide action
+* action 25 to 27 can then be executed and restart the recurring monitoring
+  actions of drbd on "odin" and "frigg"
+* action 26, 28 and 29 start the group of resource which depends on the drbd
+  resource
+<!-- relire -->
 
-Enfin, il est possible de consulter les transitions proposées par le PEngine
-grâce à la commande `crm_simulate`. Cette commande est aussi parfois utile
-pour en extraire des informations disponibles nulles par ailleurs, comme les
-[scores de localisation][Contraintes de localisation].
+FR Enfin, il est possible de consulter les transitions proposées par le PEngine
+FR grâce à la commande `crm_simulate`. Cette commande est aussi parfois utile
+FR pour en extraire des informations disponibles nulles par ailleurs, comme les
+FR [scores de localisation][Contraintes de localisation].
+FR
+Finally, it's possible to check the transitions proposed by PEngine with the
+command `crm_simulate`. This command is also sometimes useful to get
+information that are not accessible elsewhere like the [location
+scores][Localisation constraints].
 
 :::
 
 -----
 
-### TP: PEngine
+### Practical work: PEngine
 
 ::: notes
 
-1. identifier sur quels nœuds est lancé le processus `pengine`
-2. identifier où se trouvent les logs de `pengine`
-3. identifier le DC
-4. observer la différence de contenu des log de `pengine` entre nœuds
-5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+FR 1. identifier sur quels nœuds est lancé le processus `pengine`
+FR 2. identifier où se trouvent les logs de `pengine`
+FR 3. identifier le DC
+FR 4. observer la différence de contenu des log de `pengine` entre nœuds
+FR 5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+FR
+1. identify on which node the processus `pengine` is started.
+2. identify where are the logs of the `pengine`
+3. identify the DC
+4. check the difference between the content of the `pengine` logs across nodes
+5. display the PEngine point of view of the cluster state (`¢rm_simulate`)
 
 :::
 
@@ -2022,33 +2200,56 @@ pour en extraire des informations disponibles nulles par ailleurs, comme les
 
 ::: notes
 
-1. identifier sur quels nœuds est lancé le processus `pengine`
+FR 1. identifier sur quels nœuds est lancé le processus `pengine`
+FR
+FR Sur tous les nœuds.
+FR
+1. identify on which node the processus `pengine` is started.
 
-Sur tous les nœuds.
+On all nodes
 
-2. identifier où se trouvent les logs de `pengine`
+FR 2. identifier où se trouvent les logs de `pengine`
+FR
+FR Les messages de `pengine` se situent dans `/var/log/cluster/corosync.log`,
+FR mélangés avec ceux des autres sous processus.
+FR
+FR Il est aussi possible de les retrouver dans `/var/log/messages` ou ailleurs en
+FR fonction de la configuration de corosync, syslog, etc.
+FR
+2. identify where are the logs of the `pengine`
 
-Les messages de `pengine` se situent dans `/var/log/cluster/corosync.log`,
-mélangés avec ceux des autres sous processus.
+The `pengine` logs is located in `/var/log/cluster/corosync.log`, it's mixed
+with the other processus logs.
 
-Il est aussi possible de les retrouver dans `/var/log/messages` ou ailleurs en
-fonction de la configuration de corosync, syslog, etc.
+It's also possible to find these messages in `/var/log/messages` or wherever
+the configuration of corosync, syslog, etc. dictates it.
 
-3. identifier le DC
+FR 3. identifier le DC
+FR
+FR Utiliser `crm_mon`, `pcs status` ou `crmadmin`:
+FR
+3. identify the DC
 
-Utiliser `crm_mon`, `pcs status` ou `crmadmin`:
+Use `crm_mon`, `pcs status` or `crmadmin`:
 
 ~~~console
 # crmadmin -D
 Designated Controller is: hanode3
 ~~~
 
-4. observer la différence de contenu des log de `pengine` entre nœuds
+FR 4. observer la différence de contenu des log de `pengine` entre nœuds
+FR
+FR Seuls le DC possède les messages relatifs au calcul de transitions effectués
+FR par le sous-processus `pengine`.
+FR
+4. check the difference between the content of the `pengine` logs across nodes
 
-Seuls le DC possède les messages relatifs au calcul de transitions effectués
-par le sous-processus `pengine`.
+The message related to the transition calculation done by the `pengine` sub
+process are only available on the DC.
 
-5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+FR 5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+FR
+5. display the PEngine point of view of the cluster state (`¢rm_simulate`)
 
 ~~~console
 # crm_simulate --live-check
@@ -2062,51 +2263,82 @@ Online: [ hanode1 hanode2 hanode3 ]
 
 -----
 
-### Cluster Resource Manager (CRM) - Diagramme global
+### Cluster Resource Manager (CRM) - Global diagram
 
-![Diagramme CRM](medias/pcmk-archi-crmd.png)
+![CRM Diagram](medias/pcmk-archi-crmd.png)
 
 -----
 
 ## Cluster Resource Manager (CRM)
 
-* daemon `CRMd` local à chaque nœud
-* chargé du pilotage des événements
-* reçoit des instructions du `PEngine` s'il est DC ou du `CRMd` DC distant
-* transmet les actions à réaliser au sein des transitions
-  * au daemon `LRMd` local
-  * au daemon `STONITHd` local
-* récupère les codes retours des actions
-* transmets les codes retours de chaque action au `CRMd` DC
-* renommé `controller` depuis la version 2.0
+FR * daemon `CRMd` local à chaque nœud
+FR * chargé du pilotage des événements
+FR * reçoit des instructions du `PEngine` s'il est DC ou du `CRMd` DC distant
+FR * transmet les actions à réaliser au sein des transitions
+FR   * au daemon `LRMd` local
+FR   * au daemon `STONITHd` local
+FR * récupère les codes retours des actions
+FR * transmets les codes retours de chaque action au `CRMd` DC
+FR * renommé `controller` depuis la version 2.0
+FR
+* local daemon `CRMd` on each node
+* tasked with event management
+* receives instructions from `PEngine` if it's the DC or from a remote `CRMd`
+  otherwise (the DC)
+* transmits the actions
+  * to the local `LRMd` daemon
+  * to the local `STONITHd` daemon
+* fetches the return code of the actions
+* resends these return code to `CRMDd` on the DC
+* renamed `controller` in version 2.0
 
 ::: notes
 
-Le  daemon `CRMd` est local à chaque nœud qui pilote les événements. Il peut soit être
-actif (DC), et donc être chargé de l'ensemble du pilotage du cluster, soit passif, et
-attendre que le `CRMd` DC lui fournisse des instructions.
+<!-- local qui pilote (ligne 1) -->
+FR Le  daemon `CRMd` est local à chaque nœud qui pilote les événements. Il peut soit être
+FR actif (DC), et donc être chargé de l'ensemble du pilotage du cluster, soit passif, et
+FR attendre que le `CRMd` DC lui fournisse des instructions.
+FR
+FR Lorsque des instructions lui sont transmises, il les communique aux daemons `LRMd` et/ou
+FR `STONITHd` locaux pour qu'ils exécutent les actions appropriées auprès des _ressources
+FR agents_ et _fencing agents_.
+FR
+FR Une fois l'action réalisée, le `CRMd` récupère le statut de l'action (via
+FR son code retour) et le transmet au `CRMd` DC qui en valide la cohérence
+FR avec ce qui est attendu au sein de la transition.
+FR
+FR En cas de code retour différent de celui attendu, le `CRMd` DC décide d'annuler la
+FR transition en cours. Il demande alors une nouvelle transition au `PEngine`.
+FR
+The `CRMd` daemon is local to each nodes and manages events. It can be active
+(DC) in which case it's in charge of managing the whole cluster, or passive in
+which case it recieves instructions from the `CRMd` DC.
 
-Lorsque des instructions lui sont transmises, il les communique aux daemons `LRMd` et/ou
-`STONITHd` locaux pour qu'ils exécutent les actions appropriées auprès des _ressources
-agents_ et _fencing agents_.
+When instructions are fed to `CRMd`, it communicates with the local `LRMd`
+and/or local `STONITHd` so that the appropriate actions can be executed by
+the _resource agents_ and _fencing agents_.
 
-Une fois l'action réalisée, le `CRMd` récupère le statut de l'action (via
-son code retour) et le transmet au `CRMd` DC qui en valide la cohérence
-avec ce qui est attendu au sein de la transition.
+Once the action is finished, `CRMd` fetches the status of the action (via the
+return code) and  transmits it to the `CRMd` DC. The DC validates the coherence
+of the result with what was expected in the transition.
 
-En cas de code retour différent de celui attendu, le `CRMd` DC décide d'annuler la
-transition en cours. Il demande alors une nouvelle transition au `PEngine`.
+If the return code is different from the expected one, the `CRMd` DC decides to
+cancel the current transaction and asks for a new transition from the
+`PEngine`.
 
 :::
 
 -----
 
-### TP: Cluster Resource Manager
+### Practical work: Cluster Resource Manager
 
 ::: notes
 
-1. trouver comment sont désignés les messages du `CRMd` dans les log
-2. identifier dans les log qui est le DC
+FR 1. trouver comment sont désignés les messages du `CRMd` dans les log
+FR 2. identifier dans les log qui est le DC
+FR
+1. find how the `CRMd` messages are tagged in the logs
+2. identify which server is the DC in the logs
 
 :::
 
@@ -2114,21 +2346,28 @@ transition en cours. Il demande alors une nouvelle transition au `PEngine`.
 
 ### Correction: Cluster Resource Manager
 
-Étude du daemon `CRMd`.
+Study of the `CRMd` daemon.
 
 ::: notes
 
-1. trouver comment sont désignés les messages du `CRMd` dans les log
+FR 1. trouver comment sont désignés les messages du `CRMd` dans les log
+FR
+FR Les messages de ce sous-processus sont identifiés par `crmd:`.
+FR
+1. find how the `CRMd` messages are tagged in the logs
 
-Les messages de ce sous-processus sont identifiés par `crmd:`.
+The messages from this sub process are identified with `crmd:`
 
-2. identifier dans les log qui est le DC
-
+FR 2. identifier dans les log qui est le DC
+FR
+2. identify which server is the DC in the logs
 ~~~
 crmd:     info: update_dc:    Set DC to hanode1 (3.0.14)
 ~~~
 
-À noter que le retrait d'un DC est aussi visible:
+FR À noter que le retrait d'un DC est aussi visible:
+FR
+When a DC is demoted, it's also visible:
 
 ~~~
 crmd:     info: update_dc:    Unset DC. Was hanode2
@@ -2138,34 +2377,59 @@ crmd:     info: update_dc:    Unset DC. Was hanode2
 
 -----
 
-## `STONITHd` et _Fencing Agent_
+## `STONITHd` and _Fencing Agent_
 
-![Diagramme Fencing](medias/pcmk-archi-fencing.png)
+![Fencing diagram](medias/pcmk-archi-fencing.png)
 
 -----
 
 ### `STONITHd`
 
-* daemon `STONITHd`
-* gestionnaire des agents de fencing (_FA_)
-* utilise l'API des fencing agent pour exécuter les actions demandées
-* reçoit des commandes du `CRMd` et les passe aux _FA_
-* renvoie le code de retour de l'action au `CRMd`
-* support de plusieurs niveau de fencing avec ordre de priorité
-* outil `stonith-admin`
-* renommé `fenced` depuis la version 2.0
+<!-- renomé fencer ou pacemaker-fenced c'est pas trop clair j'ai pris fencer-->
+FR * daemon `STONITHd`
+FR * gestionnaire des agents de fencing (_FA_)
+FR * utilise l'API des fencing agent pour exécuter les actions demandées
+FR * reçoit des commandes du `CRMd` et les passe aux _FA_
+FR * renvoie le code de retour de l'action au `CRMd`
+FR * support de plusieurs niveau de fencing avec ordre de priorité
+FR * outil `stonith-admin`
+FR * renommé `fenced` depuis la version 2.0
+FR
+* `STONITHd` daemon
+* fencing agent manager (_FA_)
+* uses the fencing agent API to execute the requiered actions
+* recieves the commands from `CRMd` and feeds them to the _FA_
+* resends the return code of the actions to `CRMd`
+* supports several level of fencing with a priority order
+* `stonith-admin` tool
+* renamed `fencer` since version 2.0
 
 ::: notes
 
-Le daemon `STONITHd` joue sensiblement un rôle identique à celui du `LRMd` vis-à-vis des
-agents de fencing (_FA_).
+<!-- ça fait bizarre de dire ça car on n'a pas encore parlé de LRMd -->
+<!-- pour -l et -Q ça ne semble pas être ça (cf anglais) -->
+FR Le daemon `STONITHd` joue sensiblement un rôle identique à celui du `LRMd` vis-à-vis des
+FR agents de fencing (_FA_).
 
-L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
+FR
+FR L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
+FR
+FR * `stonith_admin -V --list-registered` : liste les agents configurés
+FR * `stonith_admin -V --list-installed` : liste tous les agents disponibles
+FR * `stonith_admin -V -l <nœud>` : liste les agents contrôlant le nœud spécifié.
+FR * `stonith_admin -V -Q <nœud>` : contrôle l'état d'un nœud.
+FR
+The `STONITHd` daemon is for the fencing agents (_FA_) what `LRMd` is for
+resource agents (_RA_).
 
-* `stonith_admin -V --list-registered` : liste les agents configurés
-* `stonith_admin -V --list-installed` : liste tous les agents disponibles
-* `stonith_admin -V -l <nœud>` : liste les agents contrôlant le nœud spécifié.
-* `stonith_admin -V -Q <nœud>` : contrôle l'état d'un nœud.
+The `stonith-admin` tool can be used to interact with the `STONITHd` daemon,
+for example:
+
+* `stonith_admin -V --list-registered` : list the configured agents
+* `stonith_admin -V --list-installed` : list the available agents
+* `stonith_admin -V -l <nœud>` : list the agents that can terminate the
+  specified node
+* `stonith_admin -V -Q <nœud>` : controls the state of a device on a node
 
 :::
 
@@ -2173,57 +2437,101 @@ L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
 
 ### _Fencing Agent_ (_FA_)
 
-* script permettant de traduire les instructions du _fencer_ vers l'outil de fencing
-* doit assurer que le nœud cible est bien complètement isolé du cluster
-* doit renvoyer des codes retours définis dans l'API des _FA_ en fonction des résultats
-* dix actions disponibles dans l'API, toutes ne sont pas obligatoires
+FR * script permettant de traduire les instructions du _fencer_ vers l'outil de fencing
+FR * doit assurer que le nœud cible est bien complètement isolé du cluster
+FR * doit renvoyer des codes retours définis dans l'API des _FA_ en fonction des résultats
+FR * dix actions disponibles dans l'API, toutes ne sont pas obligatoires
+FR
+* script designed to translate `fencer`'s instruction to the fencing device
+* must guaranty that the target node is isolated from the reste of the cluster
+* must return the approriate return codes as defined in the fencing agent API
+* ten actions are availagble in the API, the are not all mandatory
 
 ::: notes
 
-Attention aux _FA_ qui dépendent du nœud cible !
+FR Attention aux _FA_ qui dépendent du nœud cible !
+FR
+FR Exemple classique : la carte IPMI. Si le serveur a une coupure électrique le
+FR _FA_ (la carte IPMI donc) n'est plus joignable. Pacemaker ne reçoit donc
+FR aucune réponse et ne peut pas savoir si le fencing a fonctionné, ce qui
+FR empêche toute bascule.
+FR
+FR Il est conseillé de chaîner plusieurs _FA_ si la méthode de fencing présente
+FR un _SPoF_: IPMI, rack d'alimentation, switch réseau ou SAN, ...
+FR
+Be wary of _FA_ that depend on the node state !
 
-Exemple classique : la carte IPMI. Si le serveur a une coupure électrique le
-_FA_ (la carte IPMI donc) n'est plus joignable. Pacemaker ne reçoit donc
-aucune réponse et ne peut pas savoir si le fencing a fonctionné, ce qui
-empêche toute bascule.
+<!-- the FA or the fencing device is no longer reachable ? are both terms in
+terchangeable here ? -->
+Example: the IPMI card. If the server as an electrical outage, the _FA_ (the
+IPMI card) is no longer reachable. Pacemaker can't receive feedback from it
+therefore it cannot know if the fencing was successful, which can prevent a
+failover.
 
-Il est conseillé de chaîner plusieurs _FA_ si la méthode de fencing présente
-un _SPoF_: IPMI, rack d'alimentation, switch réseau ou SAN, ...
+In such cases, where the fencing is a _SPoF_ (IMPI, rack power supply, network
+switch or SAN ..), it's a good practice to chaine several _FA_.
 
-Voici les actions disponibles de l'API des FA:
+<!-- reformuler la différence entre status et monitor ? -->
+FR Voici les actions disponibles de l'API des FA:
+FR
+FR * `off`: implémentation obligatoire. Permet d'isoler la ressource ou le serveur
+FR * `on`: libère la ressource ou démarre le serveur
+FR * `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon
+FR   exécute les actions off et on.
+FR * `status`: permet de vérifier la disponibilité de l'agent de fencing et le
+FR   statut du dispositif concerné: on ou off
+FR * `monitor`: permet de vérifier la disponibilité de l'agent de fencing
+FR * `list`: permet de vérifier la disponibilité de l'agent de fencing et de
+FR   lister l'ensemble des dispositifs que l'agent est capable d'isoler (cas d'un
+FR   hyperviseur, d'un PDU, etc)
+FR * `list-status`: comme l'action `list`, mais ajoute le statut de chaque dispositif
+FR * `validate-all`: valide la configuration de la ressource
+FR * `meta-data`: présente les capacités de l'agent au cluster
+FR * `manpage`: nom de la page de manuelle de l'agent de fencing
+FR
 
-* `off`: implémentation obligatoire. Permet d'isoler la ressource ou le serveur
-* `on`: libère la ressource ou démarre le serveur
-* `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon
-  exécute les actions off et on.
-* `status`: permet de vérifier la disponibilité de l'agent de fencing et le
-  statut du dispositif concerné: on ou off
-* `monitor`: permet de vérifier la disponibilité de l'agent de fencing
-* `list`: permet de vérifier la disponibilité de l'agent de fencing et de
-  lister l'ensemble des dispositifs que l'agent est capable d'isoler (cas d'un
-  hyperviseur, d'un PDU, etc)
-* `list-status`: comme l'action `list`, mais ajoute le statut de chaque dispositif
-* `validate-all`: valide la configuration de la ressource
-* `meta-data`: présente les capacités de l'agent au cluster
-* `manpage`: nom de la page de manuelle de l'agent de fencing
+The following action are available in the _FA_ API:
+
+* `off`: mandatory action, enables the isolation of a resource of server
+* `on`: frees a resource or start a server
+* `reboot`: isolate and restart a resource. If the action is not available the
+  daemon will execute the off and on actions
+* `status`: check to see if a local stonith device's port is reachable
+* `monitor`: check to see if a local stonith device is reachable
+* `list`: listing hosts and port assignments from a local stonith device and
+  the fencing agent availability
+* `list-status`: same as `list` but with the status of each assignement
+* `validate-all`: validate the configuration of the resource
+* `meta-data`: displays the capabilities of the agent for the cluster
+* `manpage`: displays the name of the man page for this fencing agent
 
 :::
 
 -----
 
-### TP: Fencing
+### Practical work: Fencing
 
 ::: notes
 
-Au cours de workshop, nous utilisons l'agent de fencing `fence_virsh`. Il ne
-fait pas parti des agents de fencing distribués par défaut et s'installe via le
-paquet `fence-agents-virsh`. Cet agent de fencing est basé sur SSH et la
-commande `virsh`.
+FR Au cours de workshop, nous utilisons l'agent de fencing `fence_virsh`. Il ne
+FR fait pas parti des agents de fencing distribués par défaut et s'installe via le
+FR paquet `fence-agents-virsh`. Cet agent de fencing est basé sur SSH et la
+FR commande `virsh`.
+FR
+FR 1. installer tous les _FA_ ainsi que `fence_virsh`
+FR 2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+FR
+FR Nous abordons la création d'une ressource de fencing plus loin dans le workshop.
+FR
+During this worshop, we will use the fencing agent `fence_virsh`. it's not part
+of the default fencing agent package and can be installed via the package
+`fence-agent-virsh`. This fencing agent is based on SSH and the `virsh`
+command.
 
-1. installer tous les _FA_ ainsi que `fence_virsh`
-2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+1. install all the _FA_ including `fence_virsh`
+2. list the _FA_ with `pcs resource` and `stonith_admin`
 
-Nous abordons la création d'une ressource de fencing plus loin dans le workshop.
+We will delve into fencing resource creation later on.
 
 :::
 
@@ -2233,13 +2541,17 @@ Nous abordons la création d'une ressource de fencing plus loin dans le workshop
 
 ::: notes
 
-1. installer tous les _FA_ ainsi que `fence_virsh`
+FR 1. installer tous les _FA_ ainsi que `fence_virsh`
+FR
+1. install all the _FA_ including `fence_virsh`
 
 ~~~console
 # yum install -y fence-agents-all fence-agents-virsh
 ~~~
 
-2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+FR 2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+FR
+2. list the _FA_ with `pcs resource` and `stonith_admin`
 
 ~~~
 # pcs resource agents stonith
@@ -2259,39 +2571,64 @@ fence_apc_snmp
 
 -----
 
-## `LRMd` et _Resources Agent_ - Diagramme global
+## `LRMd` et _Resources Agent_ - Global diagram
 
-![Diagramme LRM et ressources](medias/pcmk-archi-resource.png)
+![LRM and it's resources diagram](medias/pcmk-archi-resource.png)
 
 -----
 
 ### Local Resource Manager (LRM)
 
-* daemon `lrmd`
-* interface entre le `CRMd` et les _resource agents_ (_RA_)
-* capable d'exécuter les différents types de _RA_ supportés (OCF, systemd,
-  LSF, etc) et d'en comprendre la réponse
-* reçoit des commandes du `CRMd` et les passe aux _RA_
-* renvoie le résultat de l'action au `CRMd` de façon homogène, quelque
-  soit le type de _RA_ utilisé
-* est responsable d'exécuter les actions récurrentes en toute autonomie et de
-  prévenir le `CRMd` en cas d'écart avec le résultat attendu
-* renommé _local executor_ depuis la version 2.0 
+FR * daemon `lrmd`
+FR * interface entre le `CRMd` et les _resource agents_ (_RA_)
+FR * capable d'exécuter les différents types de _RA_ supportés (OCF, systemd,
+FR   LSF, etc) et d'en comprendre la réponse
+FR * reçoit des commandes du `CRMd` et les passe aux _RA_
+FR * renvoie le résultat de l'action au `CRMd` de façon homogène, quelque
+FR   soit le type de _RA_ utilisé
+FR * est responsable d'exécuter les actions récurrentes en toute autonomie et de
+FR   prévenir le `CRMd` en cas d'écart avec le résultat attendu
+FR * renommé _local executor_ depuis la version 2.0
+FR
+* `LRMd` daemon
+* interface between `CRMd` and the _resource agent_ (_RA_)
+* can inteface with all the available _RA_ types (OCF, systemd, LSF, etc.) and
+  understand their answers
+* receives `CRMd` commands and feeds them to _RA_
+* resends the result of the action to `CRMd` in a homogenous fashion despite
+  the _RA_ type
+* is responsible for the execution of recurring actions and must warn `CRMd` in
+  case the result of the action is different from the expected one (e.g.
+  monitor)
+* renamed 'local executor' in version 2.0
 
 ::: notes
 
-Lorsqu'une instruction doit être transmise à un agent, le `CRMd` passe
-cette information au `LRMd`, qui se charge de faire exécuter l'action
-appropriée par le _RA_.
+<!-- c'est le CRMd DC qui met a jour la CIB ? avec les codes retour ? -->
+FR Lorsqu'une instruction doit être transmise à un agent, le `CRMd` passe
+FR cette information au `LRMd`, qui se charge de faire exécuter l'action
+FR appropriée par le _RA_.
+FR
+FR Le daemon `LRMd` reçoit un code de retour de l'agent, qu'il transmet au
+FR `CRMd`, lequel mettra à jour la CIB pour que cette information soit
+FR partagée au niveau du cluster.
+FR
+FR Pour les actions dont le paramètre `interval` est supérieur à 0, le
+FR `LRMd` est responsable d'exécuter les actions de façon récurrente
+FR à la période indiquée dans la configuration. Le `LRMd` ne
+FR reviendra vers le `CRMd` que si le code retour de l'action varie.
+FR
+When an instruction must be sent to an agent, `CRMd` sends the information to
+`LRMd` which execute the appropriate action on the _RA_.
 
-Le daemon `LRMd` reçoit un code de retour de l'agent, qu'il transmet au
-`CRMd`, lequel mettra à jour la CIB pour que cette information soit
-partagée au niveau du cluster.
+The `LRMd` daemon receives the return code from the agent and transmits it to
+`CRMd` which is tasked with updating the CIB so that the whole cluster is aware
+of the result.
 
-Pour les actions dont le paramètre `interval` est supérieur à 0, le
-`LRMd` est responsable d'exécuter les actions de façon récurrente
-à la période indiquée dans la configuration. Le `LRMd` ne
-reviendra vers le `CRMd` que si le code retour de l'action varie.
+For action where the `interval` parameter is superior to 0, `LRMd` is
+responsible for their recurring execution once the period specified in the
+configuration has ended. `LRMd` will get back to `CRMd` in case the return code
+is not the expected one.
 
 :::
 
@@ -2299,27 +2636,50 @@ reviendra vers le `CRMd` que si le code retour de l'action varie.
 
 ### _Ressource Agent_ (_RA_)
 
-* applique les instructions du `LRMd` sur la ressource qu'il gère
-* renvoie des codes retours stricts reflétant le statut de sa ressource
-* plusieurs types/API de _ressource agent_ supportés
-* la spécification "OCF" est la plus complète
-* l'API OCF présente au `CRMd` les actions supportées par l'agent
-* `action` et `operation` sont deux termes synonymes
-* chaque opérations a un timeout propre et éventuellement une récurrence
-
+FR * applique les instructions du `LRMd` sur la ressource qu'il gère
+FR * renvoie des codes retours stricts reflétant le statut de sa ressource
+FR * plusieurs types/API de _ressource agent_ supportés
+FR * la spécification "OCF" est la plus complète
+FR * l'API OCF présente au `CRMd` les actions supportées par l'agent
+FR * `action` et `operation` sont deux termes synonymes
+FR * chaque opérations a un timeout propre et éventuellement une récurrence
+FR
+* applies the instruction sent by `LRMd` on the resource it manages
+* resends the return code according to the API specification, in accordance to
+  the resource status
+* several kinds of _resource agent_ supported (with different API)
+* the _OCF_ specification is the most exhaustive
+* the _OCF_ API present the action supported by the agent to `CRMd`
+* `action` and `operation` as synonyms
+* each operation has a specific timeout and might have an inteval for recuring
+  operations
+ 
 ::: notes
 
-Il est possible d'utiliser plusieurs types de _RA_ différents au sein d'un même cluster:
+FR Il est possible d'utiliser plusieurs types de _RA_ différents au sein d'un même cluster:
+FR
+FR * OCF (Open Cluster Framework, type préconisé)
+FR * SYSV
+FR * systemd...
+FR
+FR Vous trouverez la liste des types supportés à l'adresse suivante:
+FR <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-supported.html>
+It's possible to use several kinfs of _RA_ in the same cluster:
 
-* OCF (Open Cluster Framework, type préconisé)
+* OCF (Open ClusterFramework, the advised type)
 * SYSV
-* systemd...
+* Systemd
+* etc..
 
-Vous trouverez la liste des types supportés à l'adresse suivante:
+A list of all available types of _RA_ is available here:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-supported.html>
 
-Dans les spécifications du type OCF, un agent a le choix parmi dix codes retours
-différents pour communiquer l'état de son opération à `LRMd`:
+FR Dans les spécifications du type OCF, un agent a le choix parmi dix codes retours
+FR différents pour communiquer l'état de son opération à `LRMd`:
+FR
+
+In the _OCF_ specification, ten different return codes are available for the
+_RA_ to communicate the state of the action it was tasked with by `LMRd`.
 
 * `OCF_SUCCESS` (0, soft)
 * `OCF_ERR_GENERIC` (1, soft)
@@ -2332,65 +2692,119 @@ différents pour communiquer l'état de son opération à `LRMd`:
 * `OCF_RUNNING_MASTER` (8, soft)
 * `OCF_FAILED_MASTER` (9, soft)
 
-Chaque code retour est associé à un niveau de criticité s'il ne correspond
-à celui attendu par le cluster:
+FR Chaque code retour est associé à un niveau de criticité s'il ne correspond
+FR à celui attendu par le cluster:
+FR
+FR * `soft`: le cluster tente une action corrective sur le même nœud ou déplace
+FR   la ressource ailleurs
+FR * `hard`: la ressource doit être déplacée et ne pas revenir sur l'ancien nœud
+FR   sans intervention humaine
+FR * `fatal`: le cluster ne peut gérer la ressource sur aucun nœud
+FR
+Each return code as a corresponding criticity, which is used when the return
+code is different from the one expected by the cluster:
 
-* `soft`: le cluster tente une action corrective sur le même nœud ou déplace
-  la ressource ailleurs
-* `hard`: la ressource doit être déplacée et ne pas revenir sur l'ancien nœud
-  sans intervention humaine
-* `fatal`: le cluster ne peut gérer la ressource sur aucun nœud
+* `soft`: the cluster will try to make a corrective action on the same node or
+  move the resource elsewhere;
+* `hard`: the resource must be move and cannot return to the old node without
+  human intervention;
+* `fatal`: the cluster cannot  manage the resource on any node.
 
-Voici les opérations disponibles aux agents implémentant la specification OCF:
+FR Voici les opérations disponibles aux agents implémentant la specification OCF:
+FR
+FR * `start`: démarre la ressource
+FR * `stop`: arrête la ressource
+FR * `monitor`: vérifie l'état de la ressource
+FR * `validate-all`: valide la configuration de la ressource
+FR * `meta-data`: présente les capacités de l'agent au cluster
+FR * `promote`: promote la ressource slave en master
+FR * `demote`: démote la ressource master en slave
+FR * `migrate_to`: actions à réaliser pour déplacer une ressource vers un autre nœud
+FR * `migrate_from`: actions à réaliser pour déplacer une ressource vers le nœud local
+FR * `notify`: action à exécuter lorsque le cluster notifie l'agent des actions
+FR   le concernant au sein du cluster
+FR
+These are the available operations for the agent who implement the _OCF_
+specification:
 
-* `start`: démarre la ressource
-* `stop`: arrête la ressource
-* `monitor`: vérifie l'état de la ressource
-* `validate-all`: valide la configuration de la ressource
-* `meta-data`: présente les capacités de l'agent au cluster
-* `promote`: promote la ressource slave en master
-* `demote`: démote la ressource master en slave
-* `migrate_to`: actions à réaliser pour déplacer une ressource vers un autre nœud
-* `migrate_from`: actions à réaliser pour déplacer une ressource vers le nœud local
-* `notify`: action à exécuter lorsque le cluster notifie l'agent des actions
-  le concernant au sein du cluster
+* `start`: start the resource
+* `stop`: stop resource
+* `monitor`: check the state resource
+* `validate-all`: validate the configuration of the resource
+* `meta-data`: displays the capabilities of the _RA_
+* `promote`: promote the slave resource into a master
+* `demote`: demote a master resource to a slave
+* `migrate_to`: required action in order to move the resource to another node
+* `migrate_from`: required action in order to move the resource to the local
+  node
+* `notify`: action to execute when the cluster notifies the _RA_ of the actions
+  it must execute
 
-L'opération `meta-data` permet à l'agent de documenter ses paramètres et
-d'exposer ses capacités au cluster qui adapte donc ses décisions en fonction
-des actions possibles. Par exemple, si les actions `migrate_*` ne sont pas
-disponibles, le cluster utilise les actions `stop` et `start` pour déplacer
-une ressource.
+FR L'opération `meta-data` permet à l'agent de documenter ses paramètres et
+FR d'exposer ses capacités au cluster qui adapte donc ses décisions en fonction
+FR des actions possibles. Par exemple, si les actions `migrate_*` ne sont pas
+FR disponibles, le cluster utilise les actions `stop` et `start` pour déplacer
+FR une ressource.
+FR
+The `meta-data` operation is used by the agent to document it's configuration
+and expose it's capabilities to the cluster. The cluster will then adapt it's
+decision according to the available actions. For example, if the `migrate_*`
+action are not available, the cluster will use the `stop` and `start` actions
+to move a resource.
 
-Les agents systemd ou sysV sont limités aux seules actions `start`, `stop`,
-`monitor`. Dans ces deux cas, les codes retours sont interprétés par `LRMd`
-comme étant ceux définis par la spécification LSB:
+FR Les agents systemd ou sysV sont limités aux seules actions `start`, `stop`,
+FR `monitor`. Dans ces deux cas, les codes retours sont interprétés par `LRMd`
+FR comme étant ceux définis par la spécification LSB:
+FR <http://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html>
+FR
+The systemd and sysV agent are limited to three actions `start`, `stop` and
+`monitor`. With these agents `LRMd` interprets the return codes as described in
+the LSB specification:
 <http://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html>
 
-Un ressource peut gérer un service seul (eg. une vIP) au sein du cluster, un
-ensemble de service cloné (eg. Nginx) ou un ensemble de clone _multi-state_
-pour lesquels un statut `master` et `slave` est géré par le cluster et le _RA_.
+FR Un ressource peut gérer un service seul (eg. une vIP) au sein du cluster, un
+FR ensemble de service cloné (eg. Nginx) ou un ensemble de clone _multi-state_
+FR pour lesquels un statut `master` et `slave` est géré par le cluster et le _RA_.
+FR
+A resource can manage a single service (e.g. a VIP), or a group of cloned
+services (e.g. Nginx) or even a group of _multi-state_ clones where the
+`master` and `slave` state is managed by the cluster and the _RA_.
 
-Les _RA_ qui pilotent des ressources _multi-state_ implémentent obligatoirement
-les actions `promote` et `demote` : une ressource est clonée sur autant de
-nœuds que demandé, démarrée en tant que slave, puis le cluster promeut un ou
-plusieurs `master` parmi les `slave`.
+FR Les _RA_ qui pilotent des ressources _multi-state_ implémentent obligatoirement
+FR les actions `promote` et `demote` : une ressource est clonée sur autant de
+FR nœuds que demandé, démarrée en tant que slave, puis le cluster promeut un ou
+FR plusieurs `master` parmi les `slave`.
+FR
+The _RA_ designed to control _multi-state_ resources must implement the
+`promote` and `demote` actions: the resource will be cloned on as many nodes as
+requested, started as a slave, then the cluster will promote one or several
+`masters` amongst the `slaves`.
 
-Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
-`migrate_to` et `migrate_from` qui ne sont disponibles qu'aux _RA_ non
-_multi-state_ (non implémenté dans Pacemaker pour les ressources multistate).
+FR Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
+FR `migrate_to` et `migrate_from` qui ne sont disponibles qu'aux _RA_ non
+FR _multi-state_ (non implémenté dans Pacemaker pour les ressources multistate).
+FR
+The _resource agent_ PAF uses all theses actions except for `migrate_to` and
+`migrate_from` which are available only for non _multi-state_ _RA_ (it's not
+implemented in Pacemaker for multi state resources).
 
 :::
 
 -----
 
-### TP: _Resource Agents_
+### Practical Work: _Resource Agents_
 
 ::: notes
 
-1. installer les _resource agents_
-2. lister les RA installés à l'aide de `pcs`
-3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
-4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+FR 1. installer les _resource agents_
+FR 2. lister les RA installés à l'aide de `pcs`
+FR 3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
+FR 4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+FR
+1. install the _resource agents_
+2. list the available _RA_ with `pcs`
+3. display the information about the `dummy` _RA_ with `pcs`
+4. display the information about the `pgsql` _RA_ with `pcs`
 
 :::
 
@@ -2400,32 +2814,50 @@ _multi-state_ (non implémenté dans Pacemaker pour les ressources multistate).
 
 ::: notes
 
-1. installer les _resource agents_
+FR 1. installer les _resource agents_
+FR
+FR Il est normalement déjà installé comme dépendance de pacemaker.
+FR
+1. install the _resource agents_
 
-Il est normalement déjà installé comme dépendance de pacemaker.
+This package is usually installed as a dependency of Pacemaker.
 
 ~~~
 yum install -y resource-agents
 ~~~
 
-2. lister les RA installés à l'aide de `pcs`
+FR 2. lister les RA installés à l'aide de `pcs`
+FR
+2. list the available _RA_ with `pcs`
 
 ~~~
 pcs resource agents
 ~~~
 
-3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
+FR 3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
+FR
+FR Chaque agent embarque sa propre documentation.
+FR
+3. display the information about the `dummy` _RA_ with `pcs`
 
-Chaque agent embarque sa propre documentation.
+Each _RA_ contains it's own documentation.
 
 ~~~
 pcs resource describe dummy
 ~~~
 
-4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+FR 4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+FR
+FR Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de PAF. Vous
+FR pouvez lister l'ensemble de ses options grâce à la commande:
+FR
 
-Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de PAF. Vous
-pouvez lister l'ensemble de ses options grâce à la commande:
+4. display the information about the `pgsql` _RA_ with `pcs`
+
+The `pgsql` _RA_ is deployed with the `resource_agents` package is the one
+deployed with PAF.
+
+You can list all it's options with the command :
 
 ~~~
 pcs resource describe pgsql
@@ -2437,22 +2869,35 @@ pcs resource describe pgsql
 
 ## PostgreSQL Automatic Failover (PAF)
 
-* _RA_ spécifique à PostgreSQL pour Pacemaker
-* alternative à l'agent existant
-  * moins complexe et moins intrusif
-  * compatible avec PostgreSQL 9.3 et supérieur
-* Voir: <https://clusterlabs.github.io/PAF/FAQ.html>
+FR * _RA_ spécifique à PostgreSQL pour Pacemaker
+FR * alternative à l'agent existant
+FR   * moins complexe et moins intrusif
+FR   * compatible avec PostgreSQL 9.3 et supérieur
+FR * Voir: <https://clusterlabs.github.io/PAF/FAQ.html>
+FR
+* _RA_ dedicated to PostgreSQL
+* an alternative to the existing one
+  - less complex and intrusive
+  - compatible with PostgreSQL 9.3 and up
+* see: <https://clusterlabs.github.io/PAF/FAQ.html>
 
 ::: notes
 
-PAF se situe entre Pacemaker et PostgreSQL. C'est un _resource agent_
-qui permet au cluster d'administrer pleinement une instance PostgreSQL locale.
+FR PAF se situe entre Pacemaker et PostgreSQL. C'est un _resource agent_
+FR qui permet au cluster d'administrer pleinement une instance PostgreSQL locale.
+FR
+FR Un chapitre entier est dédié à son installation, son fonctionnement et sa
+FR configuration plus loin dans ce workshop.
+FR
+FR ![Schema](medias/pcmk-archi-paf-overview.png)
+FR
+PAF is a component placed between Pacemaker and PostgreSQL. It's a _resource
+agent_ which enables the cluster to administer a local PostgreSQL instance.
 
-Un chapitre entier est dédié à son installation, son fonctionnement et sa
-configuration plus loin dans ce workshop.
+A chapter dedicated to it's installation, inner working and configuration can
+be found later in this workshop.
 
 ![Schema](medias/pcmk-archi-paf-overview.png)
-
 :::
 
 ------
@@ -2904,7 +3349,7 @@ notables:
   fencing. Pratique dans les cluster à deux nœuds pour privilégier un des
   nœuds
 
-Vous trouverez la liste complète à l'adresse suivante:
+ous trouverez la liste complète à l'adresse suivante:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_special_options_for_fencing_resources.html>
 
 Tous les paramètres ne débutants pas par `pcmk_*` sont propres à chaque
