@@ -2902,152 +2902,252 @@ be found later in this workshop.
 
 ------
 
-# Paramétrage du cluster
+# Cluster configuration
 
-Attention:
+FR Attention:
+FR
+FR * les paramètres de Pacemaker sont tous sensibles à la casse
+FR * aucune erreur n'est levée en cas de création d'un paramètre inexistant
+FR * les paramètres inconnus sont simplement ignorés par Pacemaker
+FR
+Warning:
 
-* les paramètres de Pacemaker sont tous sensibles à la casse
-* aucune erreur n'est levée en cas de création d'un paramètre inexistant
-* les paramètres inconnus sont simplement ignorés par Pacemaker
+* Pacemaker's parameters are all case sensitive
+* no error is returned when a non existant parameter is created
+* unknown parameters are juste ignored by Pacemaker
 
 -----
 
-## Support du Quorum
+## Quorum support
 
-Paramètre `no-quorum-policy`
+FR Paramètre `no-quorum-policy`
+FR
+FR * `ignore`: désactive la gestion du quorum (déconseillé !)
+FR * `stop`: (par défaut) arrête toutes les ressources
+FR * `freeze`: préserve les ressources encore disponible dans la partition
+FR * `suicide`: fencing des nœuds de la partition
+FR
+The `no-quorum-policy` parameter
 
-* `ignore`: désactive la gestion du quorum (déconseillé !)
-* `stop`: (par défaut) arrête toutes les ressources
-* `freeze`: préserve les ressources encore disponible dans la partition
-* `suicide`: fencing des nœuds de la partition
+* `ignore`: disables quorum management (not recommanded)
+* `stop`: stop the resources (default)
+* `freeze`: keeps the resources that are still available in the partition
+* `suicide`: fence the nodes of the partition
 
 :::notes
 
-Il est fortement déconseillé de désactiver le quorum.
+FR Il est fortement déconseillé de désactiver le quorum.
+FR
+FR La valeur par défaut est le plus souvent la plus adaptée.
+FR
+FR Le cas du `freeze` peut être utile afin de conserver les ressources actives au
+FR sein d'un cluster où il n'y a aucun risque de split brain en cas de partition
+FR réseau, eg. un serveur httpd.
+FR
 
-La valeur par défaut est le plus souvent la plus adaptée.
+It's strongly advised not to disable quorum.
 
-Le cas du `freeze` peut être utile afin de conserver les ressources actives au
-sein d'un cluster où il n'y a aucun risque de split brain en cas de partition
-réseau, eg. un serveur httpd.
+Most of the time, the default value is the most suitable.
+
+The `freeze` value can be useful in order to keep resources active in a cluster
+where there is no risk of split brain in case of network partition (e.g. an
+httpd server).
 
 :::
 
 -----
 
-## Support du Stonith
+## Stonith support
 
-Paramètre `stonith-enabled`
+FR Paramètre `stonith-enabled`
+FR
+FR * `false` : désactive la gestion du fencing (déconseillé !)
+FR * activé par défaut
+FR * aucune ressource ne démarre sans présence de FA
+FR
+The `stonith-enabled` parameter
 
-* `false` : désactive la gestion du fencing (déconseillé !)
-* activé par défaut
-* aucune ressource ne démarre sans présence de FA
+* `false`: disables the fencing (not recommanded)
+* enabled by default
+  - no ressource can start without _FA_
 
 :::notes
 
-Ce paramètre contrôle la gestion du fencing au sein du cluster. Ce dernier
-est activé et il est vivement recommandé de ne pas le désactiver.
+FR Ce paramètre contrôle la gestion du fencing au sein du cluster. Ce dernier
+FR est activé et il est vivement recommandé de ne pas le désactiver.
+FR
+FR Effectivement, il est possible de désactiver le fencing au cas par cas,
+FR ressource par ressource, grâce à leur méta-attribut `requires` (voir
+FR chapitre [Configuration des ressources][]), positionné par défaut à `fencing`.
+FR
+This parameter controls fencing management inside the cluster. It's enabled by
+default. It's not recommanded to disable it.
 
-Effectivement, il est possible de désactiver le fencing au cas par cas,
-ressource par ressource, grâce à leur méta-attribut `requires` (voir
-chapitre [Configuration des ressources][]), positionné par défaut à `fencing`.
+If need be, it's possible to disable fencing peacemeal, one resource at a
+time with their meta attribute `requires` (see the [Resource configuration][]
+chapter). It's default value is `fencing`.
 
+FR Il est techniquement possible de désactiver le [quorum][] ou [fencing][].
+FR
+FR Comme dit précédemment c'est à proscrire hors d'un environnement de test. Sans
+FR ces fonctionnalités, le comportement du cluster est imprévisible en cas de
+FR panne et sa cohérence en péril.
+FR
+FR Dans le cas d'un cluster qui gère une base de donnée cela signifie que l'on encourt le
+FR risque d'avoir plusieurs ressources PostgreSQL disponibles en écriture sur plusieurs
+FR nœuds (conséquence d'un `split brain`).
+FR
+It's possible to disable [quorum][] or [fencing][].
 
-Il est techniquement possible de désactiver le [quorum][] ou [fencing][].
+As explained before, this is not recommanded outside of a test environement.
+Without these mechanisms, the cluster behavior is unpredictable in case of
+outage and it's consistency is at risk.
 
-Comme dit précédemment c'est à proscrire hors d'un environnement de test. Sans
-ces fonctionnalités, le comportement du cluster est imprévisible en cas de
-panne et sa cohérence en péril.
-
-Dans le cas d'un cluster qui gère une base de donnée cela signifie que l'on encourt le
-risque d'avoir plusieurs ressources PostgreSQL disponibles en écriture sur plusieurs
-nœuds (conséquence d'un `split brain`).
-
-:::
-
------
-
-## Cluster symétrique et asymétrique
-
-Paramètre `symmetric-cluster`:
-
-* change l'effet des scores de préférence des ressources
-* `true`: (par défaut) cluster symétrique ou _Opt-Out_. Les ressources
-  peuvent démarrer sur tous les nœuds à moins d'y avoir un score déclaré
-  inférieur à `0`
-* `false`: cluster asymétrique ou _Opt-In_. Les ressources ne peuvent
-  démarrer sur un nœud à moins  d'y avoir un score déclaré supérieur ou
-  égal à `0`
-
-::: notes
-
-Le paramètre `symetric-cluster` permet de changer la façon dont pacemaker choisit
-où démarrer les ressources.
-
-Configuré à `true` (defaut), le cluster est dit symétrique. Les ressources
-peuvent être démarrées sur n'importe quel nœud. Le choix se fait par ordre
-décroissant des valeurs des [contraintes de localisation][Scores etlocalisation].
-Une contrainte de localisation négative empêchera la ressource de démarrer
-sur un nœud.
-
-Configuré à `false`, le cluster est dit asymétrique. Les ressources ne peuvent
-démarrer nulle part. La définition des contraintes de localisation doit définir
-sur quels nœuds les ressources peuvent être démarrées.
-
-La notion de contraintes de localisation est définie dans le chapitre
-[Contraintes de localisation][]
+In case of clusters that manage databases, this means we risk a `split brain`
+situation in case of network partition. Which will result in the same database
+being opened in read/write mode on different nodes.
 
 :::
 
 -----
 
-## Mode maintenance
+## Symetric and asymetric clusters
 
-Paramètre `maintenance-mode`:
+FR Paramètre `symmetric-cluster`:
+FR
+FR * change l'effet des scores de préférence des ressources
+FR * `true`: (par défaut) cluster symétrique ou _Opt-Out_. Les ressources
+FR   peuvent démarrer sur tous les nœuds à moins d'y avoir un score déclaré
+FR   inférieur à `0`
+FR * `false`: cluster asymétrique ou _Opt-In_. Les ressources ne peuvent
+FR   démarrer sur un nœud à moins  d'y avoir un score déclaré supérieur ou
+FR  égal à `0`
+FR
+The `symetric-cluster` parameter
 
-* désactive tout contrôle du cluster
-* plus aucun opération n'est exécutée
-* plus de monitoring des ressources
-* les ressources démarrée sont laissée dans leur état courant (elles ne
-  sont pas arrêtées)
-* toujours tester les transitions avec `crm_simulate` avant de sortir de la
-  maintenance
+* changes the effect of preference scores on resources
+* `true`: the cluster is symetric or _Opt-Out_, this is the default. The
+  resources can start on all nodes except if there is a negative score placed
+  on the node.
+* `false`: the cluster is asymetric or _Opt-In_. The resources cannot start on
+  a node unless a positive score as been placed on the node.
 
 ::: notes
+<!-- Scores etlocalisation mque espace -->
+FR Le paramètre `symetric-cluster` permet de changer la façon dont pacemaker choisit
+FR où démarrer les ressources.
+FR
+FR Configuré à `true` (defaut), le cluster est dit symétrique. Les ressources
+FR peuvent être démarrées sur n'importe quel nœud. Le choix se fait par ordre
+FR décroissant des valeurs des [contraintes de localisation][Scores etlocalisation].
+FR Une contrainte de localisation négative empêchera la ressource de démarrer
+FR sur un nœud.
+FR
+FR Configuré à `false`, le cluster est dit asymétrique. Les ressources ne peuvent
+FR démarrer nulle part. La définition des contraintes de localisation doit définir
+FR sur quels nœuds les ressources peuvent être démarrées.
+FR
+FR La notion de contraintes de localisation est définie dans le chapitre
+FR [Contraintes de localisation][]
+FR
+The `symetric-cluster` parameter changes the way pacemaker choses where to
+start resources.
 
-Le paramètre `maintenance_mode` est utile pour réaliser des opérations de
-maintenance globales à tous les nœuds du cluster. Toutes les opérations
-`monitor` sont désactivées et le cluster ne réagit plus aucun événements.
+The default value is `true`, in this case the cluster is called symetric. The
+resources can start on any node. The choice of the node is made in decreasing
+order of the [location constraints][Scores and location]. A negative location
+constraint prevents a resource to start on the node.
 
-Ce paramètre, comme tous les autres, est préservé lors du redémarrage de
-Pacemaker, sur un ou tous les nœuds. Il est donc possible de redémarrer tout
-le cluster tout en conservant le mode maintenance actif.
+When it is set to `false`, the cluster is said to be `asymetric`. The resource
+cannot start anywhere. Location constraints must be set to define where the
+resource can start.
 
-Attention toutefois aux scores de localisation. D'autant plus que ceux-ci
-peuvent être mis à jour lors du démarrage du cluster sur un nœud par exemple.
-Vérifiez toujours que les ressources sont bien dans l'état attendu sur chaque
-nœud avant de sortir du mode de maintenance afin d'éviter une intervention du
-cluster. Lorsque ce dernier reprend la main, il lance l'action `probe` sur
-toutes les ressources sur tous les nœuds pour détecter leur présence et
-comparer la réalité avec l'état de sa CIB.
+The notion of [location constraints][] is defined in it's own chapter.
 
 :::
 
 -----
 
-## Autres paramètres utiles
+## Maintenance mode
 
-* `stop-all-resources=false`: toutes les ressources sont arrêtées si
-  positionné à `true` 
-* `stonith-watchdog-timeout`: temps d'attente avant qu'un nœud disparu est
-  considéré comme "auto-fencé" par son watchdog si le cluster est configuré
-  avec
-* `cluster-recheck-interval=15min`: intervalle entre deux réveils forcé du
-  `PEngine` pour vérifier l'état du cluster
+FR Paramètre `maintenance-mode`:
+FR
+FR * désactive tout contrôle du cluster
+FR * plus aucun opération n'est exécutée
+FR * plus de monitoring des ressources
+FR * les ressources démarrée sont laissée dans leur état courant (elles ne
+FR   sont pas arrêtées)
+FR * toujours tester les transitions avec `crm_simulate` avant de sortir de la
+FR   maintenance
+FR
+The `maintenace-mode` parameter
+
+* disables all control on the cluster
+* no more action will be executed
+  - no monitoring will be done on resources
+* the started resources will be left in their current state
+* always test the transition with `crm_simulate` when leaving maintenance mode
 
 ::: notes
 
-Pour la liste complète des paramètres globaux du cluster, voir:
+FR Le paramètre `maintenance_mode` est utile pour réaliser des opérations de
+FR maintenance globales à tous les nœuds du cluster. Toutes les opérations
+FR `monitor` sont désactivées et le cluster ne réagit plus aucun événements.
+FR
+FR Ce paramètre, comme tous les autres, est préservé lors du redémarrage de
+FR Pacemaker, sur un ou tous les nœuds. Il est donc possible de redémarrer tout
+FR le cluster tout en conservant le mode maintenance actif.
+FR
+The `maintenance mode` parameter is useful to conduct maintenace operations
+that impact all the nodes of the cluster. All the `monitor` action are disables
+and the cluster doesn't react to any event.
+
+This parameter, like all others, is kept during Pacemaker restarts. It's
+therefore possible to restart all the cluster while keeping the maintenance
+mode active.
+
+FR Attention toutefois aux scores de localisation. D'autant plus que ceux-ci
+FR peuvent être mis à jour lors du démarrage du cluster sur un nœud par exemple.
+FR Vérifiez toujours que les ressources sont bien dans l'état attendu sur chaque
+FR nœud avant de sortir du mode de maintenance afin d'éviter une intervention du
+FR cluster. Lorsque ce dernier reprend la main, il lance l'action `probe` sur
+FR toutes les ressources sur tous les nœuds pour détecter leur présence et
+FR comparer la réalité avec l'état de sa CIB.
+FR
+Be careful to the location scores, they can be updated during cluster restart.
+It's important to verify that all resources are in the correct state on all
+nodes before leaving maintenance mode in order to avoid changes in the cluster
+state.  When the cluster is back in control, it starts a `probe` action on all
+resources of all nodes in order to detect their presence and compare reality
+with the state recorded in the CIB.
+
+:::
+
+-----
+
+## Other usefull parameters
+
+FR * `stop-all-resources=false`: toutes les ressources sont arrêtées si
+FR   positionné à `true`
+FR * `stonith-watchdog-timeout`: temps d'attente avant qu'un nœud disparu est
+FR   considéré comme "auto-fencé" par son watchdog si le cluster est configuré
+FR   avec
+FR * `cluster-recheck-interval=15min`: intervalle entre deux réveils forcé du
+FR   `PEngine` pour vérifier l
+FR   'état du cluster
+FR
+* `stop-all-resources=false`: all resources are stopped if this parameter is
+  set to `true`
+* `stonith-watchdog-timeout`: elapsed time before a failed node is considered
+  "self fenced" by it's watchdog if the cluster has one.
+*  `cluster-recheck-interval=15min`: interval between two forced awakening of
+   the `PEngine` in order to check the cluster state
+
+::: notes
+
+FR Pour la liste complète des paramètres globaux du cluster, voir:
+FR
+A compehensive list of cluster global parameters is available here:
 
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-cluster-options.html>
 
@@ -3055,11 +3155,13 @@ Pour la liste complète des paramètres globaux du cluster, voir:
 
 -----
 
-## TP: paramètres du cluster
+## Practical work: Cluster parameters
 
 ::: notes
 
-1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+FR 1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+FR
+1. display the default values of the following parameters with `pcs property`:
 
   * `no-quorum-policy`
   * `stonith-enabled`
@@ -3070,11 +3172,13 @@ Pour la liste complète des paramètres globaux du cluster, voir:
 
 -----
 
-## Correction: paramètres du cluster
+## Correction: Cluster parameters
 
 ::: notes
 
-1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+FR 1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+FR
+1. display the default values of the following parameters with `pcs property`:
 
   * `no-quorum-policy`
   * `stonith-enabled`
