@@ -2792,7 +2792,7 @@ implemented in Pacemaker for multi state resources).
 
 -----
 
-### Practical Work: _Resource Agents_
+### Practical work: _Resource Agents_
 
 ::: notes
 
@@ -3055,7 +3055,7 @@ start resources.
 
 The default value is `true`, in this case the cluster is called symetric. The
 resources can start on any node. The choice of the node is made in decreasing
-order of the [location constraints][Scores and location]. A negative location
+order of the [location constraints][Scores and location constraints]. A negative location
 constraint prevents a resource to start on the node.
 
 When it is set to `false`, the cluster is said to be `asymetric`. The resource
@@ -3360,70 +3360,111 @@ yourself.
 
 -----
 
-# Configuration des ressources
+# Resource configuration
 
-* mécanique interne
-* __tout__ dépend des scores !
-* chapitre organisé dans l'ordre des besoins de configuration
+FR * mécanique interne
+FR * __tout__ dépend des scores !
+FR * chapitre organisé dans l'ordre des besoins de configuration
+FR
+* internal mechanics
+* __everything__ depends on scores !
+* this chapter's organization is based on the order of configuration needs
 
 -----
 
-## Méta-attributs des ressources
+## Resource meta-attributes
 
-* un ensemble de _meta-attributes_ s'appliquent à n'importe quelle ressource:
-  * il est possible de leur positionner une valeur par défaut qui s'applique
-    à toutes les ressources
-  * il est possible de surcharger les valeurs par défaut pour chaque ressource
-* quelques exemple de méta-attributs:
-  * `target-role`: rôle attendu: `Started`, `Stopped`, `Slave`, ou `Master`
-  * `migration-threshold` : combien d'erreurs "soft" avant de déclencher un failover
-  * `failure-timeout` : durée à partir de laquelle les erreurs "soft" sont réinitialisées
-  * `resource-stickiness` : score de maintien d'une ressource sur le nœud courant
-  * `is-managed`: le cluster doit-il agir en cas d'événement ?
+FR * un ensemble de _meta-attributes_ s'appliquent à n'importe quelle ressource:
+FR   * il est possible de leur positionner une valeur par défaut qui s'applique
+FR     à toutes les ressources
+FR   * il est possible de surcharger les valeurs par défaut pour chaque ressource
+FR * quelques exemple de méta-attributs:
+FR   * `target-role`: rôle attendu: `Started`, `Stopped`, `Slave`, ou `Master`
+FR   * `migration-threshold` : combien d'erreurs "soft" avant de déclencher un failover
+FR   * `failure-timeout` : durée à partir de laquelle les erreurs "soft" sont réinitialisées
+FR   * `resource-stickiness` : score de maintien d'une ressource sur le nœud courant
+FR   * `is-managed`: le cluster doit-il agir en cas d'événement ?
+FR
+* a set of _meta-attributes_ can be applied to any resource:
+  - it's possible to set a default value which will be applied to all resources
+  - it's possible to overload all the default values
+* some example of meta attributes:
+  - `target-role`: expected role among: `Started`, `Stopped`, `Slave or
+    `Master`
+  - `migration-threshold`: how many "soft" errors before we start a failover
+  - `failure-timeout`: amount of time elapsed before the "soft" errors are
+    reset
+  - `resource-stickiness`: controls how much a service prefers to stay running
+    where it is
+  - `is-managed`: does the cluster react in case of event ?
 
 ::: notes
 
-Les _meta-attributes_ est un ensemble d'attributs commun à n'importe quelle
-type de ressource. Ils se positionnent ressource par ressource. Il est possible
-de leur créer une valeur par défaut qui sera appliquée automatiquement à toute
-ressource présente dans le cluster.
+FR Les _meta-attributes_ est un ensemble d'attributs commun à n'importe quelle
+FR type de ressource. Ils se positionnent ressource par ressource. Il est possible
+FR de leur créer une valeur par défaut qui sera appliquée automatiquement à toute
+FR ressource présente dans le cluster.
+FR
+FR Par exemple avec `pcs`:
+FR
+_Meta-attributes_ are a set of attributes shared by all types of resources.
+They can be set on a resource per resource basis. It's possible to change their
+default value so that it's applied to all the resources in the cluster.
 
-Par exemple avec `pcs`:
+Exemple using `pcs`:
 
 ~~~
 pcs resource defaults <nom_attribut>=valeur
 ~~~
 
-Le même exemple avec l'outil standard `crm_attribute`:
+FR Le même exemple avec l'outil standard `crm_attribute`:
+FR
+
+The same example using `crm_attribute`:
 
 ~~~
 crm_attribute --type rsc_defaults --name <nom_attribut> --update valeur
 ~~~
 
-La valeur d'un méta attribut positionné au niveau de la ressource elle même
-surcharge la valeur par défaut positionné précédemment.
+FR La valeur d'un méta attribut positionné au niveau de la ressource elle même
+FR surcharge la valeur par défaut positionné précédemment.
+FR
+FR La liste complète des méta-attributs et leur valeur par défaut est disponible à
+FR cette adresse:
+FR
+The value of a meta attribute positionned at the resource level takes priority
+over default values  configures at a higher level.
 
-La liste complète des méta-attributs et leur valeur par défaut est disponible à
-cette adresse:
+A comprehensive list of meta-attributes and their default value is available
+here:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-options.html#_resource_meta_attributes>
 
 :::
 
 -----
 
-### TP: paramétrage par défaut des ressources
+### Practical work: resource default parameters
 
 ::: notes
 
-1. trouver la valeur par défaut du paramètre `migration-threshold`
-2. positionner sa valeur à dix
-3. supprimer la valeur par défaut du paramètre `is-managed`
-4. contrôler que les modifications sont prise en compte avec `pcs config show`
-5. observer les modifications de la CIB dans les logs
+FR 1. trouver la valeur par défaut du paramètre `migration-threshold`
+FR 2. positionner sa valeur à dix
+FR 3. supprimer la valeur par défaut du paramètre `is-managed`
+FR 4. contrôler que les modifications sont prise en compte avec `pcs config show`
+FR 5. observer les modifications de la CIB dans les logs
+FR
+FR Remarque: il existe une propriété du cluster `default-resource-stickiness`.
+FR Cette propriété est dépréciée, il faut utiliser les valeurs par defaut des
+FR ressources à la place.
+FR
+1. find the default value of the parameter `migration-threshold`
+2. set it to a value of 10
+3. remove the default value for the parameter `is-managed`
+4. check that the modification where taken into account with `pcs config show`
+5. look for the CIB modification in the logs
 
-Remarque: il existe une propriété du cluster `default-resource-stickiness`.
-Cette propriété est dépréciée, il faut utiliser les valeurs par defaut des
-ressources à la place.
+Note: the property `default-resource-stickiness` is deprecated. The per
+resource default value should be used instead.
 
 ~~~
 pcs property list --defaults |grep -E "resource-stickiness"
@@ -3434,18 +3475,24 @@ pcs property list --defaults |grep -E "resource-stickiness"
 
 -----
 
-### Correction: paramétrage par défaut des ressources
+### Correction: resource default parameters
 
 ::: notes
 
-1. trouver la valeur par défaut du paramètre `migration-threshold`
+FR 1. trouver la valeur par défaut du paramètre `migration-threshold`
+FR
+FR La valeur par défaut est `INFINITY`. Voir:
+FR
+1. find the default value of the parameter `migration-threshold`
 
-La valeur par défaut est `INFINITY`. Voir:
+The default value is set to `INFINITY`. See:
 
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-options.html#_resource_meta_attributes>
 
 2. positionner sa valeur à dix
 
+FR 2. set it to a value of 10
+FR
 ~~~console
 # pcs resource defaults migration-threshold=10
 Warning: Defaults do not apply to resources which override them with their own defined values
@@ -3455,12 +3502,16 @@ migration-threshold: 10
 
 3. supprimer la valeur par défaut du paramètre `is-managed`
 
+FR 3. remove the default value for the parameter `is-managed`
+FR
 ~~~console
 # pcs resource defaults is-managed=
 Warning: Defaults do not apply to resources which override them with their own defined values
 ~~~
 
-4. contrôler que les modifications sont prise en compte avec `pcs config show`
+FR 4. contrôler que les modifications sont prise en compte avec `pcs config show`
+FR
+4. check that the modification where taken into account with `pcs config show`
 
 ~~~
 # pcs config show
@@ -3470,9 +3521,13 @@ Resources Defaults:
 [...]
 ~~~
 
-5. observer les modifications de la CIB dans les logs
+FR 5. observer les modifications de la CIB dans les logs
+FR
+FR NB: les log ont ici été remis en forme.
+FR
+5. look for the CIB modification in the logs
 
-NB: les log ont ici été remis en forme.
+Note: the logs where reformatted to fit the workshop.
 
 ~~~
 cib: info: Forwarding cib_apply_diff operation for section 'all' to all
@@ -3492,91 +3547,158 @@ cib: info: Completed cib_apply_diff operation for section 'all': OK
 
 -----
 
-## Configuration du fencing
+## Fencing configuration
 
-* les _FA_ sont gérés comme des ressources classiques
-* les _FA_ ont un certain nombre de paramètres en commun: `pcmk_*`
-* les autres paramètres sont propres à chaque _FA_, eg. `port`, `identity_file`, `username`, ...
-* chaque _FA_ configuré peut être appelé de n'importe quel nœud
+FR * les _FA_ sont gérés comme des ressources classiques
+FR * les _FA_ ont un certain nombre de paramètres en commun: `pcmk_*`
+FR * les autres paramètres sont propres à chaque _FA_, eg. `port`, `identity_file`, `username`, ...
+FR * chaque _FA_ configuré peut être appelé de n'importe quel nœud
+FR
+* _FA_ are handled like regular resources
+* _FA_ have a bunch of: `pcmk_*` parameters
+* other parameters exist and are _FA_ specific, eg. `port`, `identity_file`,
+  `username`, ...
+* each configured _FA_ can be called from any node
 
 ::: notes
 
-Pour chaque agent de fencing configuré, un certain nombre de méta attributs
-définissent les capacités de l'agent auprès du cluster. Quelque exemples
-notables:
+FR Pour chaque agent de fencing configuré, un certain nombre de méta attributs
+FR définissent les capacités de l'agent auprès du cluster. Quelque exemples
+FR notables:
+FR
+FR * `pcmk_reboot_action`: détermine quelle action exécuter pour isoler un nœud.
+FR   Par exemple `reboot` ou `off`. L'action indiquée dépend de ce que supporte
+FR   l'agent
+FR * `pcmk_host_check`: détermine si l'agent doit interroger l'équipement pour
+FR   établir la liste des nœuds qu'il peut isoler, ou s'il doit se reposer sur
+FR   le paramètre `pcmk_host_list`
+FR * `pcmk_host_list`: liste des nœuds que peut isoler l'agent de fencing
+FR * `pcmk_delay_base`: temps d'attente minimum avant de lancer l'action de
+FR   fencing. Pratique dans les cluster à deux nœuds pour privilégier un des
+FR   nœuds
+FR
+FR Vous trouverez la liste complète à l'adresse suivante:
 
-* `pcmk_reboot_action`: détermine quelle action exécuter pour isoler un nœud.
-  Par exemple `reboot` ou `off`. L'action indiquée dépend de ce que supporte
-  l'agent
-* `pcmk_host_check`: détermine si l'agent doit interroger l'équipement pour
-  établir la liste des nœuds qu'il peut isoler, ou s'il doit se reposer sur
-  le paramètre `pcmk_host_list`
-* `pcmk_host_list`: liste des nœuds que peut isoler l'agent de fencing
-* `pcmk_delay_base`: temps d'attente minimum avant de lancer l'action de
-  fencing. Pratique dans les cluster à deux nœuds pour privilégier un des
-  nœuds
+For each configured fencing agent, a few meta attributes define the
+capabilities of the agent to the cluster. Some notable examples:
 
-ous trouverez la liste complète à l'adresse suivante:
+* `pcmk_reboot_action`: determines which action to execute in order to isolate
+  a node. For example `reboot` or `off`. the action provided depends upon what
+  the agent supports.
+* `pcmk_host_check`: determines if the agent must ask the equipment for a list
+  of nodes it can isolate, or if it must rely on the `pcmk_host_list`
+  parameter.
+* `pcmk_host_list`: list the nodes that the _FA_ can isolate
+* `pcmk_delay_base`: minimum elapsed time before starting the fencing action.
+  It's useful in two node cluster to favor one node over the other.
+
+The full list can be found here:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_special_options_for_fencing_resources.html>
 
-Tous les paramètres ne débutants pas par `pcmk_*` sont propres à chaque
-_fencing agent_. Dans le cadre de notre workshop, nous utiliserons l'agent
-`fence_virsh` qui nécessite des paramètres de connexion SSH ainsi que le nom
-de la machine virtuelle à interrompre.
+FR Tous les paramètres ne débutants pas par `pcmk_*` sont propres à chaque
+FR _fencing agent_. Dans le cadre de notre workshop, nous utiliserons l'agent
+FR `fence_virsh` qui nécessite des paramètres de connexion SSH ainsi que le nom
+FR de la machine virtuelle à interrompre.
+FR
+All the parameters who dont start with `pcmk_*` are specific to each _fencing
+agent_. In this workshop, we will use the fencing agent `fence_virsh`. It
+requires several specific parameters for the SSH connexion like the name of the
+virtual machine to stop.
 
-Une fois paramétrés, Pacemaker s'assure que les _FA_ restent disponibles en
-exécutant à intervalle régulier l'action `monitor`, positionnée par défaut
-à une minute. À cause de cette action récurrente, les _FA_ apparaissent au
-sein du cluster au même titre que les autres ressources. Mais notez qu'une
-ressource de fencing ne démarre pas sur les nœud du cluster, ces équipement
-sont actifs _ailleurs_ dans votre architecture.
+FR Une fois paramétrés, Pacemaker s'assure que les _FA_ restent disponibles en
+FR exécutant à intervalle régulier l'action `monitor`, positionnée par défaut
+FR à une minute. À cause de cette action récurrente, les _FA_ apparaissent au
+FR sein du cluster au même titre que les autres ressources. Mais notez qu'une
+FR ressource de fencing ne démarre pas sur les nœud du cluster, ces équipement
+FR sont actifs _ailleurs_ dans votre architecture.
+FR
+Once configured, Pacemaker will make sure the _FA_ are available at all times
+with the execution of a regular `monitor` action. The default interval is set
+to a minute. Because of the  recuring actions, the _FA_ appear in the cluster
+the same way as other resources do. Please note that the fencing resource is
+not started on the cluster nodes, it's equipments are active somewhere else in
+the architecture.
 
-Lorsqu'une action de fencing commandée par Pacemaker, celle-ci sera déclenchée
-en priorité depuis le nœud d'où la ressource est supervisée. Si le nœud ou
-la ressource de fencing sont devenus indisponibles depuis la dernière action de
-monitor, n'importe quel autre nœud du cluster peut être utilisé pour
-exécuter la commande.
+FR Lorsqu'une action de fencing commandée par Pacemaker, celle-ci sera déclenchée
+FR en priorité depuis le nœud d'où la ressource est supervisée. Si le nœud ou
+FR la ressource de fencing sont devenus indisponibles depuis la dernière action de
+FR monitor, n'importe quel autre nœud du cluster peut être utilisé pour
+FR exécuter la commande.
+FR
+When a fencing action is requested by Pacemaker, it will be executed in
+priority on the node where the resource is supervised. If the node or the
+fencing resource are unavailable since the last monitor, any other node of the
+cluster can be used to execute the command.  
 
 :::
 
 -----
 
-### TP: Fencing Agent
+### Practical work: Fencing Agent
 
 ::: notes
 
-Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
-fencing configuré.
+FR Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
+FR fencing configuré.
+FR
+Reminder: the default behavior for the cluster is to refuse to start any
+resource if there is no fencing configured.
 
 ~~~console
 # crm_verify --verbose --live-check
 ~~~
 
-1. afficher la description de l'agent de fencing `fence_virsh`
+FR 1. afficher la description de l'agent de fencing `fence_virsh`
+FR
+FR Nous allons utiliser les paramètres suivants:
+FR
+FR * `ipaddr`: adresse de l'hyperviseur sur lequel se connecter en SSH
+FR * `login`: utilisateur SSH pour se connecter à l'hyperviseur
+FR * `identity_file`: chemin vers la clé privée SSH à utiliser pour l'authentification
+FR * `login_timeout`: timeout du login SSH
+FR * `port`: nom de la VM à isoler dans libvirtd
+FR
+FR Les autres paramètres sont décrits dans le slide précédent.
+FR
+FR Bien s'assurer que chaque nœud peut se connecter en SSH sans mot de passe à
+FR l'hyperviseur.
+FR
+1. display the desciption of the _FA_ `fence_virsh`
 
-Nous allons utiliser les paramètres suivants:
+We will use the following parameters:
 
-* `ipaddr`: adresse de l'hyperviseur sur lequel se connecter en SSH
-* `login`: utilisateur SSH pour se connecter à l'hyperviseur
-* `identity_file`: chemin vers la clé privée SSH à utiliser pour l'authentification
-* `login_timeout`: timeout du login SSH
-* `port`: nom de la VM à isoler dans libvirtd
+* `ipaddr`: address of the hypervisor on which we will connect with SSH
+* `login`: user for the SSH connection to the hypervisor
+* `identity_file`: path to the SSH private key used for authentication
+* `login_timeout`: timeout for the SSH login
+* `port`: name of the VM to isolate in libvirtd
 
-Les autres paramètres sont décrits dans le slide précédent.
+The other parameters are described in the previous slides.
 
-Bien s'assurer que chaque nœud peut se connecter en SSH sans mot de passe à
-l'hyperviseur.
+It's important to check that passwordless authentication is configured between
+the nodes and the hypervisor.
 
-2. créer une ressource de fencing pour chaque nœud du cluster
+FR 2. créer une ressource de fencing pour chaque nœud du cluster
+FR
+FR Les agents de fencing sont des ressources en HA prises en charge par le
+FR cluster. Dans le cadre de ce TP, nous créons une ressource par nœud,
+FR chacune responsable d'isoler un nœud.
+FR
+2. create a fencing resource for each node in the cluster
 
-Les agents de fencing sont des ressources en HA prises en charge par le
-cluster. Dans le cadre de ce TP, nous créons une ressource par nœud,
-chacune responsable d'isoler un nœud.
+The fencing agents are HA resources managed by the cluster. In this exercise,
+we will create one resource per node each one will be responsible for fencing a
+node.
 
-3. vérifier que le cluster ne présente plus d'erreur
-4. vérifier que ces ressources ont bien été créées et démarrées
-5. afficher la configuration des agents de fencing
-6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+FR 3. vérifier que le cluster ne présente plus d'erreur
+FR 4. vérifier que ces ressources ont bien été créées et démarrées
+FR 5. afficher la configuration des agents de fencing
+FR 6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+FR
+3. verify that the cluster doesn't have any error
+4. verify that the resources have been created and started
+5. display the configuration of the fencing agents
+6. verify that the resources are supervized by `LRMd` in the logs
 
 :::
 
@@ -3586,8 +3708,11 @@ chacune responsable d'isoler un nœud.
 
 ::: notes
 
-Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
-fencing configuré.
+FR Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
+FR fencing configuré.
+FR
+Reminder: the default behavior for the cluster is to refuse to start any
+resource if there is no fencing configured.
 
 ~~~console
 # crm_verify --verbose --live-check
@@ -3597,16 +3722,21 @@ fencing configuré.
 Errors found during check: config not valid
 ~~~
 
-
-1. afficher la description de l'agent de fencing `fence_virsh`
+FR 1. afficher la description de l'agent de fencing `fence_virsh`
+FR
+1. display the desciption of the _FA_ `fence_virsh`
 
 ~~~
 # pcs resource describe stonith:fence_virsh
 ~~~
 
-2. créer une ressource de fencing pour chaque nœud du cluster
+FR 2. créer une ressource de fencing pour chaque nœud du cluster
+FR
+FRAdapter `pcmk_host_list`, `ipaddr`, `login` et `port` à votre environnement.
+FR
+2. create a fencing resource for each node in the cluster
 
-Adapter `pcmk_host_list`, `ipaddr`, `login` et `port` à votre environnement.
+Adapt `pcmk_host_list`, `ipaddr`, `login` and `port` to your environnment.
 
 ~~~console
 # pcs stonith create fence_vm_hanode1 fence_virsh pcmk_host_check="static-list" \
@@ -3625,7 +3755,9 @@ port="centos7_hanode3" pcmk_reboot_action="reboot"                              
 identity_file="/root/.ssh/id_rsa" login_timeout=15
 ~~~
 
-3. vérifier que le cluster ne présente plus d'erreur
+FR 3. vérifier que le cluster ne présente plus d'erreur
+FR
+3. verify that the cluster doesn't have any error
 
 ~~~console
 # crm_verify -VL
@@ -3633,7 +3765,9 @@ identity_file="/root/.ssh/id_rsa" login_timeout=15
 0
 ~~~
 
-4. vérifier que ces ressources ont bien été créées et démarrées
+FR 4. vérifier que ces ressources ont bien été créées et démarrées
+FR
+4. verify that the resources have been created and started
 
 ~~~console
 # pcs status
@@ -3651,7 +3785,9 @@ Full list of resources:
 [...]
 ~~~
 
-5. afficher la configuration des agents de fencing
+FR 5. afficher la configuration des agents de fencing
+FR
+5. display the configuration of the fencing agents
 
 ~~~
 # pcs stonith show --full
@@ -3666,9 +3802,13 @@ Full list of resources:
   Operations: monitor interval=60s (fence_vm_hanode3-monitor-interval-60s)
 ~~~
 
-6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+FR 6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+FR
+FR Les log ont été remis en forme.
+FR
+6. verify that the resources are supervized by `LRMd` in the logs
 
-Les log ont été remis en forme.
+Note: These logs have been reformatted.
 
 ~~~
 lrmd: debug: executing - rsc:fence_vm_hanode1 action:monitor call_id:7
@@ -3680,46 +3820,83 @@ crmd:  info: Result of monitor operation for fence_vm_hanode1 on hanode1: 0 (ok)
 
 -----
 
-## Scores et contrainte localisation
+## Scores and location constraints
 
-* pondération interne d'une ressource sur un nœud
-* peut définir une exclusion si le score est négatif
-* `stickiness` : score de maintien en place d'une ressource sur son nœud
-  actuel
-* éviter d'exclure un agent de fencing de son propre nœud définitivement
-* scores accessibles grâce à `crm_simulate`
+FR * pondération interne d'une ressource sur un nœud
+FR * peut définir une exclusion si le score est négatif
+FR * `stickiness` : score de maintien en place d'une ressource sur son nœud
+FR  actuel
+FR * éviter d'exclure un agent de fencing de son propre nœud définitivement
+FR * scores accessibles grâce à `crm_simulate`
+FR
+* internal weighting of a resource on a node
+* can be used to define an exclusion if the score is negative
+* `stickiness`: controls how much a service prefers to stay running
+    where it is
+* avoid the definitive exclusion of a fencing agent from it's own node
+* scores are accessible via `crm_simulate`
 
 ::: notes
 
-Pacemaker se base sur la configuration et les scores des ressources pour
-calculer l'état idéal du cluster. Le cluster choisi le nœud où une ressource à
-le score le plus haut pour l'y placer.
+FR Pacemaker se base sur la configuration et les scores des ressources pour
+FR calculer l'état idéal du cluster. Le cluster choisi le nœud où une ressource à
+FR le score le plus haut pour l'y placer.
+FR
+Pacemaker uses the configuration and the scores of the resources to infer the
+ideal state of the cluster. The cluster choses the node where the resource has
+the hightest score to host it.
 
-Les scores peuvent être positionnés comme:
+FR Les scores peuvent être positionnés comme:
+FR
+FR * contraintes de localisation ;
+FR * [contraintes de colocation][Contraintes de colocation] ;
+FR * attributs:
+FR   * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
+FR     ressources ;
+FR   * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
+FR
+The score can be positionned as:
 
-* contraintes de localisation ;
-* [contraintes de colocation][Contraintes de colocation] ;
-* attributs:
-  * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
-    ressources ;
-  * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
+* location constraints;
+* [colocation constraints][Colocation constraints];
+* attributes:
+  - ['resource-stickiness`][Resource meta-attributes] of the cluster or
+    resources;
+  - [`symetric-clustre`][Symetric and asymetric clusters] of the cluster.
 
-Ils sont aussi être manipulés tout au long de la vie du cluster. Eg.:
+FR Ils sont aussi être manipulés tout au long de la vie du cluster. Eg.:
+FR
+FR * [bascule][Détail d'un switchover] effectuée par l'administrateur :
+FR   * ban : place un score de localisation de `-INFINITY` sur le nœud courant ;
+FR   * move : place un score de localisation de `+INFINITY` sur le nœud cible ;
+FR * les ressources agents pour désigner l'instance primaire grâce à un score de
+FR   localisation du rôle `master`.
+FR
+They are also changed during the cluster normal operation:
 
-* [bascule][Détail d'un switchover] effectuée par l'administrateur :
-  * ban : place un score de localisation de `-INFINITY` sur le nœud courant ;
-  * move : place un score de localisation de `+INFINITY` sur le nœud cible ;
-* les ressources agents pour désigner l'instance primaire grâce à un score de
-  localisation du rôle `master`.
+* [switchover][Details of a switchover]:
+  - `ban`: places a `-INFINITY` location score on the current node;
+  - `move`: places a `+INFINITY` location score on the target node;
+* multi-state resource agent chose the primary instance thanks to a location
+  score for the `master` role.
 
-Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le
-même score alors pacemaker tente de répartir équitablement les ressources parmi
-les nœuds candidats. Ce comportement peut placer vos ressource de façon plus ou
-moins aléatoire. Un score négatif empêche le placement d'une ressource sur un nœud.
+FR Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le
+FR même score alors pacemaker tente de répartir équitablement les ressources parmi
+FR les nœuds candidats. Ce comportement peut placer vos ressource de façon plus ou
+FR moins aléatoire. Un score négatif empêche le placement d'une ressource sur un nœud.
+FR
+If pacemaker as no instruction or if the location constraints have the same
+score then Pacemaker tries to allocate the resource equally between the
+candidate nodes. A negative score prevents the placement of a resource on a
+node.
 
-Les scores `+INFINITY` et `-INFINITY` permettent de forcer une ressource à
-rejoindre ou quitter un nœud de manière inconditionnelle. Voici l'arithmétique
-utilisée avec `INFINITY`:
+FR Les scores `+INFINITY` et `-INFINITY` permettent de forcer une ressource à
+FR rejoindre ou quitter un nœud de manière inconditionnelle. Voici l'arithmétique
+FR utilisée avec `INFINITY`:
+FR
+The `+INFINITY` and `-INFINITY` scores are used to force a resource to join or
+quit a node unconditionnally. The arithmetic rules for score involving
+`INFINITY` are:
 
 ~~~
 INFINITY =< 1000000
@@ -3728,62 +3905,103 @@ Any value - INFINITY = -INFINITY
 INFINITY - INFINITY = -INFINITY
 ~~~
 
-Si un nœud est sorti momentanément du cluster, par défaut ses ressources sont
-déplacées vers d'autres nœuds. Lors de sa réintroduction, les contraintes de
-localisation définies peuvent provoquer une nouvelle bascule des ressources si
-les scores y sont supérieurs ou égaux à ceux présents sur les autres nœuds. La
-plus part du temps, il est préférable d'éviter de déplacer des ressources qui
-fonctionnent correctement. C'est particulièrement vrai pour les base de données
-dont le temps de bascule peut prendre plusieurs secondes.
+FR Si un nœud est sorti momentanément du cluster, par défaut ses ressources sont
+FR déplacées vers d'autres nœuds. Lors de sa réintroduction, les contraintes de
+FR localisation définies peuvent provoquer une nouvelle bascule des ressources si
+FR les scores y sont supérieurs ou égaux à ceux présents sur les autres nœuds. La
+FR plus part du temps, il est préférable d'éviter de déplacer des ressources qui
+FR fonctionnent correctement. C'est particulièrement vrai pour les base de données
+FR dont le temps de bascule peut prendre plusieurs secondes.
+FR
+If a node is momentarily excluded from a cluster, by default it's resource are
+moved to nother node. During it's reintroduction, the location contraints of
+the node can provoque another switchover of the resources if they are higher or
+equal to those present on the other nodes. Most of the time, it's preferable to
+avoid moving resources who are in are working properly. It's especially true
+for databases where the switchover can last for several seconds.
 
-Le paramètre `stickiness` permet d'indiquer à pacemaker à quel point une
-ressource en bonne santé préfère rester où elle se trouve. Pour cela la valeur
-du paramètre `stickiness` est additionnée au score de localisation de la
-ressource sur le nœud courant et comparé aux scores sur les autres nœuds pour
-déterminer le nœud "idéal". Ce paramètre peut être défini globalement ou par
-ressource.
+FR Le paramètre `stickiness` permet d'indiquer à pacemaker à quel point une
+FR ressource en bonne santé préfère rester où elle se trouve. Pour cela la valeur
+FR du paramètre `stickiness` est additionnée au score de localisation de la
+FR ressource sur le nœud courant et comparé aux scores sur les autres nœuds pour
+FR déterminer le nœud "idéal". Ce paramètre peut être défini globalement ou par
+FR ressource.
+FR
+The `stickiness` parameter is designed to tell Pacemaker how much a resource in
+good health prefers to stay where she is running. To archive this effect, the
+valeur of the `stickiness` parameter is added to the location score of the
+resource on the current node and compared to the scores og the other nodes to
+infer the ideal node. This parameter can be set cluster wide or for a per
+resource
 
-Les scores de localisation sont aussi utilisés pour positionner les ressources
-de fencing. Vous pouvez les empêcher d'être exécutées depuis un nœud en
-utilisant un score d'exclusion de `-INFINITY`. Cette ressource ne sera alors ni
-supervisée, ni exécutée depuis ce nœud. Une telle configuration est souvent
-utilisée pour empêcher une ressource de fencing d'être priorisée ou déclenchée
-depuis le nœud qu'elle doit isoler. Néanmoins, il n'est pas recommandé
-d'empêcher ce comporter à tout prix. Un score négatif reste une bonne
-pratique, mais il est préférable d'autoriser le fencing d'un nœud depuis lui
-même, en dernier recours.
+FR Les scores de localisation sont aussi utilisés pour positionner les ressources
+FR de fencing. Vous pouvez les empêcher d'être exécutées depuis un nœud en
+FR utilisant un score d'exclusion de `-INFINITY`. Cette ressource ne sera alors ni
+FR supervisée, ni exécutée depuis ce nœud. Une telle configuration est souvent
+FR utilisée pour empêcher une ressource de fencing d'être priorisée ou déclenchée
+FR depuis le nœud qu'elle doit isoler. Néanmoins, il n'est pas recommandé
+FR d'empêcher ce comporter à tout prix. Un score négatif reste une bonne
+FR pratique, mais il est préférable d'autoriser le fencing d'un nœud depuis lui
+FR même, en dernier recours.
+FR
+FR Enfin, les scores sont consultables grâce à l'outil `crm_simulate`.
+FR
 
-Enfin, les scores sont consultables grâce à l'outil `crm_simulate`.
+The location constraints are also used to position the fencing resources. It's
+possible to forbid them from being executed from a node with an exclusion score
+of `-INFINITY`. In that case the resource will no be supervised or executed on
+the node. Such a configuration is often used to prevent a fencing resource
+from being chosen or used from the node it's supposed to isolate. Nevertheless,
+it's not recommended to forbid this behavior at all cost. A negative score is
+still an accepted practice, event if it's advise to let a fencing agent run on
+the node it's tasked to fence.
+
+Finally, these scores are visible thanks to the `crm_simulate` tool.
+
 :::
 
 -----
 
-### TP: création des contraintes de localisation
+### Practical work: Location constraint creation
 
 ::: notes
 
-1. afficher les scores au sein du cluster
+FR 1. afficher les scores au sein du cluster
+FR
+FR Noter quel nœud est responsable de chaque ressource de fencing
+FR
+FR 2. positionner les stickiness de toutes les ressources à `1`
+FR 3. comparer l'évolution des scores
+FR 4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
+FR    évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
+FR    contraintes.
+FR 5. observer les changements de placement et de score par rapport à l'état
+FR    précédent
+FR 6. afficher les contraintes existantes à l'aide de `pcs`
+FR
+1. display the score
 
-Noter quel nœud est responsable de chaque ressource de fencing
+Check which node is responsible for each fencing resource.
 
-2. positionner les stickiness de toutes les ressources à `1`
-3. comparer l'évolution des scores
-4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
-   évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
-   contraintes.
-5. observer les changements de placement et de score par rapport à l'état
-   précédent
-6. afficher les contraintes existantes à l'aide de `pcs`
+2. configure the stickiness of all resources to value of `1`
+3. compare the evolution of the scores
+4. add exclusion constraits to prevent each fencing resource from running on
+   the node it's tasked to fence. Use a weight of 100 for these constraints.
+5. watch out for the modification of the placement and score compared to the
+   previous state
+6. display the existing constraints with `pcs`
 
 :::
 
 -----
 
-### Correction: création des contraintes de localisation
+### Correction: Location constraint creation
 
 ::: notes
 
-1. afficher les scores au sein du cluster
+FR 1. afficher les scores au sein du cluster
+FR
+1. display the score
 
 ~~~console
 # crm_simulate --show-scores --live-check
@@ -3809,17 +4027,23 @@ native_color: fence_vm_hanode3 allocation score on hanode3: 0
 Transition Summary:
 ~~~
 
-Ici, `fence_vm_hanode1` est surveillé depuis `hanode1`, `fence_vm_hanode2`
-depuis `hanode2` et `fence_vm_hanode3` depuis `hanode3`.
+FR Ici, `fence_vm_hanode1` est surveillé depuis `hanode1`, `fence_vm_hanode2`
+FR depuis `hanode2` et `fence_vm_hanode3` depuis `hanode3`.
+FR
+Here, `fence_vm_hanode1` is monitored from `hanode1`, `fence_vm_hanode2` from
+`hanode2` and `fence_vm_hanode3` from `hanode3`.
 
-2. positionner les stickiness de toutes les ressources à `1`
+FR 2. positionner les stickiness de toutes les ressources à `1`
+FR
+2. configure the stickiness of all resources to value of `1`
 
 ~~~console
 # pcs resource defaults resource-stickiness=1
 ~~~
 
-3. comparer l'évolution des scores
-
+FR 3. comparer l'évolution des scores
+FR
+3. compare the evolution of the scores
 ~~~console
 # crm_simulate -sL
 [...]
@@ -3835,12 +4059,17 @@ native_color: fence_vm_hanode3 allocation score on hanode2: 0
 native_color: fence_vm_hanode3 allocation score on hanode3: 1
 ~~~
 
-Le score de chaque ressource a augmenté de `1` pour le nœud sur lequel 
-elle est "démarrée".
+FR Le score de chaque ressource a augmenté de `1` pour le nœud sur lequel 
+FR elle est "démarrée".
+FR
+The score for each resource is increased by `1` on the node where it's started.
 
-4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
-   évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
-   contraintes.
+FR 4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
+FR   évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
+FR   contraintes.
+FR
+4. add exclusion constraits to prevent each fencing resource from running on
+   the node it's tasked to fence. Use a weight of 100 for these constraints.
 
 ~~~console
 # pcs constraint location fence_vm_hanode1 avoids hanode1=100
@@ -3848,15 +4077,21 @@ elle est "démarrée".
 # pcs constraint location fence_vm_hanode3 avoids hanode3=100
 ~~~
 
-Notez que les deux syntaxes proposées sont équivalentes du point de vue du
-résultat dans la CIB.
+FR Notez que les deux syntaxes proposées sont équivalentes du point de vue du
+FR résultat dans la CIB.
+FR
+Note that the two syntaxes are equivalent from the point of view of the result
+in the CIB.
 
 ~~~
 # cibadmin -Q --xpath='//rsc_location'
 ~~~
 
-5. observer les changements de placement et de score par rapport à l'état
-   précédent
+FR 5. observer les changements de placement et de score par rapport à l'état
+FR   précédent
+FR
+5. watch out for the modification of the placement and score compared to the
+   previous state
 
 ~~~console
 # crm_simulate -sL
@@ -3882,13 +4117,20 @@ native_color: fence_vm_hanode3 allocation score on hanode3: -100
 Transition Summary:
 ~~~
 
-Chaque ressource a changé de nœud afin de ne plus résider sur celui qu'elle
-doit éventuellement isoler.
+FR Chaque ressource a changé de nœud afin de ne plus résider sur celui qu'elle
+FR doit éventuellement isoler.
+FR
+FR Un score négatif de `-100` correspondant à la contrainte créée est positionné
+FR pour chaque ressource sur le nœud qu'elle doit éventuellement isoler.
+FR
 
-Un score négatif de `-100` correspondant à la contrainte créée est positionné
-pour chaque ressource sur le nœud qu'elle doit éventuellement isoler.
+Each resource has changed node in order to avoid being hosted on the node they are
+tasked to isolate. A negative score of `-100` corresponding to the constraint
+is positionned for each resource on the relevant node.
 
-6. afficher les contraintes existantes à l'aide de `pcs`
+FR 6. afficher les contraintes existantes à l'aide de `pcs`
+FR
+6. display the existing constraints with `pcs`
 
 ~~~console
 # pcs constraint location show
