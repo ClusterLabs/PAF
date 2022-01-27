@@ -3198,100 +3198,163 @@ FR
 
 -----
 
-# Attributs d'un nœud
+# Node attributes
 
-## Généralité sur les attributs d'un nœud
+## General information about node attributes
 
-* attributs propres à chaque nœud
-* peut être persistant après reboot ou non
-* peut stocker n'importe quelle valeur sous n'importe quel nom
-* eg. `kernel=4.19.0-8-amd64`
+FR * attributs propres à chaque nœud
+FR * peut être persistant après reboot ou non
+FR * peut stocker n'importe quelle valeur sous n'importe quel nom
+FR * eg. `kernel=4.19.0-8-amd64`
+FR
+* node specific attributes
+* can be persistent (survive a reboot or not)
+* can store any value under any name
+  - eg. `kernel=4.19.0-8-amd64`
 
 ::: notes
 
-Il est possible de créer vos propres attributs avec l'outil `crm_attribute`.
+FR Il est possible de créer vos propres attributs avec l'outil `crm_attribute`.
+FR
+FR La persistance de vos attributs se contrôle avec l'argument `--lifetime`:
+FR
+FR * valeur réinitialisée au redémarrage (non persistant) : `--lifetime reboot`
+FR  * note : `--type status` est également accepté. Mentionné dans la
+FR     documentation mais pas dans le manuel de la commande 
+FR * valeur conservée au redémarrage (persistant) : `--lifetime forever`
+FR   * note : `--type nodes` est également accepté. Mentionnée dans la
+FR     documentation mais pas dans le manuel de la commande 
+FR
 
-La persistance de vos attributs se contrôle avec l'argument `--lifetime`:
+It's possible to create your own attributes with the tool `crm_attribute`.
 
-* valeur réinitialisée au redémarrage (non persistant) : `--lifetime reboot`
-  * note : `--type status` est également accepté. Mentionné dans la
-    documentation mais pas dans le manuel de la commande 
-* valeur conservée au redémarrage (persistant) : `--lifetime forever`
-  * note : `--type nodes` est également accepté. Mentionnée dans la
-    documentation mais pas dans le manuel de la commande 
+The lifetime of you attribute is control with the `--lifetime` argument of the
+command:
 
-Exemple pour stocker dans un attribut du nœud nommé `kernel` la version du
-noyau système :
+* `--lifetime reboot`: the value is reset during a restart of the cluster (it's
+  not pesistent)
+  - note: `--type status` is also accepted. It's mentionned in the
+    documentation but not in the command's manual.
+* `--lifetime forever`: the value is persistant across cluster restarts
+  - note: `--type nodes` is also accepted. It's mentionned in the documentation
+    but not in the command's manual.
+
+FR Exemple pour stocker dans un attribut du nœud nommé `kernel` la version du
+FR noyau système :
+FR
+This example shows how to create a `kernel` attribute  with the kernel version
+as a value:
 
 ~~~
 crm_attribute -l forever --node hanode1 --name kernel --update $(uname -r)
 ~~~
 
-Exemple de l'utilisation d'une rule basée sur un attribut de ce type:
+FR Exemple de l'utilisation d'une rule basée sur un attribut de ce type:
+The following link shows an example of how to setup rules based on attributes:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_using_rules_to_determine_resource_location.html#_location_rules_based_on_other_node_properties>
 
-Le _RA_ PAF utilise également les attributs non persistants et très
-transitoires. À l'annonce d'une promotion, chaque esclave renseigne son LSN
-dans un attribut transient. Lors de la promotion, le nœud "élu" compare son LSN
-avec celui des autres nœuds en consultant leur attribut `lsn_location` pour
-s'assurer qu'il est bien le plus avancé. Ces attributs sont détruits une fois
-l'élection terminée.
+FR Le _RA_ PAF utilise également les attributs non persistants et très
+FR transitoires. À l'annonce d'une promotion, chaque esclave renseigne son LSN
+FR dans un attribut transient. Lors de la promotion, le nœud "élu" compare son LSN
+FR avec celui des autres nœuds en consultant leur attribut `lsn_location` pour
+FR s'assurer qu'il est bien le plus avancé. Ces attributs sont détruits une fois
+FR l'élection terminée.
+FR
+The PAF _RA_ also uses non persistant attributes. During a promotion, each
+slave announces it's LSN using a transient attribute. During the promotion, the
+elected node compares it's LSN with the `lsn_location` attribute of the
+resource on each node in order to verify that it's the most up to date. These
+attributes are destroyed once the election is finished.
 
 :::
 
 -----
 
-## Attributs de nœuds spéciaux
+## Spetial node attributes
 
-* plusieurs attributs font office de paramètres de configuration
-* `maintenance`: mode maintenance au niveau du nœud
-* `standby`: migrer toutes les ressources hors du nœud
+FR * plusieurs attributs font office de paramètres de configuration
+FR * `maintenance`: mode maintenance au niveau du nœud
+FR * `standby`: migrer toutes les ressources hors du nœud
+FR
+* several attributes are used as configuration parameters
+* `maintenance`: is the node in maintenance mode
+* `standby`: migrate resource outside of the node
 
 ::: notes
 
-Il existe plusieurs attributs de nœuds spéciaux qui font offices de
-paramétrage. Les deux plus utiles sont `maintenance` et `standby`.
+FR Il existe plusieurs attributs de nœuds spéciaux qui font offices de
+FR paramétrage. Les deux plus utiles sont `maintenance` et `standby`.
+FR
+FR L'attribut `maintenance` a le même effet que le `maintenance_mode` au niveau
+FR du cluster, mais localisé au seul nœud sur lequel il est activé.
+FR
+FR Lorsque l'attribut `standby` est activé, il indique que le nœud ne doit plus
+FR héberger aucune ressource. Elle sont alors migré vers d'autres nœuds ou
+FR arrêté le cas échéant.
+FR
+FR Vous trouverez la liste complète de ces attributs de nœud spéciaux à
+FR l'adresse suivante:
+FR
+Several special node attributes are used as configuration parameters. The two
+most useful are `maintenance` and `standby`.
 
-L'attribut `maintenance` a le même effet que le `maintenance_mode` au niveau
-du cluster, mais localisé au seul nœud sur lequel il est activé.
+The `maintenance` attribute as the same effect as the `maintenance_mode` cluster
+wide parameter, except that it's limited only to the node it's placed on.
 
-Lorsque l'attribut `standby` est activé, il indique que le nœud ne doit plus
-héberger aucune ressource. Elle sont alors migré vers d'autres nœuds ou
-arrêté le cas échéant.
+When the `standby` attribute is activated, it indicates that the node cannot
+host resource anymore. They will be migrated to other nodes ou stopped.
 
-Vous trouverez la liste complète de ces attributs de nœud spéciaux à
-l'adresse suivante:
+A more compehensive list of special node attribute is available a the folling
+address:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_special_node_attributes.html>
 
 :::
 
 -----
 
-## Attributs de nœuds particuliers
+## Other node attribute of interest
 
-Quelques autres attributs particuliers:
+FR Quelques autres attributs particuliers:
+FR
+FR * `fail-count-*`: nombre d'incident par ressource sur le nœud
+FR * `master-*`: _master score_ de la ressource sur le nœud
+FR
+Some other node attributes of interest
 
-* `fail-count-*`: nombre d'incident par ressource sur le nœud
-* `master-*`: _master score_ de la ressource sur le nœud
+* `fail-count-*`: number of incident for a resource on a node
+* `master-*`: the _master score_ of a resouce on a node
 
 ::: notes
 
-Un attribut `fail-count-*` de type non persistant est utilisés pour
-mémoriser le nombre d'erreur de chaque ressources sur chaque nœud. Préférez
-utiliser `crm_failcount` ou `pcs resource failcount` pour accéder à ces
-informations.
+FR Un attribut `fail-count-*` de type non persistant est utilisés pour
+FR mémoriser le nombre d'erreur de chaque ressources sur chaque nœud. Préférez
+FR utiliser `crm_failcount` ou `pcs resource failcount` pour accéder à ces
+FR informations.
+FR
+Non persistent `fail-count-*` attributes are used to memorize the amount of
+errors for each resource on a node. It's a good practice to use `crm_failcount`
+or `pcs resource failcount` to access this information instead of accessible
+the attributes directly.
 
-Enfin, il existe des _master score_ pour les ressources de type _multi-state_
-(primaire/secondaire), permettant d'indiquer où l'instance primaire peut ou
-doit se trouver dans le cluster. Il sont préfixé par `master-*`. PAF positionne
-ces scores comme attributs persistants des nœuds. La position de l'instance
-primaire est ainsi préservée lors du redémarrage du cluster.
-
-Vous pouvez consulter ou modifier les _master score_ à l'aide de l'outil
-`crm_master`. Attention toutefois, ces scores sont positionnés habituellement
-par le _RA_ lui même. À moins de vous trouver dans une situation où le
-cluster ne nomme aucune ressource primaire, vous ne devriez pas vous même
-positionner un _maser score_.
+FR Enfin, il existe des _master score_ pour les ressources de type _multi-state_
+FR  (primaire/secondaire), permettant d'indiquer où l'instance primaire peut ou
+FR doit se trouver dans le cluster. Il sont préfixé par `master-*`. PAF positionne
+FR ces scores comme attributs persistants des nœuds. La position de l'instance
+FR primaire est ainsi préservée lors du redémarrage du cluster.
+FR
+FR Vous pouvez consulter ou modifier les _master score_ à l'aide de l'outil
+FR `crm_master`. Attention toutefois, ces scores sont positionnés habituellement
+FR par le _RA_ lui même. À moins de vous trouver dans une situation où le
+FR cluster ne nomme aucune ressource primaire, vous ne devriez pas vous même
+FR positionner un _maser score_.
+FR
+<!-- primary instance semble assez specifique aux bases de donnée ? -->
+Finally, a _master score_ attribute exists for _multi-state_ resources
+(primary/secondary), it's used to specify where the primary instance can/must
+be placed in the cluster.  They are prefixed with `master-*`. PAF uses theses
+scores as persistent attributes on each node. Unless you want the cluster to be
+unable to chose a primary resource, you shouldn't specify a _maaster score_
+yourself.
 
 :::
 
