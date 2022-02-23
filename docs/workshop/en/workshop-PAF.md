@@ -42,96 +42,50 @@ hide_author_in_slide: true
 
 ## Minimum prerequisites
 
-FR * fiabilité des ressources (matériel, réseau, etc.)
-FR * redondance de chaque élément d'architecture
-FR * synchronisation des horloges des serveurs
-FR * supervision de l'ensemble
-
-* ressource fiability (hardware, network, etc.)
-* redundancy of each element of the architecture
-* syncronization of the server clocks
-* supervising everything
+* resource reliability (hardware, network, etc.)
+* redundancy of each element composing the architecture
+* synchronization of the server clocks
+* monitoring everything
 
 ::: notes
 
-FR La résistance d'une chaîne repose sur son maillon le plus faible.
-FR
-The resiliance of a chain is based on the resiliance of it's weakest link.
+The strength a chain depend on it's weakest link.
 
-FR Un pré-requis à une architecture de haute disponibilité est d'utiliser du
-FR matériel de qualité, fiable, éprouvé, maîtrisé et répandu.  Fonder son
-FR architecture sur une technologie peu connue et non maîtrisée est la recette
-FR parfaite pour une erreur humaine et une indisponibilité prolongée.
-FR
 One prerequisite for an high availability architecture is to use quality
 hardware i.e. reliable, tested, mastered and wide spread. Building an
 architecture on a lesser known technology that is not mastered is the recipe
-for human errors and prolongued periods of downtime.
+for human errors and extended downtime.
 
-FR De même, chaque élément doit être redondé.  La loi de Murphy énonce que « tout
-FR ce qui peut mal tourner, tournera mal ».  Cette loi se vérifie très
-FR fréquemment.  Les incidents se manifestent rarement là où on ne les attend le
-FR plus.  Il faut réellement tout redonder :
-FR
-Likewise, each element must have it's replacement. Murphy's Law states that "if
-something can go wrong, it will". This law is very ofter proven true.  Problems
-rarely arise where we await them the most. Everything in the architectyre must
-have some redundancy:
+Likewise, each element must be duplicated to achieve redundancy. Murphy's Law
+states that "if something can go wrong, it will". This law is frequently proven
+true.  Problems rarely arise where we expect them the most. Everything in the
+architecture must really be redundant:
 
-FR * chaque application ou service doit avoir une procédure de bascule
-FR * CPU (multi-socket), mémoire (multi-slot, ECC), disques (niveaux de RAID)
-FR * redondance du SAN
-FR * plusieurs alimentations électriques par serveur, plusieurs sources
-FR   d'alimentation
-FR * plusieurs équipements réseaux, liens réseaux redondés, cartes réseaux, WAN et
-FR   LAN
-FR * climatisation redondée
-FR * plusieurs équipements de fencing (et chemins pour accéder)
-FR * plusieurs administrateurs comprenant et maîtrisant chaque brique du cluster
-FR * ...
-FR
-* each application or sevice must have a failover procedure
-* CPU (multi-socket), memory (multi-slotn ECC, disks (RAID levels)
-* SAN 
-* several power supply per server with different origins
-* several network hardware, network links, network cards, WAN & LAN
+* each application or service must have a failover procedure
+* CPU (multi-socket), memory (multi-slot, ECC), disks (RAID levels)
+* SAN
+* multiple power supply per server with different origins
+* multiple network hardware, links, cards, WAN & LAN
 * air conditioning
-* several fencing methods (with different access paths)
-* several administrators with a good understanding of the architecture
+* various fencing methods (with different access paths)
+* multiple administrators with a good understanding of the architecture
 * ...
 
-FR S'il reste un seul _Single Point of Failure_, ou _SPoF_, dans l'architecture,
-FR ce point subira un jour une défaillance.
-FR
 If there is one _Single Point of Failure_, or _SPoF_,  in the architecture,
 it will fail one day or another.
 
-FR Concernant le synchronisme des horloges des serveurs entre eux, celui-ci est
-FR important pour les besoins applicatifs et la qualité des données.  Suite à une
-FR bascule, les dates pourraient être incohérentes entre celles écrites par la
-FR précédente instance primaire et la nouvelle.
-FR
 It is paramount that all server clocks are synchronized for the applications
 and their data to be safe. For example: after a failover of a database,
-inconsistancies must be avoided between the dates provided by the old primary
-databse and the new one.
+inconsistencies must be avoided between the dates provided by the old primary
+database and the new one.
 
-FR Ensuite, ce synchronisme est important pour assurer une cohérence dans
-FR l'horodatage des journaux applicatifs entre les serveurs.  La compréhension
-FR rapide et efficace d'un incident dépend directement de ce point.  À noter qu'il
-FR est aussi possible de centraliser les logs sur une architecture dédiée à part
-FR (attention aux _SPoF_ ici aussi).
-FR
 This synchronization is also important to have coherent timestamps in the
 application logs across all servers. This is very important to understand and
 fix problems in a quick and reliable way. It's also possible to centralize logs
-in a dedicated architecture. In that case, be careful that it doesn't become
-another SPOF.
+in a dedicated architecture, be careful that it doesn't become another SPOF
+though.
 
-FR Le synchronisme des horloges est d'autant plus important dans les
-FR environnements virtualisés où les horloges ont facilement tendance à dévier.
-FR
-Finally, clock synchronization is very important in virtualized environnemnt
+Finally, clock synchronization is very important in virtualized environment
 where clock can easily drift.
 
 :::
@@ -140,87 +94,55 @@ where clock can easily drift.
 
 ## _Fencing_
 
-FR * difficulté de déterminer l'origine d'un incident de façon logicielle
-FR * chaque brique doit toujours être dans un état déterminé
-FR * garantie de pouvoir sortir du système un élément défaillant
-FR * implémenté dans Pacemaker au travers du _daemon_ `stonithd`
-FR
-* complexity to diagnose the origin of a problem with software
+* the origin of a problem is hard to diagnose from a software point of view
 * each element must be in a defined state
 * guaranty to be able to exclude a failing element from the system
 * implemented in Pacemaker by the daemon `stonithd`
 
 ::: notes
 
-FR Lorsqu'un serveur n'est plus accessible au sein d'un cluster, il est impossible
-FR aux autres nœuds de déterminer l'état réel de ce dernier.  A-t-il crashé ?
-FR Est-ce un problème réseau ?  Subit-il une forte charge temporaire ?
-FR
-When a server is not accessible from the rest of the cluster, it's not possible
-for the other server to determine it's real state. Did it crash ? Was it a
-network problem ? Is it temporarily under stress ?
+When a server become silent, it's not possible for other servers in the cluster
+to determine its real state. Did it crash ? Is it a network problem ? Is it
+temporarily under stress ?
 
-FR Le seul moyen de répondre à ces questions est d'éteindre ou d'isoler le serveur
-FR fantôme d'autorité.  Cette action permet de déterminer de façon certaine son
-FR statut : le serveur est hors _cluster_ et ne reviendra pas sans action humaine.
-FR
-The only way to answer these questions is to shutdown or isolate the ghost
-server. After this action, we are sure of the state of the server and we
-know it cannot come back into the cluster without human intevention.
+The only way to answer these questions is to shutdown or isolate the rogue
+server. The success of this action allows to define the real state of the
+server: we know it cannot come back into the cluster without human
+intervention.
 
-FR Une fois cette décision prise et appliquée avec succès, le _cluster_ peut
-FR mettre en œuvre les actions nécessaires pour rendre les services en HA de
-FR nouveau disponibles.
-FR
-Once this decision to fence a server is taken and applied, the cluster can take
-some actions to make sure the HA services are available.
+After this decision to fence a server is taken and applied, the cluster can
+then take some actions to make sure any missing services are recovered as fast
+as possible.
 
-FR Passer outre ce mécanisme, c'est s'exposer de façon certaine à des situations
-FR dites de _split brain_, où plusieurs sous-partitions du _cluster_ initial
-FR continuent à fonctionner de façon autonomes.
-FR
-Disregarding this safety mecanism will expose the system to _split brain_
+Disregarding this safety mechanism will expose the system to _split brain_
 issues, where several partitions of the cluster continue to operate on their
 own.
 
-FR Par exemple, si le _cluster_ contient des ressources de bases de données en
-FR réplication avec une seule instance primaire, le _split brain_ indique que
-FR plusieurs instances sont accessibles simultanément en écriture au sein du
-FR _cluster_, mais ne répliquent pas entre elles.  Réconcilier les données de ces
-FR deux instances peut devenir un véritable calvaire et provoquer une ou plusieurs
-FR indisponibilités.  Voici un exemple réel d'incident de ce type :
-Fr <https://blog.github.com/2018-10-30-oct21-post-incident-analysis/>.  Ici, une
-FR certaine quantité de données n'a pas été répliquée de l'ancien primaire vers le
-FR nouveau avant la bascule.  En conséquence, plusieurs jours ont été nécessaires
-FR afin de réintégrer et réconcilier les données dans le _cluster_ fraîchement
-FR reconstruit.
-FR
-In the specific case where the cluster is managing databases with a replication
-setup, a _split brain_ scenario would entail several instances of the database
-available in read/write mode at the sametime without any form of replication
-active. Fixing the data from theses database will be complicated and time
-consuming, which could lead to one or more downtime periods. Here is a real
-life example of that kind of incident:
-<https://blog.github.com/2018-10-30-oct21-post-incident-analysis/>. In this
-case some data has not been replicated from the old primary to the new one
-before the switchover. As a result, several days were needed to restore the
+In the specific case where the cluster is managing some replicating databases,
+a _split brain_ scenario would entail multiple instances are available in
+read/write mode at the same time, without replicating with each other anymore.
+Merging the data from theses divergent databases is complicated, time consuming
+and lead to extensive downtimes. Here is a real life example of that kind of
+incident: <https://blog.github.com/2018-10-30-oct21-post-incident-analysis/>.
+In this case some data has not been replicated from the old primary to the new
+one before the switchover. As a result, several days were needed to restore the
 lost data in the newly build cluster.
 
 FR Ne sous-estimez jamais le pouvoir d'innovation en terme d'incident des briques
 FR de votre _cluster_ pour provoquer une partition des nœuds entre eux.  En voici
 FR quelques exemples : <https://aphyr.com/posts/288-the-network-is-reliable>
-FR
-Never underestimate the inovative nature of incidents, and the likelihood that
-they will provoque a parition in your cluster. Here are some more examples:
+
+Never underestimate the innovative nature of incidents, and the likelihood that
+they will partition your cluster. Here are some more examples:
 <https://aphyr.com/posts/288-the-network-is-reliable>.
 
 FR À noter que PAF est pensé et construit pour les _clusters_ configurés avec le
 FR _fencing_.  En cas d'incident, il y a de fortes chances qu'une bascule n'ait
 FR jamais lieu pour un _cluster_ dépourvu de _fencing_.
-FR
+
 Please note that PAF is build with fencing enabled clusters in mind. In case of
-incident, a failover might not occur if your cluster is not equipped with the
-relevant fencing ressources.
+incident, no failover will occur if your cluster is not able to fence the
+relevant resource.
 
 :::
 
