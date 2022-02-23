@@ -1,6 +1,6 @@
 # Prerequisites
 
-Before attending to this workshop, attendies should have preprared their
+Before attending to this workshop, attendees should have prepared their
 computer with the following:
 
 * libvirtd
@@ -9,7 +9,7 @@ computer with the following:
 * SSH authentication between the VM -> user@hypervisor
 * the VM should be able to ping each other
 
-## Préparation of the MV
+## Preparation of the VM
 
 * Exchange SSH keys between the root users on the VM and the hypervisor user:
   
@@ -18,8 +18,8 @@ computer with the following:
   ssh-copy-id <user>@<ip hyperviseur>
   ~~~
 
-* The VM should be able to communicate between eachother using their node names,
-  e.g.:
+* The VM should be able to communicate between each other using their node
+  names, e.g.:
   
   ~~~
   cat >> /etc/hosts <<EOF
