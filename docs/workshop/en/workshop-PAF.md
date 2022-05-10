@@ -128,20 +128,12 @@ In this case some data has not been replicated from the old primary to the new
 one before the switchover. As a result, several days were needed to restore the
 lost data in the newly build cluster.
 
-FR Ne sous-estimez jamais le pouvoir d'innovation en terme d'incident des briques
-FR de votre _cluster_ pour provoquer une partition des nœuds entre eux.  En voici
-FR quelques exemples : <https://aphyr.com/posts/288-the-network-is-reliable>
-
 Never underestimate the innovative nature of incidents, and the likelihood that
 they will partition your cluster. Here are some more examples:
 <https://aphyr.com/posts/288-the-network-is-reliable>.
 
-FR À noter que PAF est pensé et construit pour les _clusters_ configurés avec le
-FR _fencing_.  En cas d'incident, il y a de fortes chances qu'une bascule n'ait
-FR jamais lieu pour un _cluster_ dépourvu de _fencing_.
-
-Please note that PAF is build with fencing enabled clusters in mind. In case of
-incident, no failover will occur if your cluster is not able to fence the
+Note that PAF is build with fencing enabled clusters in mind.  Should a
+failure occurs, no failover will occur if your cluster is not able to fence the
 relevant resource.
 
 :::
@@ -150,51 +142,27 @@ relevant resource.
 
 ## Quorum
 
-FR * quelle partie du cluster doit fonctionner en cas de partition réseau ?
-FR  * un vote à chaque élément du _cluster_
-FR  * le _cluster_ ne fonctionne que s'il a la majorité des votes
-FR
-* which part of the cluster should keep operating in case of network partition
-  ?
-  * one vote per cluster member
+* which part of the cluster should keep operating during a network partition?
+  * each cluster member has one vote
   * the cluster keeps running only if it has the majority of the votes
 
 ::: notes
 
-FR Le quorum est le nombre minimum de votes qu'une transaction distribuée doit
-FR obtenir pour être autorisée à effectuer une opération dans le système.  Son
-FR objectif est d'assurer la cohérence du système distribué.
-FR
 The quorum is the minimum number of votes requiered for a distributed
-transaction to be authorized to execute an opération on the system. It's goal
+transaction to be authorized to execute an operation on the system. It's goal
 is to guaranty the coherence of the distributed system.
 
-FR Pour ce faire, chaque nœud du système se voit assigner un nombre de votes.  Il
-FR faut au moins que `(N / 2) + 1` votes soient présents pour que le quorum soit
-FR atteint, avec `N` le nombre de votes possible.  Le _cluster_ ne fonctionne que
-FR si la majorité des nœuds sont présents.
-FR
-To archive this goal, each node is granted some votes. A minimum of `(N / 2) +
-1` votes are requiered for the quorum to be archived (`N` being the maximum number
+To achieve this goal, each node is granted some votes. A minimum of `(N / 2) +
+1` votes are required to grant the quorum, `N` being the maximum number
 of vote possible). The cluster will be able to operate only if the majority
-is archived.
+of node is available.
 
-FR Suite à une partition réseau, le quorum permet au cluster de savoir quelle
-FR partition doit conserver les services actifs, celle(s) où il doit les
-FR interrompre, et qui peut déclencher des opérations de fencing si nécessaire.
-FR
-After a network partition, the cluster uses the quorum information to know
-which partition must keep the services active, and which partition must stop
-all the services. Fencing operation can be started if necessary. 
+After a network partition, the cluster relies on the quorum information to
+decide on which partition the services must runs, and which partition must stop
+all of them. Fencing operation can be started if necessary. 
 
-FR En plus d'arrêter ses services locaux, une partition du cluster n'atteignant
-FR pas le quorum ne peut notamment pas actionner le fencing des nœuds de la
-FR partition distante.
-FR
-FR Ce mécanisme est donc indispensable au bon fonctionnement du cluster.
-FR
-In addition to stopping local services, a cluster partition who doesn't meet
-the quorum cannot use fencing on the node of the other partition.
+In addition to stopping all local services, a cluster partition who doesn't meet
+the quorum cannot use fencing operation against remote nodes.
 
 <!-- TODO: test this !! -->
 
@@ -206,13 +174,7 @@ This mecanism is paramount for the cluster to operate correctly.
 
 ## KISS
 
-FR * une architecture complexe pose des problèmes
-FR   * de mise en œuvre (risque de _SPOF_)
-FR   * de maintenance
-FR   * de documentation
-FR * il est préférable de toujours aller au plus simple
-FR
-* complex architechture pose complex problems
+* a complex architecture brings its own complex problems:
   * to build (avoid a _SPOF_)
   * to maintain
   * to document
@@ -221,13 +183,6 @@ FR
 
 ::: notes
 
-FR Augmenter la complexité d'un cluster augmente aussi le nombre de défaillances possibles. Entre deux solutions, la
-FR solution la plus simple sera souvent la meilleure et la plus pérenne.
-FR
-FR L'incident décrit par de Gocardless dans le lien ci-après est un bon exemple. L'article indique que l'automatisation
-FR réduit la connaissance de l'architecture. Au fil du temps il est difficile de maintenir une documentation à jour, des
-FR équipes correctement formées :
-FR
 Increasing the complexity of a cluster also increases the number of failures
 scenarios. Given two cluster implementations, the simplest one will usually be
 the best and most sustainable.
@@ -258,33 +213,15 @@ be out-of-date.
 
 ### History of Pacemaker
 
-FR * plusieurs plate-formes historiques distinctes
-FR   * projet Linux-HA mené par SUSE
-FR   * "Cluster Services" de Red Hat
-FR * 2007 : Pacemaker apparaît
-FR   * issu de Linux-HA
-FR   * 1er point de convergence
-FR
 * several projects on different platforms 
   * Linux HA project led by SUSE
   * "Cluster Services" by Red Hat
-* 2007: Pacemaker 
+* 2007: Pacemaker appears
   * originated from Linux-HA
-  * first convergence
+  * first projects convergence
 
 ::: notes
 
-FR Un historique complet est disponible
-FR [ici](https://www.alteeve.com/w/High-Availability_Clustering_in_the_Open_Source_Ecosystem).
-FR
-FR Plusieurs sociétés se sont forgées une longue expérience dans le domaine de la Haute Disponibilité en maintenant chacun
-FR leur plate-forme.
-FR
-FR SUSE d'abord, avec son projet Linux-HA. Red Hat ensuite avec "Cluster Services".
-FR
-FR En 2007, issu d'une première collaboration, Pacemaker apparaît pour gérer les clusters peu importe la couche de
-FR communication utilisée : OpenAIS (Red Hat) ou Heartbeat (SUSE).
-FR
 The complete history is available 
 [here](https://www.alteeve.com/w/High-Availability_Clustering_in_the_Open_Source_Ecosystem).
 
@@ -304,24 +241,14 @@ layers avaiable at that time: OpenAIS (Reh Hat) or Heartbeat (SUSE).
 
 ### Historique de Pacemaker - suite
 
-FR * 2009 : Corosync apparaît
-FR   * issu de OpenAIS
-FR   * 2ème point de convergence
-FR * 2014 : début de l'harmonisation
-FR
-* 2009 : Corosync
+* 2009 : Corosync appears
   * based on OpenAIS
   * 2nd convergence
-* 2014 : the harmonisation starts
+* 2014 : harmonisation starts
 
 ::: notes
 
-FR En 2009 apparaît l'uniformisation des couches de communication grâce à Corosync.
-FR
-FR Une collaboration forte étant désormais née, Pacemaker et Corosync deviennent petit à petit la référence et chaque
-FR distribution tend vers cette plate-forme commune.
-FR
-In 2009, an effort to standarize the communication layers leads the birth of
+In 2009, an effort to standarize the communication layers leads to the birth of
 Corosync.
 
 A strong collaboration is born, Pacemaker and Corosync are becoming the
@@ -334,35 +261,19 @@ include these tools in their packaging.
 
 ### History of Pacemaker - future
 
-FR * 2017: les principales distributions ont convergé
-FR   * Corosync 2.x et Pacemaker 1.1.x
-FR * 2018: corosync 3 et Pacemaker 2.0.x
-FR
 * 2017: the main distribution have converged
   * Corosync 2.x and Pacemaker 1.1.x
 * 2018: corosync 3 and Pacemaker 2.0.x
 
 ::: notes
 
-FR En 2017, les dernières versions des principales distributions Linux avaient toutes fini leur convergence vers Corosync
-FR 2.x et Pacemaker 1.1.x. Seul le client d'administration de haut niveau varie en fonction de la politique de la
-FR distribution.
-FR
 In 2017, the latest versions of the main Linux distributions are done
-converging to Corosync 2.x and Pacemaker 1.1.x. The last divergence lies with
-the administration client.
+converging to Corosync 2.x and Pacemaker 1.1.x. The last difference between
+them is the chosen cluster administration command line utility: `crmsh` or
+`pcs`.
 
-FR Début 2018, Pacemaker 2.0 et Corosync 3.0 font leur apparition. Coté Pacemaker, les principaux changements concernent:
-FR
-FR * la suppression de beaucoup de code consacré aux anciennes architectures devenues obsolètes : incompatibilité avec
-FR   OpenAIS, CMAN, Corosync 1.x, Heartbeat
-FR * plusieurs paramètres de configuration ont été supprimés ou remplacés par des équivalents pour une configuration plus
-FR   cohérente
-FR
-FR Pour plus de détails, voir: <https://wiki.clusterlabs.org/wiki/Pacemaker_2.0_Changes>
-FR
-A the beginning of 2018, Pacemaker 2.0 and Corosync 3.0 are release. One the
-Pacemaker side, the main changes are :
+Early 2018, Pacemaker 2.0 and Corosync 3.0 are release. On the Pacemaker side,
+the main changes are :
 
 * the removal of a lot of code dedicated to old architectures: OpenAIS, CMAN,
   Corosync 1.x and Heartbeat compatibility is dropped.
@@ -371,23 +282,10 @@ Pacemaker side, the main changes are :
 
 More information is available here: <https://wiki.clusterlabs.org/wiki/Pacemaker_2.0_Changes>
 
-FR Concernant Corosync, la principale nouveauté est le support du projet "Kronosnet" comme protocole de communication au
-FR sein du cluster. Cette librairie permet d'ajouter beaucoup de souplesse, de fonctionnalités, de visibilité sur
-FR l'activité de Corosync et surtout une latence plus faible que l'actuel protocole. Entre autre nouveautés, nous
-FR trouvons :
-FR
-FR * le support de un à huit liens réseaux
-FR * l'ajout de liens réseaux à chaud
-FR * le mélange de protocoles entre les liens si nécessaire
-FR * plusieurs algorithmes de gestions de ces liens (active/passive ou active/active)
-FR * la capacité de gérer la compression et/ou le chiffrement
-FR
-FR Pour plus de détails, voir: [Kronosnet:The new face of Corosync communications](http://build.clusterlabs.org/corosync/presentations/2017-Kronosnet-The-new-face-of-corosync-communications.pdf)
-FR
-As far as Corosync is concerned, the main novelty is the support for the
-project "Kronosnet" as the communication protocol. This library allows for more
-flexibility, adds more fonctionalities, facilitates the supervision of Corosync
-and decreases the latency. Some of the novelties are listed below :
+In regard with Corosync, the main novelty is the availability of "Kronosnet" as
+communication protocol. This library allows for more flexibility, adds more
+functionality, ease the supervision of Corosync and decreases the
+latency. Some of the novelties are listed below :
 
 * support for up to 8 network links
 * support for the addition of network without restart
@@ -414,69 +312,44 @@ FR
 * `crmsh`
   * original tool
   * management and configuration of the cluster
+  * rely on ssh
 * `pcs`
   * introduced by Red Hat
-  * also supports Corosync
+  * management and configuration of the cluster
+  * rely on its own communication daemons `pcsd`
   * used in this workshop
 
 ::: notes
 
-FR A l'origine du projet Pacemaker, un outil apparaît : `crmsh`. Cet outil permet de configurer et de gérer le cluster
-FR sans toucher aux fichiers de configuration. Il est principalement maintenu par Suse et présente parfois des
-FR incompatibilités avec les autres distributions pour la création du cluster lui-même, son démarrage ou son arrêt.
-FR Néanmoins, l'outil évolue très vite et plusieurs de ces incompatibilités sont corrigées.
-FR
 The tool `cmrsh` originates to the beginning of the Pacemaker project. This
 tool is designed to managed and configure the cluster without requiering to
 modify the configuration files. It's mostly maintained by SUSE, and sometimes
 presents incompatibilities with other distribution in the creation, starting
 and stopping process of the cluster. Nevertheless, the tool evolves quickly and
-several incompatibilities hav been fixed.
+several incompatibilities have been fixed.
 
-FR Lorsque Red Hat intègre Pacemaker, un nouvel outil est créé : `pcs`. En plus de regrouper les commandes de Pacemaker,
-FR il supporte également Corosync (et CMAN pour les versions EL 6) et inclut un service HTTP permettant (entre autre) la
-FR configuration et la maintenance du cluster via un navigateur web.
-FR
 When Red Hat adopted Pacemaker, a new tool was created: `pcs`. It regroups all
 the Pacemaker commands along with those for Corosync (and CMAN in the versions
 for EL 6). It includes an HTTP service to configure and maintain the cluster
 via a web browser.
 
-FR Concernant le contrôle du cluster, `crmsh` repose sur SSH et csync2 pour l'exécution de commandes sur les serveurs
-FR distants (via la librairie python `parallax`) et la gestion de la configuration sur tous les serveurs.
-FR
 `crmsh` uses SSH and csync2 to execute commands on the remote servers (via the
 `parallax` python library) and manage the configuration across all servers.
 
-FR Pour ces mêmes tâches, les daemons `pcsd` échangent des commandes entre eux via leur service web. Le daemon `pcsd` gère
-FR à la fois une API HTTP pour la communication de commandes inter-serveurs ou l'interface HTTP à destination de
-FR l'administrateur.
-FR
-FR Lorsqu'une commande nécessite une action côté système (donc hors Pacemaker), les daemon `pcsd` communiquent entre eux
-FR et s'échangent les commandes à exécuter localement au travers de cette API HTTP. Les commandes sollicitant cette API
-FR peuvent être la création du cluster lui-même, son démarrage, son arrêt, sa destruction, l'ajout ou la suppression d'un
-FR nœud, etc.
-FR
 To archive the same tasks, the `pcsd` daemons exchange commands via their web
 services. The `pcsd` daemon manages the communication for the HTTP API
-dedicated to inter-server commands and the administration.
+dedicated to inter-server commands and the HTTP administrator frontend.
 
 When a command requiers a system operation (outside of Pacemaker), the `pcsd`
 daemons communicate and exchange the commands to execute using the HTTP API.
 The command that use this API range from the cluster creation or destruction,
 starting or stopping process and the addition or removal a node, etc. 
 
-FR En 2018, `pcs` a fini d'être intégré à Debian. `crmsh` est encore utilisé en priorité sous Suse, mais reste souvent
-FR utilisé sur les Debian et Ubuntu par choix historique et reste un très bon choix, pour peu que l'administrateur ne
-FR l'utilise pas pour interagir avec le système lui même.
-FR
 In 2018, `pcs` is fully integrated into Debian. `crmsh` is still used in
 piority in SUSE, it's also often used in Debian and Ubuntu since it's the
 historic choice for thoses platforms. It remains a good choise as long as the
-administrator doesn't need to interact with the system.
+administrator doesn't need to interact with the system itself.
 
-FR **Ce workshop se base sur une distribution CentOS 7 et sur l'outil `pcs`**.
-FR
 **This workshop is based on Centos 7 and uses the `pcs` tool.**
 
 :::
