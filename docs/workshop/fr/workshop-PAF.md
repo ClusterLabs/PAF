@@ -355,24 +355,19 @@ L'installation recommandée (et supportée) suivant les distributions de RHEL et
 |:---------:|:--------:|:---------:|------------------------------|
 | EL 7      | 2.x      | 1.1.x     | pcsd 0.9                     |
 | EL 8      | 3.x      | 2.0.x     | pcsd 0.10                    |
-| Debian 8  | 1.4      | 1.1.x     | crmsh                        |
-| Debian 9  | 2.4      | 1.1.x     | pcs 0.9 ou crmsh 2.3         |
-| Debian 10 | 3.0      | 2.0.x     | pcs 0.10 ou crmsh 4.0        |
+| Debian 9  | 2.4      | 1.1.x     | pcs 0.9 or crmsh 2.3         |
+| Debian 10 | 3.0      | 2.0.x     | pcs 0.10 or crmsh 4.0        |
+| Debian 11 | 3.1      | 2.0.x     | pcs 0.10 or crmsh 4.2        |
 
-L'équipe de maintenance des paquets Pacemaker n'a pu intégrer les dernières
-versions des composants à temps pour la version 8 de Debian. Il a été décidé
-d'utiliser officiellement le dépôt backport de Debian pour distribuer ces
-paquets dans Debian 8. Les versions 8 et 9 de Debian partagent donc les mêmes
-versions des paquets concernant Pacemaker.
-
-L'initialisation du cluster avec `crmsh` 2.x n'est toujours pas fonctionnelle
-et ne devrait pas être corrigée, la branche 3.x étant désormais la branche
-principale du projet. La version 3.0 de `crmsh` supporte l'initialisation d'un
+Sous Debian 9, l'initialisation du cluster avec `crmsh` 2.x n'était toujours pas
+fonctionnelle. La version 3.0 de `crmsh` supportait l'initialisation d'un
 cluster sous Debian mais avec un peu d'aide manuelle et quelques erreurs
-d'intégration.
+d'intégration. La branche principale du projet est désormais la 4.x, mais
+les auteurs de ce tutoriel ne l'ont pas encore testée.
 
-L'utilisation de `pcsd` et `pcs` est désormais pleinement fonctionne sous
-Debian. Voir à ce propos:
+Bien que `crmsh` soit l'outil d'administration historique sous les OS Debian et
+dérivés, l'utilisation de `pcsd` et `pcs` y est pleinement fonctionnel depuis
+la version 9 de Debian. Voir à ce propos:
 <https://clusterlabs.github.io/PAF/Quick_Start-Debian-9-pcs.html>
 
 :::
@@ -443,10 +438,10 @@ ces outils, ils sont très pratiques au quotidien et facilitent grandement la
 gestion du cluster. De plus, ils intègrent toutes les bonnes pratiques
 relatives aux commandes supportées.
 
-Tout au long de cette formation, nous utilisons le couple `pcs` afin de
-simplifier le déploiement et l'administration du cluster Pacemaker. Il est
-disponible sur la plupart des distributions Linux et se comportent de la même
-façon, notamment sur Debian et EL et leurs dérivés.
+Tout au long de cette formation, nous utilisons `pcs` afin de simplifier le
+déploiement et l'administration du cluster Pacemaker. Il est disponible sur la
+plupart des distributions Linux et se comportent de la même façon, notamment
+sur Debian et EL et leurs dérivés.
 
 Ce paquet installe le CLI `pcs` et le daemon `pcsd`. Ce dernier s'occupe
 seulement de propager les configurations et commandes sur tous les nœuds.
@@ -517,7 +512,7 @@ Pacemaker sont présents. Notamment:
 ::: notes
 
 1. installer le paquet `pcs`
-2. activer le daemon `pcsd` au démarrage de l'instance et le démarrer
+2. activer le daemon `pcsd` au démarrage du serveur et le démarrer
 
 
 :::
@@ -555,12 +550,12 @@ ou
 * authentification des daemons `pcsd` entre eux
 * création du cluster à l'aide de `pcs`
   - crée la configuration corosync sur tous les serveurs
-* configuration de Pacemaker des _processus_ de Pacemaker
+* configuration des _processus_ de Pacemaker
 
 ::: notes
 
-La création du cluster se résume à créer le fichier de configuration de
-Corosync, puis à démarrer de Pacemaker.
+La création du cluster se résume à créer le même fichier de configuration de
+Corosync sur tous les nœuds, puis démarrer Pacemaker dessus.
 
 L'utilisation de `pcs` nous permet de ne pas avoir à éditer la configuration de
 Corosync manuellement. Néanmoins, un pré-requis à l'utilisation de `pcs` est
@@ -576,8 +571,9 @@ processus, pas la gestion du cluster. Notamment, où sont les journaux
 applicatifs et leur contenu. Pour la famille des distributions EL, son
 emplacement est `/etc/sysconfig/pacemaker`. Pour la famille des distributions
 Debian, il sont emplacement est `/etc/default/pacemaker`. Ce fichier en
-concerne QUE l'instance locale de Pacemaker. Chaque instance peut avoir un
-paramétrage différent, mais cela est bien entendu déconseillé.
+concerne QUE l'instance locale de Pacemaker. Contrairement à Corosync, chaque
+instance Pacemaker peut avoir un paramétrage différent, mais cela est bien
+entendu déconseillé.
 
 :::
 
