@@ -1,6 +1,6 @@
 ---
 subtitle : 'Workshop Pacemaker/PostgreSQL'
-title : 'Introduction à PostgreSQL Automatic Failover'
+title : 'An introduction to PostgreSQL Automatic Failover'
 
 licence : PostgreSQL
 author: Jehan-Guillaume de Rorthais, Maël Rimbault, Adrien Nayrat, Stefan Fercot, Benoit Lobréau
@@ -40,56 +40,53 @@ hide_author_in_slide: true
 
 -----
 
-## Prérequis minimum
+## Minimum prerequisites
 
-* fiabilité des ressources (matériel, réseau, etc.)
-* redondance de chaque élément d'architecture
-* synchronisation des horloges des serveurs
-* supervision de l'ensemble
-
+* resource reliability (hardware, network, etc.)
+* redundancy of each element composing the architecture
+* synchronization of the server clocks
+* monitoring everything
 
 ::: notes
 
-La résistance d'une chaîne repose sur son maillon le plus faible.
+The strength a chain depend on it's weakest link.
 
-Un pré-requis à une architecture de haute disponibilité est d'utiliser du
-matériel de qualité, fiable, éprouvé, maîtrisé et répandu.  Fonder son
-architecture sur une technologie peu connue et non maîtrisée est la recette
-parfaite pour une erreur humaine et une indisponibilité prolongée.
+One prerequisite for an high availability architecture is to use quality
+hardware i.e. reliable, tested, mastered and wide spread. Building an
+architecture on a lesser known technology that is not mastered is the recipe
+for human errors and extended downtime.
 
-De même, chaque élément doit être redondé.  La loi de Murphy énonce que « tout
-ce qui peut mal tourner, tournera mal ».  Cette loi se vérifie très
-fréquemment.  Les incidents se manifestent rarement là où on ne les attend le
-plus.  Il faut réellement tout redonder :
+Likewise, each element must be duplicated to achieve redundancy. Murphy's Law
+states that "if something can go wrong, it will". This law is frequently proven
+true.  Problems rarely arise where we expect them the most. Everything in the
+architecture must really be redundant:
 
-* chaque application ou service doit avoir une procédure de bascule
-* CPU (multi-socket), mémoire (multi-slot, ECC), disques (niveaux de RAID)
-* redondance du SAN
-* plusieurs alimentations électriques par serveur, plusieurs sources
-  d'alimentation
-* plusieurs équipements réseaux, liens réseaux redondés, cartes réseaux, WAN et
-  LAN
-* climatisation redondée
-* plusieurs équipements de fencing (et chemins pour accéder)
-* plusieurs administrateurs comprenant et maîtrisant chaque brique du cluster
+* each application or service must have a failover procedure
+* CPU (multi-socket), memory (multi-slot, ECC), disks (RAID levels)
+* SAN
+* multiple power supply per server with different origins
+* multiple network hardware, links, cards, WAN & LAN
+* air conditioning
+* various fencing methods (with different access paths)
+* multiple administrators with a good understanding of the architecture
 * ...
 
-S'il reste un seul _Single Point of Failure_, ou _SPoF_, dans l'architecture,
-ce point subira un jour une défaillance.
+If there is one _Single Point of Failure_, or _SPoF_,  in the architecture,
+it will fail one day or another.
 
-Concernant le synchronisme des horloges des serveurs entre eux, celui-ci est
-important pour les besoins applicatifs et la qualité des données.  Suite à une
-bascule, les dates pourraient être incohérentes entre celles écrites par la
-précédente instance primaire et la nouvelle.
+It is paramount that all server clocks are synchronized for the applications
+and their data to be safe. For example: after a failover of a database,
+inconsistencies must be avoided between the dates provided by the old primary
+database and the new one.
 
-Ensuite, ce synchronisme est important pour assurer une cohérence dans
-l'horodatage des journaux applicatifs entre les serveurs.  La compréhension
-rapide et efficace d'un incident dépend directement de ce point.  À noter qu'il
-est aussi possible de centraliser les logs sur une architecture dédiée à part
-(attention aux _SPoF_ ici aussi).
+This synchronization is also important to have coherent timestamps in the
+application logs across all servers. This is very important to understand and
+fix problems in a quick and reliable way. It's also possible to centralize logs
+in a dedicated architecture, be careful that it doesn't become another SPOF
+though.
 
-Le synchronisme des horloges est d'autant plus important dans les
-environnements virtualisés où les horloges ont facilement tendance à dévier.
+Finally, clock synchronization is very important in virtualized environment
+where clock can easily drift.
 
 :::
 
@@ -97,48 +94,47 @@ environnements virtualisés où les horloges ont facilement tendance à dévier.
 
 ## _Fencing_
 
-* difficulté de déterminer l'origine d'un incident de façon logicielle
-* chaque brique doit toujours être dans un état déterminé
-* garantie de pouvoir sortir du système un élément défaillant
-* implémenté dans Pacemaker au travers du _daemon_ `stonithd`
+* the origin of a problem is hard to diagnose from a software point of view
+* each element must be in a defined state
+* guaranty to be able to exclude a failing element from the system
+* implemented in Pacemaker by the daemon `stonithd`
 
 ::: notes
 
-Lorsqu'un serveur n'est plus accessible au sein d'un cluster, il est impossible
-aux autres nœuds de déterminer l'état réel de ce dernier.  A-t-il crashé ?
-Est-ce un problème réseau ?  Subit-il une forte charge temporaire ?
+When a server become silent, it's not possible for other servers in the cluster
+to determine its real state. Did it crash ? Is it a network problem ? Is it
+temporarily under stress ?
 
-Le seul moyen de répondre à ces questions est d'éteindre ou d'isoler le serveur
-fantôme d'autorité.  Cette action permet de déterminer de façon certaine son
-statut : le serveur est hors _cluster_ et ne reviendra pas sans action humaine.
+The only way to answer these questions is to shutdown or isolate the rogue
+server. The success of this action allows to define the real state of the
+server: we know it cannot come back into the cluster without human
+intervention.
 
-Une fois cette décision prise et appliquée avec succès, le _cluster_ peut
-mettre en œuvre les actions nécessaires pour rendre les services en HA de
-nouveau disponibles.
+After this decision to fence a server is taken and applied, the cluster can
+then take some actions to make sure any missing services are recovered as fast
+as possible.
 
-Passer outre ce mécanisme, c'est s'exposer de façon certaine à des situations
-dites de _split brain_, où plusieurs sous-partitions du _cluster_ initial
-continuent à fonctionner de façon autonomes.
+Disregarding this safety mechanism will expose the system to _split brain_
+issues, where several partitions of the cluster continue to operate on their
+own.
 
-Par exemple, si le _cluster_ contient des ressources de bases de données en
-réplication avec une seule instance primaire, le _split brain_ indique que
-plusieurs instances sont accessibles simultanément en écriture au sein du
-_cluster_, mais ne répliquent pas entre elles.  Réconcilier les données de ces
-deux instances peut devenir un véritable calvaire et provoquer une ou plusieurs
-indisponibilités.  Voici un exemple réel d'incident de ce type :
-<https://blog.github.com/2018-10-30-oct21-post-incident-analysis/>.  Ici, une
-certaine quantité de données n'a pas été répliquée de l'ancien primaire vers le
-nouveau avant la bascule.  En conséquence, plusieurs jours ont été nécessaires
-afin de réintégrer et réconcilier les données dans le _cluster_ fraîchement
-reconstruit.
+In the specific case where the cluster is managing some replicating databases,
+a _split brain_ scenario would entail multiple instances are available in
+read/write mode at the same time, without replicating with each other anymore.
+Merging the data from theses divergent databases is complicated, time consuming
+and lead to extensive downtimes. Here is a real life example of that kind of
+incident: <https://blog.github.com/2018-10-30-oct21-post-incident-analysis/>.
+In this case some data has not been replicated from the old primary to the new
+one before the switchover. As a result, several days were needed to restore the
+lost data in the newly build cluster.
 
-Ne sous-estimez jamais le pouvoir d'innovation en terme d'incident des briques
-de votre _cluster_ pour provoquer une partition des nœuds entre eux.  En voici
-quelques exemples : <https://aphyr.com/posts/288-the-network-is-reliable>
+Never underestimate the innovative nature of incidents, and the likelihood that
+they will partition your cluster. Here are some more examples:
+<https://aphyr.com/posts/288-the-network-is-reliable>.
 
-À noter que PAF est pensé et construit pour les _clusters_ configurés avec le
-_fencing_.  En cas d'incident, il y a de fortes chances qu'une bascule n'ait
-jamais lieu pour un _cluster_ dépourvu de _fencing_.
+Note that PAF is build with fencing enabled clusters in mind.  Should a
+failure occurs, no failover will occur if your cluster is not able to fence the
+relevant resource.
 
 :::
 
@@ -146,30 +142,31 @@ jamais lieu pour un _cluster_ dépourvu de _fencing_.
 
 ## Quorum
 
-* quelle partie du cluster doit fonctionner en cas de partition réseau ?
-  * un vote à chaque élément du _cluster_
-  * le _cluster_ ne fonctionne que s'il a la majorité des votes
+* which part of the cluster should keep operating during a network partition?
+  * each cluster member has one vote
+  * the cluster keeps running only if it has the majority of the votes
 
 ::: notes
 
-Le quorum est le nombre minimum de votes qu'une transaction distribuée doit
-obtenir pour être autorisée à effectuer une opération dans le système.  Son
-objectif est d'assurer la cohérence du système distribué.
+The quorum is the minimum number of votes requiered for a distributed
+transaction to be authorized to execute an operation on the system. It's goal
+is to guaranty the coherence of the distributed system.
 
-Pour ce faire, chaque nœud du système se voit assigner un nombre de votes.  Il
-faut au moins que `(N / 2) + 1` votes soient présents pour que le quorum soit
-atteint, avec `N` le nombre de votes possible.  Le _cluster_ ne fonctionne que
-si la majorité des nœuds sont présents.
+To achieve this goal, each node is granted some votes. A minimum of `(N / 2) +
+1` votes are required to grant the quorum, `N` being the maximum number
+of vote possible). The cluster will be able to operate only if the majority
+of node is available.
 
-Suite à une partition réseau, le quorum permet au cluster de savoir quelle
-partition doit conserver les services actifs, celle(s) où il doit les
-interrompre, et qui peut déclencher des opérations de fencing si nécessaire.
+After a network partition, the cluster relies on the quorum information to
+decide on which partition the services must runs, and which partition must stop
+all of them. Fencing operation can be started if necessary. 
 
-En plus d'arrêter ses services locaux, une partition du cluster n'atteignant
-pas le quorum ne peut notamment pas actionner le fencing des nœuds de la
-partition distante.
+In addition to stopping all local services, a cluster partition who doesn't meet
+the quorum cannot use fencing operation against remote nodes.
 
-Ce mécanisme est donc indispensable au bon fonctionnement du cluster.
+<!-- TODO: test this !! -->
+
+This mecanism is paramount for the cluster to operate correctly.
 
 :::
 
@@ -177,22 +174,26 @@ Ce mécanisme est donc indispensable au bon fonctionnement du cluster.
 
 ## KISS
 
-* une architecture complexe pose des problèmes
-  * de mise en œuvre (risque de _SPOF_)
-  * de maintenance
-  * de documentation
-* il est préférable de toujours aller au plus simple
+* a complex architecture brings its own complex problems:
+  * to build (avoid a _SPOF_)
+  * to maintain
+  * to document
+* it's advised to aim for simplicity first and foremost
+
 
 ::: notes
 
-Augmenter la complexité d'un cluster augmente aussi le nombre de défaillances possibles. Entre deux solutions, la
-solution la plus simple sera souvent la meilleure et la plus pérenne.
+Increasing the complexity of a cluster also increases the number of failures
+scenarios. Given two cluster implementations, the simplest one will usually be
+the best and most sustainable.
 
-L'incident décrit par de Gocardless dans le lien ci-après est un bon exemple. L'article indique que l'automatisation
-réduit la connaissance de l'architecture. Au fil du temps il est difficile de maintenir une documentation à jour, des
-équipes correctement formées :
+The outage described by Grocardless in the following hyperlink is a good
+example of this. The article describes how automation erodes the knowledge of
+the architecture and how it's difficult ot keep the documentation up to date
+and the team trained:
 
-[Incident review: API and Dashboard outage on 10 October 2017](https://gocardless.com/blog/incident-review-api-and-dashboard-outage-on-10th-october/)
+[Incident review: API and Dashboard outage on 10 October
+2017](https://gocardless.com/blog/incident-review-api-and-dashboard-outage-on-10th-october/)
 
 > **Automation erodes knowledge**
 >
@@ -206,32 +207,33 @@ be out-of-date.
 
 -----
 
-## Histoire
+## History
 
 -----
 
-### Historique de Pacemaker
+### History of Pacemaker
 
-* plusieurs plate-formes historiques distinctes
-  * projet Linux-HA mené par SUSE
-  * "Cluster Services" de Red Hat
-* 2007 : Pacemaker apparaît
-  * issu de Linux-HA
-  * 1er point de convergence
-
+* several projects on different platforms 
+  * Linux HA project led by SUSE
+  * "Cluster Services" by Red Hat
+* 2007: Pacemaker appears
+  * originated from Linux-HA
+  * first projects convergence
 
 ::: notes
 
-Un historique complet est disponible
-[ici](https://www.alteeve.com/w/High-Availability_Clustering_in_the_Open_Source_Ecosystem).
+The complete history is available 
+[here](https://www.alteeve.com/w/High-Availability_Clustering_in_the_Open_Source_Ecosystem).
 
-Plusieurs sociétés se sont forgées une longue expérience dans le domaine de la Haute Disponibilité en maintenant chacun
-leur plate-forme.
+Several companies have build a long standing experience in the field of high
+availability and provide solution dedicated to it.
 
-SUSE d'abord, avec son projet Linux-HA. Red Hat ensuite avec "Cluster Services".
+SUSE is one of them with the project Linux-HA. Red Hat is also known for their
+"Cluster Services".
 
-En 2007, issu d'une première collaboration, Pacemaker apparaît pour gérer les clusters peu importe la couche de
-communication utilisée : OpenAIS (Red Hat) ou Heartbeat (SUSE).
+In 2007, a first collaborative work leads to the birth of Pacemaker. This
+solution is designed to operate clusters over the different communication
+layers avaiable at that time: OpenAIS (Reh Hat) or Heartbeat (SUSE).
 
 :::
 
@@ -239,119 +241,128 @@ communication utilisée : OpenAIS (Red Hat) ou Heartbeat (SUSE).
 
 ### Historique de Pacemaker - suite
 
-* 2009 : Corosync apparaît
-  * issu de OpenAIS
-  * 2ème point de convergence
-* 2014 : début de l'harmonisation
+* 2009 : Corosync appears
+  * based on OpenAIS
+  * 2nd convergence
+* 2014 : harmonisation starts
 
 ::: notes
 
-En 2009 apparaît l'uniformisation des couches de communication grâce à Corosync.
+In 2009, an effort to standarize the communication layers leads to the birth of
+Corosync.
 
-Une collaboration forte étant désormais née, Pacemaker et Corosync deviennent petit à petit la référence et chaque
-distribution tend vers cette plate-forme commune.
+A strong collaboration is born, Pacemaker and Corosync are becoming the
+reference for Linux high availability and all the Linux distributions start to
+include these tools in their packaging.
 
 :::
 
 -----
 
-### Historique de Pacemaker - futur
+### History of Pacemaker - future
 
-* 2017: les principales distributions ont convergé
-  * Corosync 2.x et Pacemaker 1.1.x
-* 2018: corosync 3 et Pacemaker 2.0.x
+* 2017: the main distribution have converged
+  * Corosync 2.x and Pacemaker 1.1.x
+* 2018: corosync 3 and Pacemaker 2.0.x
 
 ::: notes
 
-En 2017, les dernières versions des principales distributions Linux avaient toutes fini leur convergence vers Corosync
-2.x et Pacemaker 1.1.x. Seul le client d'administration de haut niveau varie en fonction de la politique de la
-distribution.
+In 2017, the latest versions of the main Linux distributions are done
+converging to Corosync 2.x and Pacemaker 1.1.x. The last difference between
+them is the chosen cluster administration tool: `crmsh` or `pcs`.
 
-Début 2018, Pacemaker 2.0 et Corosync 3.0 font leur apparition. Coté Pacemaker, les principaux changements concernent:
+Early 2018, Pacemaker 2.0 and Corosync 3.0 are release. On the Pacemaker side,
+the main changes are :
 
-* la suppression de beaucoup de code consacré aux anciennes architectures devenues obsolètes : incompatibilité avec
-  OpenAIS, CMAN, Corosync 1.x, Heartbeat
-* plusieurs paramètres de configuration ont été supprimés ou remplacés par des équivalents pour une configuration plus
-  cohérente
+* the removal of a lot of code dedicated to old architectures: OpenAIS, CMAN,
+  Corosync 1.x and Heartbeat compatibility is dropped.
+* several configuration parameters have been removed or replaced with others in
+  an effort to make the configuration more consistent.
 
-Pour plus de détails, voir: <https://wiki.clusterlabs.org/wiki/Pacemaker_2.0_Changes>
+More information is available here: <https://wiki.clusterlabs.org/wiki/Pacemaker_2.0_Changes>
 
-Concernant Corosync, la principale nouveauté est le support du projet "Kronosnet" comme protocole de communication au
-sein du cluster. Cette librairie permet d'ajouter beaucoup de souplesse, de fonctionnalités, de visibilité sur
-l'activité de Corosync et surtout une latence plus faible que l'actuel protocole. Entre autre nouveautés, nous
-trouvons :
+In regard with Corosync, the main novelty is the availability of "Kronosnet" as
+communication protocol. This library allows for more flexibility, adds more
+functionality, ease the supervision of Corosync and decreases the
+latency. Some of the novelties are listed below :
 
-* le support de un à huit liens réseaux
-* l'ajout de liens réseaux à chaud
-* le mélange de protocoles entre les liens si nécessaire
-* plusieurs algorithmes de gestions de ces liens (active/passive ou active/active)
-* la capacité de gérer la compression et/ou le chiffrement
+* support for up to 8 network links
+* support for the addition of network without restart
+* support for multiple protocols in different links
+* several algorithm to manage links (active/passive or active/active)
+* support for compression and encryption
 
-Pour plus de détails, voir: [Kronosnet:The new face of Corosync communications](http://build.clusterlabs.org/corosync/presentations/2017-Kronosnet-The-new-face-of-corosync-communications.pdf)
+More information is available here: [Kronosnet:The new face of Corosync communications](http://build.clusterlabs.org/corosync/presentations/2017-Kronosnet-The-new-face-of-corosync-communications.pdf)
 
 :::
 
 -----
 
-## Clients d'administration
+## Administration tools
 
 * `crmsh`
-  * outil originel
-  * gestion et configuration du cluster
+  * original tool
+  * management and configuration of the cluster
+  * rely on ssh
 * `pcs`
-  * introduit par Red Hat
-  * supporte également Corosync
-  * utilisé dans ce workshop
+  * introduced by Red Hat
+  * management and configuration of the cluster
+  * rely on its own communication daemons `pcsd`
+  * used in this workshop
 
 ::: notes
 
-A l'origine du projet Pacemaker, un outil apparaît : `crmsh`. Cet outil permet de configurer et de gérer le cluster
-sans toucher aux fichiers de configuration. Il est principalement maintenu par Suse et présente parfois des
-incompatibilités avec les autres distributions pour la création du cluster lui-même, son démarrage ou son arrêt.
-Néanmoins, l'outil évolue très vite et plusieurs de ces incompatibilités sont corrigées.
+The tool `cmrsh` originates to the beginning of the Pacemaker project. This
+tool is designed to managed and configure the cluster without requiering to
+modify the configuration files. It's mostly maintained by SUSE, and sometimes
+presents incompatibilities with other distribution in the creation, starting
+and stopping process of the cluster. Nevertheless, the tool evolves quickly and
+several incompatibilities have been fixed.
 
-Lorsque Red Hat intègre Pacemaker, un nouvel outil est créé : `pcs`. En plus de regrouper les commandes de Pacemaker,
-il supporte également Corosync (et CMAN pour les versions EL 6) et inclut un service HTTP permettant (entre autre) la
-configuration et la maintenance du cluster via un navigateur web.
+When Red Hat adopted Pacemaker, a new tool was created: `pcs`. It regroups all
+the Pacemaker commands along with those for Corosync (and CMAN in the versions
+for EL 6). It includes an HTTP service to configure and maintain the cluster
+via a web browser.
 
-Concernant le contrôle du cluster, `crmsh` repose sur SSH et csync2 pour l'exécution de commandes sur les serveurs
-distants (via la librairie python `parallax`) et la gestion de la configuration sur tous les serveurs.
+`crmsh` uses SSH and csync2 to execute commands on the remote servers (via the
+`parallax` python library) and manage the configuration across all servers.
 
-Pour ces mêmes tâches, les daemons `pcsd` échangent des commandes entre eux via leur service web. Le daemon `pcsd` gère
-à la fois une API HTTP pour la communication de commandes inter-serveurs ou l'interface HTTP à destination de
-l'administrateur.
+To archive the same tasks, the `pcsd` daemons exchange commands via their web
+services. The `pcsd` daemon manages the communication for the HTTP API
+dedicated to inter-server commands and the HTTP administrator frontend.
 
-Lorsqu'une commande nécessite une action côté système (donc hors Pacemaker), les daemon `pcsd` communiquent entre eux
-et s'échangent les commandes à exécuter localement au travers de cette API HTTP. Les commandes sollicitant cette API
-peuvent être la création du cluster lui-même, son démarrage, son arrêt, sa destruction, l'ajout ou la suppression d'un
-nœud, etc.
+When a command requiers a system operation (outside of Pacemaker), the `pcsd`
+daemons communicate and exchange the commands to execute using the HTTP API.
+The command that use this API range from the cluster creation or destruction,
+starting or stopping process and the addition or removal a node, etc. 
 
-En 2018, `pcs` a fini d'être intégré à Debian. `crmsh` est encore utilisé en priorité sous Suse, mais reste souvent
-utilisé sur les Debian et Ubuntu par choix historique et reste un très bon choix, pour peu que l'administrateur ne
-l'utilise pas pour interagir avec le système lui même.
+In 2018, `pcs` is fully integrated into Debian. `crmsh` is still used in
+piority in SUSE, it's also often used in Debian and Ubuntu since it's the
+historic choice for thoses platforms. It remains a good choise as long as the
+administrator doesn't need to interact with the system itself.
 
-**Ce workshop se base sur une distribution CentOS 7 et sur l'outil `pcs`**.
+**This workshop is based on Centos 7 and uses the `pcs` tool.**
 
 :::
 
 -----
 
-## Versions disponibles
+## Available versions
 
-* RHEL 7 et Debian 9:
+* RHEL 7 and Debian 9:
   * Corosync 2.x
   * Pacemaker 1.1.x
 
-* RHEL 8 et Debian 10:
+* RHEL 8 and Debian 10:
   * Corosync 3.x
   * Pacemaker 2.0.x
 
 
 ::: notes
 
-L'installation recommandée (et supportée) suivant les distributions de RHEL et dérivés :
+The recommended (and supported) version depending on the distribution are:
 
-| OS        | Corosync | Pacemaker | Administration               |
+| OS        | Corosync | Pacemaker | Administration tool          |
 |:---------:|:--------:|:---------:|------------------------------|
 | EL 7      | 2.x      | 1.1.x     | pcsd 0.9                     |
 | EL 8      | 3.x      | 2.0.x     | pcsd 0.10                    |
@@ -359,52 +370,52 @@ L'installation recommandée (et supportée) suivant les distributions de RHEL et
 | Debian 10 | 3.0      | 2.0.x     | pcs 0.10 or crmsh 4.0        |
 | Debian 11 | 3.1      | 2.0.x     | pcs 0.10 or crmsh 4.2        |
 
-Sous Debian 9, l'initialisation du cluster avec `crmsh` 2.x n'était toujours pas
-fonctionnelle. La version 3.0 de `crmsh` supportait l'initialisation d'un
-cluster sous Debian mais avec un peu d'aide manuelle et quelques erreurs
-d'intégration. La branche principale du projet est désormais la 4.x, mais
-les auteurs de ce tutoriel ne l'ont pas encore testée.
+By the time of Debian 9, the cluster initialization with `crmsh` 2.x was not
+working with Debian. The 3.x version of `crmsh` supported the cluster
+initialization with some manual intervention and integration errors. The main
+branch of the project is now 4.x, but authors of this workshop never tested it.
 
-Bien que `crmsh` soit l'outil d'administration historique sous les OS Debian et
-dérivés, l'utilisation de `pcsd` et `pcs` y est pleinement fonctionnel depuis
-la version 9 de Debian. Voir à ce propos:
+Despite `crmsh` is the historical administration tool for Debian based OS, the
+use of `pcsd` and `pcs` is fully operational since Debian 9. See:
 <https://clusterlabs.github.io/PAF/Quick_Start-Debian-9-pcs.html>
 
 :::
 
 -----
 
-# Premiers pas avec Pacemaker
+# First steps with Pacemaker
 
-Ce chapitre aborde l'installation et démarrage de Pacemaker. L'objectif est de
-créer rapidement un cluster vide que nous pourrons étudier plus en détail
-dans la suite du workshop.
+This chapter takes up the installation and start-up of Pacemaker. The objective
+is to quickly create an empty cluster that we will populate and learn from
+during this workshop.
 
 -----
 
 ## Installation
 
-Paquets essentiels:
+Mandatory packages:
 
-* `corosync` : communication entre les nœuds
-* `pacemaker` : orchestration du cluster
-* `pcs` : administration du cluster
+* `corosync`: messaging layer
+* `pacemaker`: cluster orchestration
+* `pcs`: administration tool
 
-::: notes
+:::notes
 
-L'installation de Pacemaker se fait très simplement depuis les dépôts
-officiels de CentOS 7 en utilisant les paquets `pacemaker`. notez que
-les paquets `corosync` et `resource-agents` sont installés aussi par dépendance.
+The installation of Pacemaker is made simple by using the `pacemaker` package
+available from the CentOS 7 official repositories. Note that the `corosync` and
+the `resource-agents` packages are also installed as dependencies.
 
-Voici le détail de ces paquets :
+More details about the packages:
 
-* `corosync` : gère la communication entre les nœuds, la gestion du groupe, du quorum
-* `pacemaker` : orchestration du cluster, réaction aux événements, prise de
-  décision et actions
-* `resource-agents`: collection de _resource agents_ (_RA_) pour divers services
+* `corosync`: manages the communication between nodes, the group membership and
+  the quorum
+* `pacemaker`: orchestrates the cluster, reacts to events, takes decisions and
+  performs actions
+* `resource-agents` (_RA_): are a collection of scripts that share a common API
+  and allow Pacemaker to control and monitor different kind of resources.
 
-Le paquet `corosync` installe un certain nombre d'outils commun à toutes les
-distributions et que nous aborderons plus loin:
+The `corosync` package installs several tools common to all Linux distributions.
+We will describe them later on:
 
 * `corosync-cfgtool`
 * `corosync-cmapctl`
@@ -412,9 +423,9 @@ distributions et que nous aborderons plus loin:
 * `corosync-keygen`
 * `corosync-quorumtool`
 
-Pacemaker aussi installe un certain nombre de binaires commun à toutes les
-distributions, dont les suivants que vous pourriez rencontrer dans ce workshop
-ou dans certaines discussions :
+Pacemaker also installs it's share of binaries that are common across all Linux
+distributions. Some of them are listed below we might use them in this  workshop
+or are commonly discussed in Pacemaler related topics:
 
 * `crm_attribute`
 * `crm_node`
@@ -428,52 +439,51 @@ ou dans certaines discussions :
 * `crm_verify`
 * `stonith_admin`
 
-Beaucoup d'autres outils sont installés sur toutes les distributions, mais sont
-destinés à des utilisations très pointues, de debug ou aux agents eux-même.
+A lots of other tools are installed on all distributions, but their use cases
+are limited to some debug activities or used only by the agents.
 
-Les outils d'administration `pcs` et `crm` reposent fortement sur l'ensemble de
-ces binaires et permettent d'utiliser une interface unifiée et commune à
-ceux-ci. Bien que l'administration du cluster peut se faire entièrement sans
-ces outils, ils sont très pratiques au quotidien et facilitent grandement la
-gestion du cluster. De plus, ils intègrent toutes les bonnes pratiques
-relatives aux commandes supportées.
+The administration tools `pcs` and `crm` rely heavily on these tools and create
+a unified interface to manage the cluster. Even thought cluster admnistration
+tasks can be performed without these tools, they are very usefull and ease
+cluster management to a great degree. Moreover, they carry a fair amount of best
+practices for the supported commands.
 
-Tout au long de cette formation, nous utilisons `pcs` afin de simplifier le
-déploiement et l'administration du cluster Pacemaker. Il est disponible sur la
-plupart des distributions Linux et se comportent de la même façon, notamment
-sur Debian et EL et leurs dérivés.
+During this workshop, we will be using `pcs` to simplify the deployment and
+administration of the cluster. In addition to it's simplicity, the tool works
+the same on all Linux distributions, most notably Debian, EL and their
+derivatives.
 
-Ce paquet installe le CLI `pcs` et le daemon `pcsd`. Ce dernier s'occupe
-seulement de propager les configurations et commandes sur tous les nœuds.
-
-:::
-
------
-
-### TP: Installation de Pacemaker
-
-::: notes
-
-1. installer les paquets nécessaires et suffisants
-2. vérifier les dépendances installées
+The packages install both the CLI `pcs` and the daemon `pcsd`. The latter is
+responsible for the configuration and commands propagation across the nodes.
 
 :::
 
 -----
 
-### Correction: Installation de Pacemaker
+### Practical work: Installation of Pacemaker
 
 ::: notes
 
-1. Installer les paquets nécessaires et suffisants
+1. install the required packages
+2. verify which dependencies were installed
+
+:::
+
+-----
+
+### Correction: Installation of Pacemaker
+
+::: notes
+
+1. Install the required packages
 
 ~~~console
 # yum install -y pacemaker
 ~~~
 
-2. vérifier les dépendances installées
+2. verify which dependencies were installed
 
-À la fin de la commande précédente:
+Check the output of the previous command:
 
 ~~~
 Dependency Installed:
@@ -483,11 +493,11 @@ Dependency Installed:
   resource-agents.x86_64 0:4.1.1-30.el7_7.4
 ~~~
 
-Les paquets `corosync`, `resource-agents` et `pacemaker-cli` ont été installés en tant que
-dépendance de `pacemaker`.
+The `corosync`, `resource-agents` and `pacemaker-cli` packages have been
+installed as dependencies of `pacemaker`.
 
-Tous les outils nécessaires et suffisants à l'administration d'un cluster
-Pacemaker sont présents. Notamment:
+All the required tools to manage a Pacemaker cluster are installer. Most
+notably:
 
 ~~~console
 # ls /sbin/crm* /sbin/corosync*
@@ -507,34 +517,33 @@ Pacemaker sont présents. Notamment:
 
 -----
 
-### TP: Installation de `pcs`
+### Practical work: Installation of `pcs`
 
 ::: notes
 
-1. installer le paquet `pcs`
-2. activer le daemon `pcsd` au démarrage du serveur et le démarrer
-
+1. install the `pcs` package
+2. enable the `pcsd` daemon so that it starts on server boots, and start it.
 
 :::
 -----
 
-### Correction: Installation de `pcs`
+### Correction: Installation of `pcs`
 
 ::: notes
 
-1. installer le paquet `pcs`
+1. install the `pcs` package
 
 ~~~console
 # yum install -y pcs
 ~~~
 
-2. activer `pcsd` au démarrage de l'instance et le démarrer
+2. enable the `pcsd` daemon so that it starts on server boots, and start it.
 
 ~~~console
 # systemctl enable --now pcsd
 ~~~
 
-ou 
+or
 
 ~~~console
 # systemctl enable pcsd
@@ -545,72 +554,69 @@ ou
 
 -----
 
-## Création du cluster
+## Cluster creation
 
-* authentification des daemons `pcsd` entre eux
-* création du cluster à l'aide de `pcs`
-  - crée la configuration corosync sur tous les serveurs
-* configuration des _processus_ de Pacemaker
+* authenticate all `pcsd` daemons with each others
+* create the cluster using `pcs`
+   - this creates the corosync configuration on all servers
+* configures the behavior of Pacemaker's processes
 
 ::: notes
 
-La création du cluster se résume à créer le même fichier de configuration de
-Corosync sur tous les nœuds, puis démarrer Pacemaker dessus.
+Cluster creation is done by creating the same Corosync configuration file on all
+nodes, then starting Pacemaker on them.
 
-L'utilisation de `pcs` nous permet de ne pas avoir à éditer la configuration de
-Corosync manuellement. Néanmoins, un pré-requis à l'utilisation de `pcs` est
-que tous les daemons soient authentifiés les uns auprès des autres pour
-s'échanger des commandes au travers de leur API HTTP. Cela se fait grâce à la
-commande `pcs cluster auth [...]`.
+Using `pcs` simplifies this process since it creates the configuration files
+everywhere itself. However, this magical step requires that all `pcsd` dameons
+are authenticated with each other so they can exchange of commands using the
+HTTP API. This can be done with the command `pcs cluster auth [...]`.
 
-Il est ensuite aisé de créer le cluster grâce à la commande `pcs cluster
-setup [...]`.
+Once this is done, it's easy to create the cluster using `pcs cluster setup
+[...]`.
 
-Le fichier de configuration de Pacemaker ne concerne que le comportement des
-processus, pas la gestion du cluster. Notamment, où sont les journaux
-applicatifs et leur contenu. Pour la famille des distributions EL, son
-emplacement est `/etc/sysconfig/pacemaker`. Pour la famille des distributions
-Debian, il sont emplacement est `/etc/default/pacemaker`. Ce fichier en
-concerne QUE l'instance locale de Pacemaker. Contrairement à Corosync, chaque
-instance Pacemaker peut avoir un paramétrage différent, mais cela est bien
-entendu déconseillé.
+The Pacemaker configuration file deals with the behavior of Pacemaker's
+processes, not the cluster management. Information such as where are the traces
+and what is logged can be found there. On the EL familly, the file is stored in
+the `/etc/sysconfig/pacemaker` directory. On Debian, it's located in
+`/etc/default/pacemaker`. This file is relevant only for the local instance of
+Pacemaker. Unlike Corosync's configuration, each node can have a different
+file, but this practice is not recommended.
 
 :::
 
 -----
 
-### TP: Authentification de pcs
+### Practical work: pcs authentication
 
 ::: notes
 
-1. positionner un mot de passe pour l'utilisateur `hacluster` sur chaque nœud
+1. create a password for the `hacluster` user on each node.
 
-L'outil `pcs` se sert de l'utilisateur système `hacluster` pour s'authentifier
-auprès de `pcsd`. Puisque les commandes de gestion du cluster peuvent être
-exécutées depuis n'importe quel membre du cluster, il est recommandé de
-configurer le même mot de passe pour cet utilisateur sur tous les nœuds pour
-éviter les confusions.
+The `pcs` tool uses the `hacluster` system user for the authentication with
+`pcsd`.  Since the cluster management commands can be executed from any member
+of the cluster, it is advised to configure the same password on all node to
+avoid mixing them up.
 
-2. authentifier les membres du cluster entre eux
+2. authenticate all cluster members with each other
 
-Remarque: à partir de Pacemaker 2, cette commande doit être exécutée sur chaque
-nœud du cluster.
+Note: since Pacemaker 2, the command must be executed on each node of the
+cluster.
 
 :::
 
 -----
 
-### Correction: Authentification de pcs
+### Correction: pcs authentiation
 
 ::: notes
 
-1. positionner un mot de passe pour l'utilisateur `hacluster` sur chaque nœud
+1. create a password for the `hacluster` user on each node.
 
 ~~~console
 # passwd hacluster
 ~~~
 
-2. authentifier les membres du cluster entre eux
+2. authenticate all cluster members with each other
 
 ~~~console
 # pcs cluster auth hanode1 hanode2 hanode3 -u hacluster
@@ -620,46 +626,45 @@ nœud du cluster.
 
 -----
 
-### TP: Création du cluster avec pcs
+### Practical work: Cluster creation with pcs
 
 ::: notes
 
-Les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+The `pcs` commands can be executed from any node.
 
-1. créer un cluster nommé `cluster_tp` incluant les trois nœuds `hanode1`,
-   `hanode2` et `hanode3`
-2. trouver le fichier de configuration de corosync sur les trois nœuds
-3. vérifier que le fichier de configuration de corosync est identique partout
-4. activer le mode debug de Pacemaker pour les sous processus `crmd`,
-`pengine`, `attrd` et `lrmd`
+1. create a cluster called `cluster_tp` with three node `hanode1`, `hanode2` and
+   `hanode3`
+2. find the corosync configuration file on all three nodes
+3. check that the configuration file is identical on all three nodes
+4. enable the debug mode in Pacemaker for the `crmd`, `pengine`, `attrd` and
+   `lrmd` sub processes.
 
-Afin de pouvoir mieux étudier Pacemaker, nous activons le mode debug de des
-sous processus `crmd`, `pengine`, `attrd` et `lrmd` que nous aborderons dans la suite de
-cette formation.
+We activate the debug mode for the `crmd`, `pengine`, `attrd` and `lrmd` in
+order to have an easier time studying Pacemaker. This will be very useful during
+the workshop.
 
 :::
 
 -----
 
-### Correction: Création du cluster avec pcs
+### Correction: Cluster creation with pcs
 
 ::: notes
 
-Les commandes `pcs` peuvent être exécutées depuis n'importe quel nœud.
+The `pcs` commands can be executed from any node.
 
-1. créer un cluster nommé `cluster_tp` incluant les trois nœuds `hanode1`,
-   `hanode2` et `hanode3`
+1. create a cluster called `cluster_tp` with three node `hanode1`, `hanode2` and
+   `hanode3`
 
 ~~~console
 # pcs cluster setup --name cluster_tp hanode1 hanode2 hanode3
 ~~~
 
-2. trouver le fichier de configuration de corosync sur les trois nœuds
+2. find the corosync configuration file on all three nodes
 
-Le fichier de configuration de Corosync se situe à l'emplacement
-`/etc/corosync/corosync.conf`.
+Corosync's configuration file is located here: `/etc/corosync/corosync.conf`.
 
-3. vérifier que le fichier de configuration de corosync est identique partout
+3. check that the configuration file is identical on all three nodes
 
 ~~~console
 root@hanode1# md5sum /etc/corosync/corosync.conf
@@ -672,133 +677,194 @@ root@hanode3# md5sum /etc/corosync/corosync.conf
 564b9964bc03baecf42e5fa8a344e489  /etc/corosync/corosync.conf
 ~~~
 
-4. activer le mode debug de Pacemaker pour les sous processus `crmd`, `pengine`
-   et `lrmd`
+4. enable the debug mode in Pacemaker for the `crmd`, `pengine`, `attrd` and
+   `lrmd` sub processes.
 
-Éditer la variable `PCMK_debug` dans le fichier de configuration
-`/etc/sysconfig/pacemaker` :
+Edit the `PCMK_debug` variable in the configuration file
+`/etc/sysconfig/pacemaker`:
 
 ~~~console
 PCMK_debug=crmd,pengine,lrmd,attrd
 ~~~
 
-Pour obtenir l'ensemble des messages de debug de tous les processus,
-positionner ce paramètre à `yes`.
+You can trace all the debug messages from all processes by setting this
+parameter to `yes`.
 
 :::
 
 -----
 
-## Démarrage du cluster
+## Cluster startup
 
-* cluster créé mais pas démarré
-* désactiver Pacemaker au démarrage des serveurs
-* utilisation de `pcs` pour démarrer le cluster
+FR * cluster créé mais pas démarré
+FR * désactiver Pacemaker au démarrage des serveurs
+FR * utilisation de `pcs` pour démarrer le cluster
+FR
+* the cluster is created but not started
+* disable Pacemaker on server startup
+* use `pcs` to start the cluster
 
 ::: notes
 
-Une fois le cluster créé, ce dernier n'est pas démarré automatiquement. Il est
-déconseillé de démarrer Pacemaker automatiquement au démarrage des serveurs. En
-cas d'incident et de fencing, un nœud toujours défaillant pourrait déstabiliser
-le cluster et provoquer des interruptions de services suite à un retour
-automatique prématuré. En forçant l'administrateur à devoir démarrer Pacemaker
-manuellement, celui-ci a alors tout le loisir d'intervenir, d'analyser
-l'origine du problème et éventuellement d'effectuer des actions correctives
-avant de réintégrer le nœud, sain, dans le cluster.
+FR Une fois le cluster créé, ce dernier n'est pas démarré automatiquement. Il est
+FR déconseillé de démarrer Pacemaker automatiquement au démarrage des serveurs. En
+FR cas d'incident et de fencing, un nœud toujours défaillant pourrait déstabiliser
+FR le cluster et provoquer des interruptions de services suite à un retour
+FR automatique prématuré. En forçant l'administrateur à devoir démarrer Pacemaker
+FR manuellement, celui-ci a alors tout le loisir d'intervenir, d'analyser
+FR l'origine du problème et éventuellement d'effectuer des actions correctives
+FR avant de réintégrer le nœud, sain, dans le cluster.
+FR
+The cluster is not automatically started once it's creation. It's discouraged
+to enable Pacemaker's startup at boot time. In case of outage or fencing, a
+failing node could destabilize the cluster and provoque a downtime because
+it joined the cluster prematurely. By forcing the administrator to start
+Pacemaker manually, we give him time to intervene, analyze the origin of the
+problem and conduct corrective mesure if necessary, before reintroducing the
+node into the cluster.
 
-Le démarrage du cluster nécessite la présence des deux services Corosync et
-Pacemaker sur tous les nœuds. Démarrer d'abord les services Corosync puis
-Pacemaker. À noter que démarrer Pacemaker suffit souvent sur de nombreuses
-distributions Linux, Corosync étant démarré automatiquement comme dépendance.
+FR Le démarrage du cluster nécessite la présence des deux services Corosync et
+FR Pacemaker sur tous les nœuds. Démarrer d'abord les services Corosync puis
+FR Pacemaker. À noter que démarrer Pacemaker suffit souvent sur de nombreuses
+FR distributions Linux, Corosync étant démarré automatiquement comme dépendance.
+FR
+Cluster startup requires the presence of the Corosync and Pacemaker services on
+all nodes. Corosync should be started first then Pacemaker. On most Linux
+distribution, starting Pacemaker is enough, since Corosync  will be started
+automatically as a dependency.
 
-Plutôt que de lancer manuellement Pacemaker sur chaque nœud, il est possible
-de sous traiter cette tâche aux daemons `pcsd` avec une unique commande `pcs`.
+FR Plutôt que de lancer manuellement Pacemaker sur chaque nœud, il est possible
+FR de sous traiter cette tâche aux daemons `pcsd` avec une unique commande `pcs`.
+FR
+Instead of starting Pacemaker manually on each node, it's possible to delagate
+this task to the `pcsd` daemons thanks to a single `pcs` command.
 
 :::
 
 -----
 
-### TP: Démarrage du cluster
+### Practical work: Starting the cluster
 
 ::: notes
 
-1. désactiver Pacemaker et Corosync au démarrage du serveur
-2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
-3. vérifier l'état de Pacemaker et Corosync
+FR 1. désactiver Pacemaker et Corosync au démarrage du serveur
+FR 2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
+FR 3. vérifier l'état de Pacemaker et Corosync
+FR
+1. deactivate Pacemaker and Corosync at server startup
+2. start Pacemaker and Corosync on all nodes using `pcs`
+3. verify the state of Pacemaker and Corosync
 
 :::
 
 -----
 
-### Correction: Démarrage du cluster
+### Correction: Starting the cluster
 
 ::: notes
 
-1. désactiver Pacemaker et Corosync au démarrage du serveur
+FR 1. désactiver Pacemaker et Corosync au démarrage du serveur
+FR
+FR Sur tous les serveurs:
+FR
+1. deactivate Pacemaker and Corosync at server startup
 
-Sur tous les serveurs:
+On all servers:
 
 ~~~console
 # systemctl disable corosync pacemaker
 ~~~
 
-Ou, depuis un seul des serveurs:
+FR Ou, depuis un seul des serveurs:
+FR
+Or from one of the servers:
 
 ~~~console
 # pcs cluster disable --all
 ~~~
 
-2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
+FR 2. démarrer Pacemaker et Corosync sur tous les nœuds à l'aide de `pcs`
+FR
+2. start Pacemaker and Corosync on all nodes using `pcs`
 
 ~~~console
 # pcs cluster start --all
 ~~~
 
-3. vérifier l'état de Pacemaker et Corosync
+FR 3. vérifier l'état de Pacemaker et Corosync
+FR
+FR Sur chaque serveur, exécuter:
+FR
+3. verify the state of Pacemaker and Corosync
 
-Sur chaque serveur, exécuter:
+On each server, execute:
 
 ~~~
 # systemctl status pacemaker corosync
 ~~~
 
-Ou:
+Or:
 
 ~~~
 # pcs status
 ~~~
 
-Nous observons que les deux services sont désactivés au démarrage des
-serveurs et actuellement démarrés.
+FR Nous observons que les deux services sont désactivés au démarrage des
+FR serveurs et actuellement démarrés.
+FR
+We can see that both services are running and have been disabled at server
+startup.
 
 :::
 
 -----
 
-## Visualiser l'état du cluster
+## Visualize the cluster state
 
-Pour visualiser l'état du cluster :
+FR Pour visualiser l'état du cluster :
+FR
+FR * `crm_mon`: commande livrée avec Pacemaker
+FR * `pcs`
+FR
+To visualize the cluster state:
 
-* `crm_mon`: commande livrée avec Pacemaker
+* `crm_mon`: a command provided with Pacemaker
 * `pcs`
 
 ::: notes
 
-L'outil `crm_mon` permet de visualiser l'état complet du cluster et des
-ressources. Voici le détail des arguments disponibles :
+FR L'outil `crm_mon` permet de visualiser l'état complet du cluster et des
+FR ressources. Voici le détail des arguments disponibles :
+FR
+FR * `-1`: affiche l'état du cluster et quitte
+FR * `-n`: regroupe les ressources par nœuds
+FR * `-r`: affiche les ressources non actives
+FR * `-f`: affiche le nombre fail count pour chaque ressource
+FR * `-t`: affiche les dates des événements
+FR * `-c`: affiche les tickets du cluster (utile pour les cluster étendus sur réseau WAN)
+FR * `-L`: affiche les contraintes de location négatives
+FR * `-A`: affiche les attributs des nœuds
+FR * `-R`: affiche plus de détails (node IDs, individual clone instances)
+FR * `-D`: cache l'entête
+FR
+FR Voici des exemples d'utilisation:
+FR
+The `crm_mon` tool is geared to the visualisation of the state of the cluster
+as a whole, including it's resources. Here is the detail of the available
+arguments:
 
-* `-1`: affiche l'état du cluster et quitte
-* `-n`: regroupe les ressources par nœuds
-* `-r`: affiche les ressources non actives
-* `-f`: affiche le nombre fail count pour chaque ressource
-* `-t`: affiche les dates des événements
-* `-c`: affiche les tickets du cluster (utile pour les cluster étendus sur réseau WAN)
-* `-L`: affiche les contraintes de location négatives
-* `-A`: affiche les attributs des nœuds
-* `-R`: affiche plus de détails (node IDs, individual clone instances)
-* `-D`: cache l'entête
+* `-1`: displays the state of the cluster and exits
+* `-n`: gathers resources on a per node basis
+* `-r`: displays the active resources
+* `-f`: displays the fail count for each node
+* `-t`: displays the dates of the events
+* `-c`: displays the tickets of the cluster (useful for extended clusters on WAN networks)
+* `-L`: displays the negative location constraints
+* `-A`: displays the node attributes
+* `-R`: displays mode detailed information (node IDs, individual clone instances)
+* `-D`: hide the header
 
-Voici des exemples d'utilisation:
+Here are some examples:
 
 ~~~console
 # crm_mon -DnA
@@ -806,12 +872,20 @@ Voici des exemples d'utilisation:
 # crm_mon -1frntcLAR
 ~~~
 
-À noter que ces différents arguments peuvent être aussi activés ou désactivés
-dans le mode interactif.
+FR À noter que ces différents arguments peuvent être aussi activés ou désactivés
+FR dans le mode interactif.
+FR
+FR L'outil `pcs` contient quelques commandes utiles pour consulter l'état d'un
+FR cluster, mais n'a pas de mode interactif. Voici quelques exemples
+FR d'utilisation:
+FR
 
-L'outil `pcs` contient quelques commandes utiles pour consulter l'état d'un
-cluster, mais n'a pas de mode interactif. Voici quelques exemples
-d'utilisation:
+Please note that these arguments can also be toggle on and off in interactive
+mode.
+
+The `pcs` tool comes equiped with several commands that are useful to display
+the cluster state, but it doesn't have an interactive mode. Here are few
+examples of their usage:
 
 ~~~console
 # pcs cluster status
@@ -824,11 +898,13 @@ d'utilisation:
 
 -----
 
-### TP: Visualiser l'état du cluster
+### Practical work: Cluster state visualization
 
 ::: notes
 
-Expérimenter avec les commandes vues précédemment et leurs arguments.
+FR Expérimenter avec les commandes vues précédemment et leurs arguments.
+FR
+Experiment with the commands listed before and their arguments.
 
 :::
 
@@ -836,33 +912,56 @@ Expérimenter avec les commandes vues précédemment et leurs arguments.
 
 # Corosync
 
-Rapide tour d'horizon sur Corosync.
+FR Rapide tour d'horizon sur Corosync.
+FR
+A Quick overview of Corosync.
 
 -----
 
-## Présentation
+## Presentation
 
-* couche de communication bas niveau du cluster
-* créé en 2004
-* dérivé de OpenAIS
-* avec des morceaux de CMAN dedans ensuite (à vérifier)
+FR * couche de communication bas niveau du cluster
+FR * créé en 2004
+FR * dérivé de OpenAIS
+FR * avec des morceaux de CMAN dedans ensuite (à vérifier)
+FR
+* communication layer of the clusterware
+* created in 2004
+* derived from OpenAIS
+* with some components from CMAN
+<!-- Vérifier le a vérifier -->
 
 ::: notes
 
-Corosync est un système de communication de groupe (`GCS`). Il fournit
-l'infrastructure nécessaire au fonctionnement du cluster en mettant à
-disposition des APIs permettant la communication et d'adhésion des membres au
-sein du cluster. Corosync fournit notamment des notifications de gain ou de
-perte du quorum qui sont utilisés pour mettre en place la haute disponibilité.
+FR Corosync est un système de communication de groupe (`GCS`). Il fournit
+FR l'infrastructure nécessaire au fonctionnement du cluster en mettant à
+FR disposition des APIs permettant la communication et d'adhésion des membres au
+FR sein du cluster. Corosync fournit notamment des notifications de gain ou de
+FR perte du quorum qui sont utilisés pour mettre en place la haute disponibilité.
+FR
+Corosync is a group communication system (_GCS_). It provides the
+infrastructure necessary for the cluster to operate by providing API for
+communication and cluster membership. Among other features, it also provides
+notification for the gain or loss of quorum which is important to archive high
+availability.
 
-Son fichier de configuration se trouve à l'emplacement
-`/etc/corosync/corosync.conf`. En cas de modification manuelle, il faut
-__ABSOLUMENT__ veiller à conserver une configuration identique sur tous les
-nœuds. Cela peut être fait manuellement ou avec la commande `pcs cluster sync`.
+FR Son fichier de configuration se trouve à l'emplacement
+FR `/etc/corosync/corosync.conf`. En cas de modification manuelle, il faut
+FR __ABSOLUMENT__ veiller à conserver une configuration identique sur tous les
+FR nœuds. Cela peut être fait manuellement ou avec la commande `pcs cluster sync`.
+FR
+It's configuration is located in `/etc/corosync/corosync.conf`. In case of
+manual update, it is paramount to propagate the modifications on all nodes and
+ensure that all nodes have the same configuration. This can be done manually
+or with the command `pcs cluster sync`.
 
-La configuration de corosync est décrite dans la page de manuel
-`corosync.conf`. Ses fonctionnalités liées au quorum sont décrites dans le
-manuel nommé `votequorum`.
+FR La configuration de corosync est décrite dans la page de manuel
+FR `corosync.conf`. Ses fonctionnalités liées au quorum sont décrites dans le
+FR manuel nommé `votequorum`.
+FR
+The Corosync configuration is described in length in the man page for
+`corosync.conf`. The parameters describing quorum are described in the man page
+for `votequorum`.
 
 :::
 
@@ -870,160 +969,280 @@ manuel nommé `votequorum`.
 
 ## Architecture
 
-* corosync expose ses fonctionnalités sous forme de services, eg. :
-  * `cgp` : API de gestion de groupe de processus ;
-  * `cmap` : API de gestion de configuration ;
-  * `votequorum` : API de gestion du quorum.
+FR * corosync expose ses fonctionnalités sous forme de services, eg. :
+FR   * `cgp` : API de gestion de groupe de processus ;
+FR   * `cmap` : API de gestion de configuration ;
+FR   * `votequorum` : API de gestion du quorum.
+FR
+* corosync exposes it's functionnalities as servises, e.g.:
+  * `cpg` (closed process group): process group & membership management API;
+  * `cmap`: configuration management API;
+  * `votequorum`: quorum managment API.
+<!-- pas sur pour cpg -->
 
 ::: notes
 
-Corosync s'appuie sur une ensemble de services internes pour proposer plusieurs APIs aux applications
-qui l'utilisent.
+FR Corosync s'appuie sur une ensemble de services internes pour proposer plusieurs APIs aux applications
+FR qui l'utilisent.
+FR
+FR Corosync expose notamment l'api `cpg` dont l'objet est d'assurer le moyen de
+FR communication d'une applications distribuées. Cette api permet de gérer :
+FR
+FR * l'entrée et la sortie des membres dans un ou plusieurs groupes ;
+FR * la propagation des messages à l'ensemble des membres des groupes ;
+FR * la propagation des changements de configuration ;
+FR * l'ordre de délivrance des messages.
+FR
+Corosync relies on a set of internal services to propose several API to its
+client applications.
 
-Corosync expose notamment l'api `cpg` dont l'objet est d'assurer le moyen de
-communication d'une applications distribuées. Cette api permet de gérer :
+One of those API is `cpg` whose role is to provide means of communication for
+distributed applications. This API can manage:
 
-* l'entrée et la sortie des membres dans un ou plusieurs groupes ;
-* la propagation des messages à l'ensemble des membres des groupes ;
-* la propagation des changements de configuration ;
-* l'ordre de délivrance des messages.
+* the entry or exit of members in one or more groups;
+* the propagation of messages to all members of said groups;
+* the propagation of configuration changes;
+* the order of delivery of messages.
 
-Corosync utilise `cmap` pour gérer et stocker sa configuration sous forme de stockage
-clé-valeur. Cette API est également mise à disposition des applications qui utilisent corosync.
-Pacemaker s'en sert notamment pour récupérer certaines informations sur le cluster et
-ses membres.
+FR Corosync utilise `cmap` pour gérer et stocker sa configuration sous forme de stockage
+FR clé-valeur. Cette API est également mise à disposition des applications qui utilisent corosync.
+FR Pacemaker s'en sert notamment pour récupérer certaines informations sur le cluster et
+FR ses membres.
+FR
+Corosync uses `cmap` to manage and store it's configuration in the form of a
+key value store. This API is also available for the client applications of
+Corosync. For example, Pacemaker uses it to fetch some information from the
+cluster and it's members.
 
-Le service `votequorum` permet à corosync de fournir des notifications sur la gain ou la
-perte du quorum dans le cluster, le nombre de vote courant, etc.
+FR Le service `votequorum` permet à corosync de fournir des notifications sur la gain ou la
+FR perte du quorum dans le cluster, le nombre de vote courant, etc.
+FR
+The `votequorum` service is designed to provide notification when quorum is
+archived or lost in the cluster, about the number of nodes in the cluster,
+etc.
 
 :::
 
 -----
 
-## Fonctionnalités de corosync 3
+## Corosync 3 features
 
-Nouvelle librairie `kronosnet` (`knet`):
+FR Nouvelle librairie `kronosnet` (`knet`):
+FR
+FR * évolution du chiffrement
+FR * redondance des canaux de communications
+FR * compression
+FR
 
-* évolution du chiffrement
-* redondance des canaux de communications
+New library `kronosnet` (`knet`):
+
+* cryptography
+* redundancy of channels
 * compression
 
 ::: notes
 
-Corosync3 utilise la librairie kronosnet (`knet`). Cette libraire :
+FR Corosync3 utilise la librairie kronosnet (`knet`). Cette libraire :
+FR
+FR * remplace les modes de transport `multicast` et `unicast` ;
+FR * remplace le protocole `RRP` (_Redundant Ring Protocole_).
+FR
+Corosync 3 uses the `kronosnet` (`knet`) library, which:
 
-* remplace les modes de transport `multicast` et `unicast` ;
-* remplace le protocole `RRP` (_Redundant Ring Protocole_).
+* replaces the `multicast` and `unicast` method,
+* replaces the `RRP` protocol (_Redundant Ring Protocol_)
 
-Corosync implémente le protocole _Totem Single Ring Ordering and Membership_ pour la gestion
-des messages et des groupes. Il est possible de redonder les canaux de communications ou liens
-en créant plusieurs interfaces (option `totem` > `interface` > `linknumber`) qui seront
-utilisés comme support des rings (option `nodelist` > `node` > `ringX_addr`). `knet` permet
-de créer jusqu'à 8 liens avec des protocoles et des priorités différentes.
+FR Corosync implémente le protocole _Totem Single Ring Ordering and Membership_ pour la gestion
+FR des messages et des groupes. Il est possible de redonder les canaux de communications ou liens
+FR en créant plusieurs interfaces (option `totem` > `interface` > `linknumber`) qui seront
+FR utilisés comme support des rings (option `nodelist` > `node` > `ringX_addr`). `knet` permet
+FR de créer jusqu'à 8 liens avec des protocoles et des priorités différentes.
+FR
+FR Le chiffrement peut être configuré soit avec l'option `totem` > `secauth` soit avec les
+FR paramètres `totem` > `crypto_model`, `totem` > `crypto_cipher` et `totem` > `crypto_hash`.
+FR
+FR Il est également possible d'utiliser la compression.
+FR
+Corosync implements the _Totem Single Ring Ordering and Membership_ protocol
+for its message and group management. It's possible to add redundancy for
+communication channels and network links by creating several interfaces
+(`totem` > `interface` > `linknumer` option) which will be used by the rings
+(`nodelist` > `node` > `ringX_addr`). `knet` allows for the creation of
+up to 8 links with different protocols and priorities.
 
-Le chiffrement peut être configuré soit avec l'option `totem` > `secauth` soit avec les
-paramètres `totem` > `crypto_model`, `totem` > `crypto_cipher` et `totem` > `crypto_hash`.
+Cryptography can be configured either with the option `totem` > `secauth` or
+the parameters `totem` > `crypto_model`, `totem` > `crypto_cipher` and `totem`
+> `crypto_hash`.
 
-Il est également possible d'utiliser la compression.
-
-:::
-
------
-
-## Clusters à deux nœuds
-
-* paramètre dédié : `two_node: 1`
-* option héritée de CMAN
-* requiers `expected-votes: 2`
-* implique `wait_for_all: 1`
-* requiers un fencing hardware configuré sur la même interface que le heartbeat
-
-::: notes
-
-Considérons un cluster à deux nœuds avec un vote par nœud. Le nombre de vote
-attendu est 2 (`expected-votes`), il n'est donc pas possible d'avoir une
-majorité en cas de partition du cluster. La configuration `two_node` permet de
-fixer artificiellement le quorum à 1 et de résoudre ce problème.
-
-Ce paramétrage, implique `wait_for_all : 1` qui empêche le cluster d'établir
-une majorité tant que l'ensemble des nœuds n'est pas présent. Ce qui évite une
-partition au démarrage du cluster.
-
-En cas de partition réseau, les deux nœuds font la course pour fencer l'autre.
-Le nœud vainqueur conserve alors le quorum grâce au paramètre `two_node: 1`.
-Quand au second nœud, après redémarrage de Pacemaker, si la partition réseau
-existe toujours, ce dernier n'obtient donc pas le quorum grâce au paramètre
-`wait_for_all: 1` et en conséquence ne peut démarrer aucune ressource.
-
-Même si elle fonctionne, ce genre de configuration n'est cependant pas
-optimale. Comme en témoigne
-[cet article du blog de clusterlabs](http://blog.clusterlabs.org/blog/2018/two-node-problems).
+It's also possible to use compression.
 
 :::
 
 -----
 
-## Outils
+## Two node clusters
 
-Corosync installe plusieurs outils:
-
-* `corosync-cfgtool` : administration, paramétrage
-* `corosync-cpgtool` : visualisation des différents groupes CPG
-* `corosync-cmapctl` : administration de la base d'objets
-* `corosync-quorumtool` : gestion du quorum
+FR * paramètre dédié : `two_node: 1`
+FR * option héritée de CMAN
+FR * requiers `expected-votes: 2`
+FR * implique `wait_for_all: 1`
+FR * requiers un fencing hardware configuré sur la même interface que le heartbeat
+FR
+* dedicated parameter: `two_node: 1`
+* inherited from CMAN
+* requires: `expected-votes: 2`
+* implies: `wait_for_all: 1`
+* requiers a fencing hardware configured on the same interface as the
+  heartbeat.
 
 ::: notes
 
-`corosync-cfgtool` permet de :
+FR Considérons un cluster à deux nœuds avec un vote par nœud. Le nombre de vote
+FR attendu est 2 (`expected-votes`), il n'est donc pas possible d'avoir une
+FR majorité en cas de partition du cluster. La configuration `two_node` permet de
+FR fixer artificiellement le quorum à 1 et de résoudre ce problème.
+FR
+Given a two cluster node with one vote per node, the number of expected vote is
+2 (`expected-votes`). Therefore, it's not possible to have a majority in case
+of cluster partition. The `two_node` parameter fixes this problem by fixing the
+quorum at a value of 1.
 
-* arrêter corosync sur le serveur ;
-* récupérer l'IP d'un nœud ;
-* tuer un nœud ;
-* récupérer des informations sur les rings et réinitialiser leur statut ;
-* demander à l'ensemble des nœuds de recharger leur configuration.
+CR Ce paramétrage, implique `wait_for_all : 1` qui empêche le cluster d'établir
+CR une majorité tant que l'ensemble des nœuds n'est pas présent. Ce qui évite une
+CR partition au démarrage du cluster.
+CR 
+This configuration implies the usage of `wait_for_all: 1`, which forbids the
+cluster from establishing a majority unless all members of the cluster are
+present. This restriction is designed to avoid a partition during cluster
+startup.
 
-`corosync-cpgtool` permet d'afficher les groupes cpg et leurs membres.
+CR En cas de partition réseau, les deux nœuds font la course pour fencer l'autre.
+CR Le nœud vainqueur conserve alors le quorum grâce au paramètre `two_node: 1`.
+CR Quand au second nœud, après redémarrage de Pacemaker, si la partition réseau
+CR existe toujours, ce dernier n'obtient donc pas le quorum grâce au paramètre
+CR `wait_for_all: 1` et en conséquence ne peut démarrer aucune ressource.
+CR
+In case of network partition, both nodes race to fence the other node. The
+winner keeps the quorum thanks to the parameter `two_node: 1`. If the second
+node is restarted while the partition is still present, it will not be able to
+archive the quorum thanks to the parameter `wait_for_all: 1`. As a result it
+will bot be able to start any ressource.
 
-`corosync-cmapctl` permet de manipuler et consulter la base d'objet de corosync,
-les actions possibles sont :
-
-* lister les valeurs associées aux clés : directement (ex: totem.secauth), par
-préfix(ex: totem.) ou sans filtre ;
-* définir ou supprimer des valeurs ;
-* changer la configuration depuis un fichier externe ;
-* suivre les modifications des clés stockées dans `cmap` en temps réel en filtrant
-sur un préfix ou directement sur un clé.
-
-`corosync-quorumtool` permet d'accéder au service de quorum pour par exemple:
-
-* modifier la configuration des votes (nombre, nombre attendu) ;
-* suivre les modifications de quorum ;
-* lister les nœuds avec leurs nom, id et IPs .
+FR Même si elle fonctionne, ce genre de configuration n'est cependant pas
+FR optimale. Comme en témoigne
+FR [cet article du blog de clusterlabs](http://blog.clusterlabs.org/blog/2018/two-node-problems).
+FR
+Even though this kind of configuration works, it's not optimal as explained in
+[this clusterlab blog
+post](http://blog.clusterlabs.org/blog/2018/two-node-problems).
 
 :::
 
 -----
 
-## TP: utilisation de Corosync
+## Tools
+
+FR Corosync installe plusieurs outils:
+FR
+FR * `corosync-cfgtool` : administration, paramétrage
+FR * `corosync-cpgtool` : visualisation des différents groupes CPG
+FR * `corosync-cmapctl` : administration de la base d'objets
+FR * `corosync-quorumtool` : gestion du quorum
+FR
+Corosync installs several tools:
+
+* `corosync-cfgtool` : administration, configuration
+* `corosync-cpgtool` : cpg group visualization
+* `corosync-cmapctl` : administration of the cmap key value store
+* `corosync-quorumtool` : quorum managment
+<!-- pas sur d'avoir bien compris la ligne cmap -->
 
 ::: notes
 
-1. afficher le statut du ring local avec `corosync-cfgtool`
-2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
-3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
-4. afficher la configuration des nœuds dans la base CMAP avec
-   `corosync-cmapctl` (clé `nodelist`)
-5. afficher l'état du quorum avec `corosync-quorumtool`
+FR `corosync-cfgtool` permet de :
+FR
+FR * arrêter corosync sur le serveur ;
+FR * récupérer l'IP d'un nœud ;
+FR * tuer un nœud ;
+FR * récupérer des informations sur les rings et réinitialiser leur statut ;
+FR * demander à l'ensemble des nœuds de recharger leur configuration.
+FR
+`corosync-cfgtool` can be used to:
+
+* stop corosync on the server;
+* retrieve the IP of a node;
+* kill a node;
+* retrieve information about rings and reinitialize their status;
+* ask all nodes to reload their configuration.
+
+FR `corosync-cpgtool` permet d'afficher les groupes cpg et leurs membres.
+FR
+`corosync-cpgtool` can be used to display cpg groups and members.
+
+FR `corosync-cmapctl` permet de manipuler et consulter la base d'objet de corosync,
+FR les actions possibles sont :
+FR
+FR * lister les valeurs associées aux clés : directement (ex: totem.secauth), par
+FR préfix(ex: totem.) ou sans filtre ;
+FR * définir ou supprimer des valeurs ;
+FR * changer la configuration depuis un fichier externe ;
+FR * suivre les modifications des clés stockées dans `cmap` en temps réel en filtrant
+FR sur un préfix ou directement sur un clé.
+FR
+`corosync-cmapctl` can be used to read and modify data in the key value store
+of corosync, possible actions are:
+
+* list the values for given keys: directrly (e.g.: totem.secauth), using a
+  prefix (e.g.: totem.) or without filters;
+* define or delete values;
+* change the configuration using an external file;
+* follow the modification of keys sorted in `cmap` in realtime.
+
+FR `corosync-quorumtool` permet d'accéder au service de quorum pour par exemple:
+FR
+FR * modifier la configuration des votes (nombre, nombre attendu) ;
+FR * suivre les modifications de quorum ;
+FR * lister les nœuds avec leurs nom, id et IPs .
+FR
+`corosync-quorumtool` can be used to access the quorum service in order to:
+
+* modify the configuration of votes (number & avaited number);
+* follow quorum evolution;
+* list nodes with their name, id and ips.
 
 :::
 
 -----
 
-## Correction: utilisation de Corosync
+## Practice work: Corosync utilisation
 
 ::: notes
 
-1. afficher le statut du ring local avec `corosync-cfgtool`
+FR 1. afficher le statut du ring local avec `corosync-cfgtool`
+FR 2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
+FR 3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
+FR 4. afficher la configuration des nœuds dans la base CMAP avec
+FR    `corosync-cmapctl` (clé `nodelist`)
+FR 5. afficher l'état du quorum avec `corosync-quorumtool`
+FR
+1. display the local ring status with `corosync-cfgtool`
+2. display the IP of each node with `corosync-cfgtool`
+3. display CPG groups and members with `corosync-cpgtool`
+4. display the configuration of each node from the CMAP base with
+   `corosync-cmapctl` (key: `nodelist`)
+5. display the state of the quorum with `corosync-quorumtool`
+
+:::
+
+-----
+
+## Correction: Corosync utilisation
+
+::: notes
+
+FR 1. afficher le statut du ring local avec `corosync-cfgtool`
+FR
+1. display the local ring status with `corosync-cfgtool`
 
 ~~~console
 # corosync-cfgtool -s
@@ -1034,7 +1253,9 @@ RING ID 0
   status  = ring 0 active with no faults
 ~~~
 
-2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
+FR 2. afficher l'IP de chaque nœud avec `corosync-cfgtool`
+FR
+2. display the IP of each node with `corosync-cfgtool`
 
 ~~~console
 # corosync-cfgtool -a 1
@@ -1047,7 +1268,9 @@ RING ID 0
 10.20.30.8
 ~~~
 
-3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
+FR 3. afficher les groupes CPG et leurs membres avec `corosync-cpgtool`
+FR
+3. display CPG groups and members with `corosync-cpgtool`
 
 ~~~console
 # corosync-cpgtool -e
@@ -1074,11 +1297,17 @@ pacemakerd
 		      6721	         2 (10.20.30.7)
 ~~~
 
-Chaque sous-processus de pacemaker est associé à un groupe de communication
-avec leur équivalents sur les autres nœuds du cluster.
+FR Chaque sous-processus de pacemaker est associé à un groupe de communication
+FR avec leur équivalents sur les autres nœuds du cluster.
+FR
+Each sub process of pacemaker is part of a communication group with it's
+counterpart on the other nodes.
 
-4. afficher la configuration des nœuds dans la base CMAP avec
-   `corosync-cmapctl` (clé `nodelist`)
+FR 4. afficher la configuration des nœuds dans la base CMAP avec
+FR    `corosync-cmapctl` (clé `nodelist`)
+FR
+4. display the configuration of each node from the CMAP base with
+   `corosync-cmapctl` (key: `nodelist`)
 
 ~~~console
 # corosync-cmapctl -b nodelist
@@ -1091,7 +1320,9 @@ nodelist.node.2.nodeid (u32) = 3
 nodelist.node.2.ring0_addr (str) = hanode3
 ~~~
 
-5. afficher l'état du quorum avec `corosync-quorumtool`
+FR 5. afficher l'état du quorum avec `corosync-quorumtool`
+FR
+5. display the state of the quorum with `corosync-quorumtool`
 
 ~~~console
 # corosync-quorumtool
@@ -1125,16 +1356,21 @@ Membership information
 -----
 
 
-# Composants du cluster
+# Components of the cluster
 
 ![Diagramme complet](medias/pcmk-archi-all.png)
 
 ::: notes
 
-Dans ce chapitre, nous abordons rapidement l'architecture de Pacemaker en détaillant ses
-sous processus. Le but est de comprendre le rôle de chaque brique et ainsi mieux
-diagnostiquer l'état du cluster, son paramétrage et savoir interpréter les messages de
-log correctement. Voici les différents processus tel que démarrés par Pacemaker:
+FR Dans ce chapitre, nous abordons rapidement l'architecture de Pacemaker en détaillant ses
+FR sous processus. Le but est de comprendre le rôle de chaque brique et ainsi mieux
+FR diagnostiquer l'état du cluster, son paramétrage et savoir interpréter les messages de
+FR log correctement. Voici les différents processus tel que démarrés par Pacemaker:
+FR
+In this chapter, we will do an overview of Pacemaker's architecture and focus
+on it's sub processes. The objective is to understand the role of each part in
+order to have an easier time diagnosing the cluster state, understanding it's
+configuration and interpreting the log messages correctly.
 
 ~~~
 /usr/sbin/pacemakerd -f
@@ -1146,17 +1382,28 @@ log correctement. Voici les différents processus tel que démarrés par Pacemak
 \_ /usr/libexec/pacemaker/crmd
 ~~~
 
-Le diagramme présente les différents éléments de Pacemaker au sein d'un cluster à trois
-nœuds. Une vue plus détaillée mais centrée sur un seul nœud est présenté dans la
-documentation de Pacemaker. Voir:
+FR Le diagramme présente les différents éléments de Pacemaker au sein d'un cluster à trois
+FR nœuds. Une vue plus détaillée mais centrée sur un seul nœud est présenté dans la
+FR documentation de Pacemaker. Voir:
+FR
+FR [Schémas de l'architecture interne de Pacemaker](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_pacemaker_architecture.html#_internal_components)
+FR
+This diagram shows the different components of Pacemaker in a three node
+cluster. A more detailed view, focused on a single node is present in
+Pacemaker's documentation. See:
 
-[Schémas de l'architecture interne de Pacemaker](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_pacemaker_architecture.html#_internal_components)
+[Schemas of the internal architecture of Pacemaker](http://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_pacemaker_architecture.html#_internal_components)
 
-Cette architecture et le paramétrage de Pacemaker permet de supporter différents types de
-scénario de cluster dont certains (vieux) exemples sont présentés dans le wiki de
-Pacemaker:
+FR Cette architecture et le paramétrage de Pacemaker permet de supporter différents types de
+FR scénario de cluster dont certains (vieux) exemples sont présentés dans le wiki de
+FR Pacemaker:
+FR
+FR [Schémas des différentes configuration de nœuds possibles avec Pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
+FR
+This architecture is designed to support different types of clusters. Some
+(old) example are present in the Pacemaker wiki:
 
-[Schémas des différentes configuration de nœuds possibles avec Pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
+[Schemas of different cluster configuration in pacemaker](https://wiki.clusterlabs.org/wiki/Pacemaker#Example_Configurations)
 
 :::
 
@@ -1165,31 +1412,57 @@ Pacemaker:
 
 ## Cluster Information Base (CIB)
 
-* détient la configuration du cluster
-* l'état des différentes ressources
-* un historique des actions exécutées
-* stockage fichier au format XML
-* synchronisé automatiquement entre les nœuds
-* historisé
-* géré par le processus `cib`
-* renommé `pacemaker-based` depuis la version 2.0
+FR * détient la configuration du cluster
+FR * l'état des différentes ressources
+FR * un historique des actions exécutées
+FR * stockage fichier au format XML
+FR * synchronisé automatiquement entre les nœuds
+FR * historisé
+FR * géré par le processus `cib`
+FR * renommé `pacemaker-based` depuis la version 2.0
+FR
+* contains:
+  - the cluster configuration
+  - the state of the resources
+  - an history of the latest actions
+* stored in XML format
+* automatically synchronized between nodes
+* archived
+* managed by the `cib` process
+  - renamed `pacemaker-based` since version 2.0
 
 ::: notes
 
-La CIB est la représentation interne de la configuration et de l'état des composantes du
-cluster. C'est un fichier XML, créée par Pacemaker à l'initialisation du cluster et qui
-évolue ensuite au fil des configurations et évènements du cluster.
+FR La CIB est la représentation interne de la configuration et de l'état des composantes du
+FR cluster. C'est un fichier XML, créée par Pacemaker à l'initialisation du cluster et qui
+FR évolue ensuite au fil des configurations et évènements du cluster.
+FR
+The CIB is a internal representation of the configuration and state of the
+cluster's components and resources. It's an XML file, created by Pacemaker
+during cluster initialization. It evolves as the cluster configuration changes
+and events takes place in the cluster.
 
-En fonction de cet ensemble d'états et du paramétrage fourni, le cluster détermine l'état
-idéal de chaque ressource qu'il gère (démarré/arrêté/promu et sur quel serveur) et
-calcule les transitions permettant d'atteindre cet état.
+FR En fonction de cet ensemble d'états et du paramétrage fourni, le cluster détermine l'état
+FR idéal de chaque ressource qu'il gère (démarré/arrêté/promu et sur quel serveur) et
+FR calcule les transitions permettant d'atteindre cet état.
+FR
+From the component states and configuration, the cluster determines the ideal
+state for each managed resource (started/stopped/promoted and on which server)
+and computes the transitions necessary to reach this state.
 
-Le processus `cib` est chargé d'appliquer les modifications dans la CIB, de
-conserver les information transitoires en mémoire (statuts, certains scores, etc) et de
-notifier les autres processus de ces modifications si nécessaire.
+FR Le processus `cib` est chargé d'appliquer les modifications dans la CIB, de
+FR conserver les information transitoires en mémoire (statuts, certains scores, etc) et de
+FR notifier les autres processus de ces modifications si nécessaire.
+FR
+The `cib` process (`pacemaker-based`) is tasked to apply the modification
+inside the CIB, keep track of transient information (status, some scores, etc.)
+ad notify the other processes of the changes if it's necessary.
 
-Le contenu de la CIB est historisé puis systématiquement synchronisé entre les nœuds à
-chaque modification. Ces fichiers sont stockés dans `/var/lib/pacemaker/cib` :
+FR Le contenu de la CIB est historisé puis systématiquement synchronisé entre les nœuds à
+FR chaque modification. Ces fichiers sont stockés dans `/var/lib/pacemaker/cib` :
+FR
+The content of the CIB is archived and synchronized between all nodes after
+each modification. These files are stored in `/var/lib/pacemaker/cib`.
 
 ~~~
 ls /var/lib/pacemaker/cib/ -alh
@@ -1213,28 +1486,43 @@ drwxr-x--- 6 hacluster haclient 4.0K Feb  7 12:16 ..
 -rw------- 1 hacluster haclient   32 Feb  7 16:46 cib.xml.sig
 ~~~
 
-`cib.xml` correspond à la version courante de la CIB, les autres fichiers `cib-*.raw`,
-aux versions précédentes.
+FR `cib.xml` correspond à la version courante de la CIB, les autres fichiers `cib-*.raw`,
+FR aux versions précédentes.
+FR
+`cib.xml` is the current version of the CIB, the `cib-*.raw` files are older
+versions of it.
 
-Par défaut, Pacemaker conserve toutes les versions de la CIB depuis la création du
-cluster. Il est recommandé de limiter ce nombre de fichier grâce aux paramètres
-`pe-error-series-max`, `pe-warn-series-max` et `pe-input-series-max`.
+FR Par défaut, Pacemaker conserve toutes les versions de la CIB depuis la création du
+FR cluster. Il est recommandé de limiter ce nombre de fichier grâce aux paramètres
+FR `pe-error-series-max`, `pe-warn-series-max` et `pe-input-series-max`.
+FR
+By default, Pacemaker keep all the versions of the CIB since cluster creation.
+It's advised to limit the amount of files kept with the parameters:
+`pe-error-series-max`, `pe-warn-series-max` and `pe-input-series-max`.
 
-Il n'est pas recommandé d'éditer la CIB directement en XML. Préférez toujours utiliser
-les commandes de haut niveau proposées par `pcs` ou `crm`. En dernier recours, utilisez
-l'outil `cibadmin`.
+FR Il n'est pas recommandé d'éditer la CIB directement en XML. Préférez toujours utiliser
+FR les commandes de haut niveau proposées par `pcs` ou `crm`. En dernier recours, utilisez
+FR l'outil `cibadmin`.
+FR
+Making modification by editing the CIB directly is not recommanded. A better
+practice is to used the high level commands available in `pcs` or `crm`. As a
+last resort, the `cibadmin` tool is available.
 
 :::
 
 -----
 
-### TP: CIB
+### Practice work: CIB
 
 ::: notes
 
-1. consulter le contenu de ce répertoire où est stockée la CIB
-2. identifier la dernière version de la CIB
-3. comparer avec `cibadmin --query` et `pcs cluster cib`
+FR 1. consulter le contenu de ce répertoire où est stockée la CIB
+FR 2. identifier la dernière version de la CIB
+FR 3. comparer avec `cibadmin --query` et `pcs cluster cib`
+FR
+1. check the content of the directory where the CIB is stored
+2. identify the last version of the CIB
+3. compare the output of the commands `cibadmin --query` and `pcs cluster cib`
 
 :::
 
@@ -1244,154 +1532,275 @@ l'outil `cibadmin`.
 
 ::: notes
 
-1. consulter le contenu de ce répertoire où est stockée la CIB
+FR 1. consulter le contenu de ce répertoire où est stockée la CIB
+FR
+1. check the content of the directory where the CIB is stored
 
 ~~~
 # ls /var/lib/pacemaker/cib
 ~~~
 
-2. identifier la dernière version de la CIB
+FR 2. identifier la dernière version de la CIB
+FR
+FR La version courante de la CIB est stockée dans
+FR `/var/lib/pacemaker/cib/cib.xml`. Sa version est stockée dans
+FR `/var/lib/pacemaker/cib/cib.last`.
+FR
+2. identify the last version of the CIB
 
-La version courante de la CIB est stockée dans
-`/var/lib/pacemaker/cib/cib.xml`. Sa version est stockée dans
-`/var/lib/pacemaker/cib/cib.last`.
+The current version of the CIB is stored in `/var/lib/pacemaker/cib/cib.xml`.
+It's version is stored in `/var/lib/pacemaker/cib/cib.last`.
 
-3. comparer avec `cibadmin --query` et `pcs cluster cib`
+FR 3. comparer avec `cibadmin --query` et `pcs cluster cib`
+FR
+FR Vous observez une section `<status\>` supplémentaire dans le document
+FR XML présenté par `cibadmin`. Cette section contient l'état du cluster et est
+FR uniquement conservée en mémoire.
+FR
 
-Vous observez une section `<status\>` supplémentaire dans le document
-XML présenté par `cibadmin`. Cette section contient l'état du cluster et est
-uniquement conservée en mémoire.
+3. compare the output of the commands `cibadmin --query` and `pcs cluster cib`
+
+There is a additional `<status\>` section in the XML document presented by
+`cibadmin`.  This section contains the cluster state and is only kept in
+memory which explains why it's onlu visible with `cibadmin`.
 
 :::
 
 -----
 
-### Designated Controler (DC) - Diagramme global
+### Designated Controler (DC) - Global diagram
 
-![Diagramme DC](medias/pcmk-archi-dc.png)
+![DC diagram](medias/pcmk-archi-dc.png)
 
 -----
 
 ## Designated Controler (DC)
 
-* daemon `CRMd` désigné pilote principal sur un nœud uniquement
-* lit et écrit dans la CIB
-* invoque PEngine pour générer les éventuelles transitions
-* contrôle le déroulement des transitions
-* envoie les actions à réaliser aux daemons `CRMd` des autres nœuds
-* possède les journaux applicatifs les plus complets
+FR * daemon `CRMd` désigné pilote principal sur un nœud uniquement
+FR * lit et écrit dans la CIB
+FR * invoque PEngine pour générer les éventuelles transitions
+FR * contrôle le déroulement des transitions
+FR * envoie les actions à réaliser aux daemons `CRMd` des autres nœuds
+FR * possède les journaux applicatifs les plus complets
+FR
+
+* a `CRMd` daemon appointed as the manager of the cluster
+  - present only on one node
+* read and write from/to the CIB
+* calls the PEngine to generate the necessary transitions
+* control the proceeding of transitions
+* sends the actions to the daemons`CRMd` of other nodes
+* has the most complete traces of all nodes
 
 ::: notes
 
-Le *Designated Controler* est élu au sein du cluster une fois le groupe de communication
-établi au niveau de Corosync. Il pilote l'ensemble du cluster.
+FR Le *Designated Controler* est élu au sein du cluster une fois le groupe de communication
+FR établi au niveau de Corosync. Il pilote l'ensemble du cluster.
+FR
+FR Il est responsable de:
+FR
+FR * lire l'état courant dans la CIB
+FR * invoquer le `PEngine` en cas d'écart avec l'état
+FR   stable (changement d'état d'un service, changement de configuration, évolution des
+FR   scores ou des attributs, etc)
+FR * mettre à jour la CIB (mises à jour propagée aux autres nœuds)
+FR * transmettre aux `CRMd` distants une à une les actions à réaliser sur leur nœud
+FR
+FR C'est le DC qui maintient l'état primaire de la CIB ("master copy").
+FR
+<!-- saut a la ligne absent pour "invoquer le Pengine" dans la version en ligne -->
 
-Il est responsable de:
+The *Designated Controler* is elected once a communication group is established
+by Corosync. It manages the whole cluster.
 
-* lire l'état courant dans la CIB * invoquer le `PEngine` en cas d'écart avec l'état
-  stable (changement d'état d'un service, changement de configuration, évolution des
-  scores ou des attributs, etc)
-* mettre à jour la CIB (mises à jour propagée aux autres nœuds)
-* transmettre aux `CRMd` distants une à une les actions à réaliser sur leur nœud
+It's responsible for:
 
-C'est le DC qui maintient l'état primaire de la CIB ("master copy").
+* reading the current state in the CIB
+* invoking the `PEngine` if the state of the cluster is different from it's
+  expected state (service state change, configuration change, evolution of
+  scores or attributes, etc.)
+* updates the CIB (the updates sent to all nodes)
+* dictate the actions that have to be executed to the relevant remote `CRMd`
+  processes, theses changes are send one at a time
+
+The DC is responsible for the _master copy_ of the CIB.
+<!-- Est ce que master copy suffit a un anglais pour comprendre de quoi on parle la ? -->
 
 :::
 
 -----
 
-### PEngine - Diagramme global
+### PEngine - Global Diagram
 
-![Diagramme PEngine](medias/pcmk-archi-pengine.png)
+![PEngine diagram](medias/pcmk-archi-pengine.png)
 
 -----
 
 ## Policy Engine (PEngine)
 
-* reçoit en entrée les informations d'état des ressources et le paramétrage
-* décide de l'état idéal du cluster
-* génère un graphe de transition pour atteindre cet état
-* renommé `Scheduler` depuis la version 2.0
-* peut être consulté grâce à la commande `crm_simulate`
+FR * reçoit en entrée les informations d'état des ressources et le paramétrage
+FR * décide de l'état idéal du cluster
+FR * génère un graphe de transition pour atteindre cet état
+FR * renommé `Scheduler` depuis la version 2.0
+FR * peut être consulté grâce à la commande `crm_simulate`
+FR
+FR ![Diagramme Scheduler - calcul graphe de transition](medias/pcmk-archi-transition.png)
 
-![Diagramme Scheduler - calcul graphe de transition](medias/pcmk-archi-transition.png)
+* receives information about the state of resources and configuration
+* decides the ideal state for the cluster
+* creates a transition graph to reach the ideal state
+* renamed `Scheduler` in version 2.0
+* can be leveraged with the `crm_simulate` command
+
+![Diagramme Scheduler - transition graph calculation](medias/pcmk-archi-transition.png)
 
 ::: notes
 
-Le `PEngine` est la brique de Pacemaker qui calcule les transitions nécessaires pour
-passer d'un état à l'autre.
+FR Le `PEngine` est la brique de Pacemaker qui calcule les transitions nécessaires pour
+FR passer d'un état à l'autre.
+FR
+FR Il reçoit en entrée des informations d'état et de paramétrage au format XML (extrait de
+FR la CIB), détermine si un nouvel état est disponible pour les ressources du cluster, et
+FR calcule toutes les actions à mettre en œuvre pour l'atteindre.
+FR
+FR Toutes ces actions sont regroupées au sein d'un graph de transition que le
+FR `Designated Controller`, qui pilote le cluster, devra ensuite mettre en œuvre.
+FR
+The `PEngine` is the Pacemaker component responsible for the computation of the
+transition necessary to go from one state to another.
 
-Il reçoit en entrée des informations d'état et de paramétrage au format XML (extrait de
-la CIB), détermine si un nouvel état est disponible pour les ressources du cluster, et
-calcule toutes les actions à mettre en œuvre pour l'atteindre.
+It receives information about states and configuration in XML format (from the
+CIB), decides if a new state is available and computes all the actions
+necessary to reach it.
 
-Toutes ces actions sont regroupées au sein d'un graph de transition que le
-`Designated Controller`, qui pilote le cluster, devra ensuite mettre en œuvre.
+All theses actions are gathered in a transition graph which will be applied by
+the component responsible for decision making: the `Designated Controller`.
 
-Voici un exemple de transition complexe présentant une bascule maître-esclave DRBD:
-![Diagramme exemple de transition complexe](medias/Policy-Engine-big.png)
+FR Voici un exemple de transition complexe présentant une bascule maître-esclave DRBD:
+FR ![Diagramme exemple de transition complexe](medias/Policy-Engine-big.png)
+FR
+FR Ce diagramme vient de la documentation de Pacemaker. L'original est disponible à cette
+FR adresse:
+FR <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/images/Policy-Engine-big.png>
+FR
+FR Les explications sur les codes couleurs sont disponibles à cette adresse:
+FR <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/_visualizing_the_action_sequence.html>
+FR
+This is an example of complex transition graph involving a master slave DRBD
+switchover.
+![example diagram for a complex transition](medias/Policy-Engine-big.png)
 
-Ce diagramme vient de la documentation de Pacemaker. L'original est disponible à cette
-adresse:
+This diagram comes from the Pacemaker documentation. The original is available
+at:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/images/Policy-Engine-big.png>
 
-Les explications sur les codes couleurs sont disponibles à cette adresse:
+The explanation of the color code is available at this address:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Administration/_visualizing_the_action_sequence.html>
 
-Dans cet exemple chaque flèche impose une dépendance et un ordre entre les actions. Pour
-qu'une action soit déclenchée, toutes les actions précédentes doivent être exécutées et
-réussies. Les textes en jaune sont des "actions virtuelles", simples points de passage
-permettant de synchroniser les actions entre elles avant de poursuivre les suivantes. Les
-textes en noir représentent des actions à exécuter sur l'un des nœuds du cluster.
+FR Dans cet exemple chaque flèche impose une dépendance et un ordre entre les actions. Pour
+FR qu'une action soit déclenchée, toutes les actions précédentes doivent être exécutées et
+FR réussies. Les textes en jaune sont des "actions virtuelles", simples points de passage
+FR permettant de synchroniser les actions entre elles avant de poursuivre les suivantes. Les
+FR textes en noir représentent des actions à exécuter sur l'un des nœuds du cluster.
+FR
+FR Le format des textes est le suivant: `<resource>_<action>_<interval>`
+FR
+FR Une action avec un intervalle à 0 est une action ponctuelle (`start`, `stop`, etc). Une
+FR action avec un intervalle supérieur à 0 est une action récurrente, tel que `monitor`.
+FR
+In this example each arrow represents a dependancy and forces an order of
+execution between actions. In an order for an action to be triggered, all the
+preceding actions must have been executed and have succeded. The yellow texts
+represent virtual actions, they act as synchronisation points when several
+actions are required before starting another one. The black texts represent
+actions that must be executed on a cluster node.
 
-Le format des textes est le suivant: `<resource>_<action>_<interval>`
+The format of the text is the following: `<resource>_<action>_<interval>`.
 
-Une action avec un intervalle à 0 est une action ponctuelle (`start`, `stop`, etc). Une
-action avec un intervalle supérieur à 0 est une action récurrente, tel que `monitor`.
+An action with an interval of zero is a one off action (`start`, `stop`, etc.).
+Actions with intervals superior to zero are recurring action such as `monitor`.
 
-Dans cet exemple:
+FR Dans cet exemple:
+FR
+FR * les actions 1 à 4 concernent l'exécution des actions `notify pre-demote` sur les nœuds
+FR   "frigg" et "odin" du cluster
+FR * l'action 1 déclenche en parallèle les deux actions 2 et 3
+FR * l'action 4 est réalisée une fois que les actions 1, 2 et 3 sont validées
+FR * l'action 5 est exécutée n'importe quand
+FR * l'action 5 interrompt l'exécution récurrente de l'action `monitor` sur la ressource
+FR   "drbd0:0" du serveur "frigg"
+FR * l'action 7 est exécutée après que 5 et 6 soient validées
+FR * l'action 7 effectue un `demote` de la ressource "drbd0:0" sur "frigg" (qui n'est donc
+FR   plus supervisée)
+FR * la pseudo action 8 est réalisée une fois que l'action `demote` est terminée
+FR * la pseudo action 9 initialise le déclenchement des actions `notify post-demote` et
+FR   dépend de la réalisation précédente de la notification "pre-demote" et de l'action
+FR   `demote` elle même
+FR * les actions 9 à 12 représentent l'exécution des notifications `post-demote` dans tout
+FR   le cluster
+FR * les actions 13 à 24 représentent les actions de `notify pre-promote`, `promote` de
+FR   drbd sur "odin" et `notify post-promote` au sein du cluster
+FR * les actions 25 et 27 peuvent alors être exécutées et redémarrent les actions de
+FR   monitoring récurrentes de drbd sur "odin" et "frigg"
+FR * les actions 26, 28 à 30 démarrent un groupe de ressource dépendant de la ressource
+FR   drbd
+FR
+In this example:
 
-* les actions 1 à 4 concernent l'exécution des actions `notify pre-demote` sur les nœuds
-  "frigg" et "odin" du cluster
-* l'action 1 déclenche en parallèle les deux actions 2 et 3
-* l'action 4 est réalisée une fois que les actions 1, 2 et 3 sont validées
-* l'action 5 est exécutée n'importe quand
-* l'action 5 interrompt l'exécution récurrente de l'action `monitor` sur la ressource
-  "drbd0:0" du serveur "frigg"
-* l'action 7 est exécutée après que 5 et 6 soient validées
-* l'action 7 effectue un `demote` de la ressource "drbd0:0" sur "frigg" (qui n'est donc
-  plus supervisée)
-* la pseudo action 8 est réalisée une fois que l'action `demote` est terminée
-* la pseudo action 9 initialise le déclenchement des actions `notify post-demote` et
-  dépend de la réalisation précédente de la notification "pre-demote" et de l'action
-  `demote` elle même
-* les actions 9 à 12 représentent l'exécution des notifications `post-demote` dans tout
-  le cluster
-* les actions 13 à 24 représentent les actions de `notify pre-promote`, `promote` de
-  drbd sur "odin" et `notify post-promote` au sein du cluster
-* les actions 25 et 27 peuvent alors être exécutées et redémarrent les actions de
-  monitoring récurrentes de drbd sur "odin" et "frigg"
-* les actions 26, 28 à 30 démarrent un groupe de ressource dépendant de la ressource
-  drbd
+* action 1 to 4 are `notify pre-demote` actions executed on the nodes "frigg"
+  and "odin"
+  - action 1 is used to start action 2 and 3 in parallel
+  - action 4 is done after action 1, 2 and 3 are completed sucessfully
+* action 5 is executed at any time
+* action 5 cancels the recurring execution of the `monitor` action on ressource
+  "drbd0:0" of server "frigg"
+* action 7 is executed after action 5 and 6 are deemed valid
+* action 7 `demotes` the ressource "drbd0:0" on server "frigg" (it is therefore
+  no longer monitored)
+* action 8 is a pseudo action triggered once the `demote` is finished
+* action 9 is a pseudo action responsible for starting the the two `notify
+  post-demote` actions. It requires the `pre-demote` notification and the
+  `demote` action
+* action 9 to 12 represent the execution of the `post-demote` actions in the
+  whole cluster
+* action 13 to 24 represent the execution of the `notify-pre-demote` and
+  `demote` action on the drbd resource of "odin". `notify post-demote` is a
+  cluster wide action
+* action 25 to 27 can then be executed and restart the recurring monitoring
+  actions of drbd on "odin" and "frigg"
+* action 26, 28 and 29 start the group of resource which depends on the drbd
+  resource
+<!-- relire -->
 
-Enfin, il est possible de consulter les transitions proposées par le PEngine
-grâce à la commande `crm_simulate`. Cette commande est aussi parfois utile
-pour en extraire des informations disponibles nulles par ailleurs, comme les
-[scores de localisation][Contraintes de localisation].
+FR Enfin, il est possible de consulter les transitions proposées par le PEngine
+FR grâce à la commande `crm_simulate`. Cette commande est aussi parfois utile
+FR pour en extraire des informations disponibles nulles par ailleurs, comme les
+FR [scores de localisation][Contraintes de localisation].
+FR
+Finally, it's possible to check the transitions proposed by PEngine with the
+command `crm_simulate`. This command is also sometimes useful to get
+information that are not accessible elsewhere like the [location
+scores][Localisation constraints].
 
 :::
 
 -----
 
-### TP: PEngine
+### Practical work: PEngine
 
 ::: notes
 
-1. identifier sur quels nœuds est lancé le processus `pengine`
-2. identifier où se trouvent les logs de `pengine`
-3. identifier le DC
-4. observer la différence de contenu des log de `pengine` entre nœuds
-5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+FR 1. identifier sur quels nœuds est lancé le processus `pengine`
+FR 2. identifier où se trouvent les logs de `pengine`
+FR 3. identifier le DC
+FR 4. observer la différence de contenu des log de `pengine` entre nœuds
+FR 5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+FR
+1. identify on which node the processus `pengine` is started.
+2. identify where are the logs of the `pengine`
+3. identify the DC
+4. check the difference between the content of the `pengine` logs across nodes
+5. display the PEngine point of view of the cluster state (`¢rm_simulate`)
 
 :::
 
@@ -1401,33 +1810,56 @@ pour en extraire des informations disponibles nulles par ailleurs, comme les
 
 ::: notes
 
-1. identifier sur quels nœuds est lancé le processus `pengine`
+FR 1. identifier sur quels nœuds est lancé le processus `pengine`
+FR
+FR Sur tous les nœuds.
+FR
+1. identify on which node the processus `pengine` is started.
 
-Sur tous les nœuds.
+On all nodes
 
-2. identifier où se trouvent les logs de `pengine`
+FR 2. identifier où se trouvent les logs de `pengine`
+FR
+FR Les messages de `pengine` se situent dans `/var/log/cluster/corosync.log`,
+FR mélangés avec ceux des autres sous processus.
+FR
+FR Il est aussi possible de les retrouver dans `/var/log/messages` ou ailleurs en
+FR fonction de la configuration de corosync, syslog, etc.
+FR
+2. identify where are the logs of the `pengine`
 
-Les messages de `pengine` se situent dans `/var/log/cluster/corosync.log`,
-mélangés avec ceux des autres sous processus.
+The `pengine` logs is located in `/var/log/cluster/corosync.log`, it's mixed
+with the other processus logs.
 
-Il est aussi possible de les retrouver dans `/var/log/messages` ou ailleurs en
-fonction de la configuration de corosync, syslog, etc.
+It's also possible to find these messages in `/var/log/messages` or wherever
+the configuration of corosync, syslog, etc. dictates it.
 
-3. identifier le DC
+FR 3. identifier le DC
+FR
+FR Utiliser `crm_mon`, `pcs status` ou `crmadmin`:
+FR
+3. identify the DC
 
-Utiliser `crm_mon`, `pcs status` ou `crmadmin`:
+Use `crm_mon`, `pcs status` or `crmadmin`:
 
 ~~~console
 # crmadmin -D
 Designated Controller is: hanode3
 ~~~
 
-4. observer la différence de contenu des log de `pengine` entre nœuds
+FR 4. observer la différence de contenu des log de `pengine` entre nœuds
+FR
+FR Seuls le DC possède les messages relatifs au calcul de transitions effectués
+FR par le sous-processus `pengine`.
+FR
+4. check the difference between the content of the `pengine` logs across nodes
 
-Seuls le DC possède les messages relatifs au calcul de transitions effectués
-par le sous-processus `pengine`.
+The message related to the transition calculation done by the `pengine` sub
+process are only available on the DC.
 
-5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+FR 5. afficher la vision de PEngine sur l'état du cluster (`crm_simulate`)
+FR
+5. display the PEngine point of view of the cluster state (`¢rm_simulate`)
 
 ~~~console
 # crm_simulate --live-check
@@ -1441,51 +1873,82 @@ Online: [ hanode1 hanode2 hanode3 ]
 
 -----
 
-### Cluster Resource Manager (CRM) - Diagramme global
+### Cluster Resource Manager (CRM) - Global diagram
 
-![Diagramme CRM](medias/pcmk-archi-crmd.png)
+![CRM Diagram](medias/pcmk-archi-crmd.png)
 
 -----
 
 ## Cluster Resource Manager (CRM)
 
-* daemon `CRMd` local à chaque nœud
-* chargé du pilotage des événements
-* reçoit des instructions du `PEngine` s'il est DC ou du `CRMd` DC distant
-* transmet les actions à réaliser au sein des transitions
-  * au daemon `LRMd` local
-  * au daemon `STONITHd` local
-* récupère les codes retours des actions
-* transmets les codes retours de chaque action au `CRMd` DC
-* renommé `controller` depuis la version 2.0
+FR * daemon `CRMd` local à chaque nœud
+FR * chargé du pilotage des événements
+FR * reçoit des instructions du `PEngine` s'il est DC ou du `CRMd` DC distant
+FR * transmet les actions à réaliser au sein des transitions
+FR   * au daemon `LRMd` local
+FR   * au daemon `STONITHd` local
+FR * récupère les codes retours des actions
+FR * transmets les codes retours de chaque action au `CRMd` DC
+FR * renommé `controller` depuis la version 2.0
+FR
+* local daemon `CRMd` on each node
+* tasked with event management
+* receives instructions from `PEngine` if it's the DC or from a remote `CRMd`
+  otherwise (the DC)
+* transmits the actions
+  * to the local `LRMd` daemon
+  * to the local `STONITHd` daemon
+* fetches the return code of the actions
+* resends these return code to `CRMDd` on the DC
+* renamed `controller` in version 2.0
 
 ::: notes
 
-Le  daemon `CRMd` est local à chaque nœud qui pilote les événements. Il peut soit être
-actif (DC), et donc être chargé de l'ensemble du pilotage du cluster, soit passif, et
-attendre que le `CRMd` DC lui fournisse des instructions.
+<!-- local qui pilote (ligne 1) -->
+FR Le  daemon `CRMd` est local à chaque nœud qui pilote les événements. Il peut soit être
+FR actif (DC), et donc être chargé de l'ensemble du pilotage du cluster, soit passif, et
+FR attendre que le `CRMd` DC lui fournisse des instructions.
+FR
+FR Lorsque des instructions lui sont transmises, il les communique aux daemons `LRMd` et/ou
+FR `STONITHd` locaux pour qu'ils exécutent les actions appropriées auprès des _ressources
+FR agents_ et _fencing agents_.
+FR
+FR Une fois l'action réalisée, le `CRMd` récupère le statut de l'action (via
+FR son code retour) et le transmet au `CRMd` DC qui en valide la cohérence
+FR avec ce qui est attendu au sein de la transition.
+FR
+FR En cas de code retour différent de celui attendu, le `CRMd` DC décide d'annuler la
+FR transition en cours. Il demande alors une nouvelle transition au `PEngine`.
+FR
+The `CRMd` daemon is local to each nodes and manages events. It can be active
+(DC) in which case it's in charge of managing the whole cluster, or passive in
+which case it recieves instructions from the `CRMd` DC.
 
-Lorsque des instructions lui sont transmises, il les communique aux daemons `LRMd` et/ou
-`STONITHd` locaux pour qu'ils exécutent les actions appropriées auprès des _ressources
-agents_ et _fencing agents_.
+When instructions are fed to `CRMd`, it communicates with the local `LRMd`
+and/or local `STONITHd` so that the appropriate actions can be executed by
+the _resource agents_ and _fencing agents_.
 
-Une fois l'action réalisée, le `CRMd` récupère le statut de l'action (via
-son code retour) et le transmet au `CRMd` DC qui en valide la cohérence
-avec ce qui est attendu au sein de la transition.
+Once the action is finished, `CRMd` fetches the status of the action (via the
+return code) and  transmits it to the `CRMd` DC. The DC validates the coherence
+of the result with what was expected in the transition.
 
-En cas de code retour différent de celui attendu, le `CRMd` DC décide d'annuler la
-transition en cours. Il demande alors une nouvelle transition au `PEngine`.
+If the return code is different from the expected one, the `CRMd` DC decides to
+cancel the current transaction and asks for a new transition from the
+`PEngine`.
 
 :::
 
 -----
 
-### TP: Cluster Resource Manager
+### Practical work: Cluster Resource Manager
 
 ::: notes
 
-1. trouver comment sont désignés les messages du `CRMd` dans les log
-2. identifier dans les log qui est le DC
+FR 1. trouver comment sont désignés les messages du `CRMd` dans les log
+FR 2. identifier dans les log qui est le DC
+FR
+1. find how the `CRMd` messages are tagged in the logs
+2. identify which server is the DC in the logs
 
 :::
 
@@ -1493,21 +1956,28 @@ transition en cours. Il demande alors une nouvelle transition au `PEngine`.
 
 ### Correction: Cluster Resource Manager
 
-Étude du daemon `CRMd`.
+Study of the `CRMd` daemon.
 
 ::: notes
 
-1. trouver comment sont désignés les messages du `CRMd` dans les log
+FR 1. trouver comment sont désignés les messages du `CRMd` dans les log
+FR
+FR Les messages de ce sous-processus sont identifiés par `crmd:`.
+FR
+1. find how the `CRMd` messages are tagged in the logs
 
-Les messages de ce sous-processus sont identifiés par `crmd:`.
+The messages from this sub process are identified with `crmd:`
 
-2. identifier dans les log qui est le DC
-
+FR 2. identifier dans les log qui est le DC
+FR
+2. identify which server is the DC in the logs
 ~~~
 crmd:     info: update_dc:    Set DC to hanode1 (3.0.14)
 ~~~
 
-À noter que le retrait d'un DC est aussi visible:
+FR À noter que le retrait d'un DC est aussi visible:
+FR
+When a DC is demoted, it's also visible:
 
 ~~~
 crmd:     info: update_dc:    Unset DC. Was hanode2
@@ -1517,34 +1987,59 @@ crmd:     info: update_dc:    Unset DC. Was hanode2
 
 -----
 
-## `STONITHd` et _Fencing Agent_
+## `STONITHd` and _Fencing Agent_
 
-![Diagramme Fencing](medias/pcmk-archi-fencing.png)
+![Fencing diagram](medias/pcmk-archi-fencing.png)
 
 -----
 
 ### `STONITHd`
 
-* daemon `STONITHd`
-* gestionnaire des agents de fencing (_FA_)
-* utilise l'API des fencing agent pour exécuter les actions demandées
-* reçoit des commandes du `CRMd` et les passe aux _FA_
-* renvoie le code de retour de l'action au `CRMd`
-* support de plusieurs niveau de fencing avec ordre de priorité
-* outil `stonith-admin`
-* renommé `fenced` depuis la version 2.0
+<!-- renomé fencer ou pacemaker-fenced c'est pas trop clair j'ai pris fencer-->
+FR * daemon `STONITHd`
+FR * gestionnaire des agents de fencing (_FA_)
+FR * utilise l'API des fencing agent pour exécuter les actions demandées
+FR * reçoit des commandes du `CRMd` et les passe aux _FA_
+FR * renvoie le code de retour de l'action au `CRMd`
+FR * support de plusieurs niveau de fencing avec ordre de priorité
+FR * outil `stonith-admin`
+FR * renommé `fenced` depuis la version 2.0
+FR
+* `STONITHd` daemon
+* fencing agent manager (_FA_)
+* uses the fencing agent API to execute the requiered actions
+* recieves the commands from `CRMd` and feeds them to the _FA_
+* resends the return code of the actions to `CRMd`
+* supports several level of fencing with a priority order
+* `stonith-admin` tool
+* renamed `fencer` since version 2.0
 
 ::: notes
 
-Le daemon `STONITHd` joue sensiblement un rôle identique à celui du `LRMd` vis-à-vis des
-agents de fencing (_FA_).
+<!-- ça fait bizarre de dire ça car on n'a pas encore parlé de LRMd -->
+<!-- pour -l et -Q ça ne semble pas être ça (cf anglais) -->
+FR Le daemon `STONITHd` joue sensiblement un rôle identique à celui du `LRMd` vis-à-vis des
+FR agents de fencing (_FA_).
 
-L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
+FR
+FR L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
+FR
+FR * `stonith_admin -V --list-registered` : liste les agents configurés
+FR * `stonith_admin -V --list-installed` : liste tous les agents disponibles
+FR * `stonith_admin -V -l <nœud>` : liste les agents contrôlant le nœud spécifié.
+FR * `stonith_admin -V -Q <nœud>` : contrôle l'état d'un nœud.
+FR
+The `STONITHd` daemon is for the fencing agents (_FA_) what `LRMd` is for
+resource agents (_RA_).
 
-* `stonith_admin -V --list-registered` : liste les agents configurés
-* `stonith_admin -V --list-installed` : liste tous les agents disponibles
-* `stonith_admin -V -l <nœud>` : liste les agents contrôlant le nœud spécifié.
-* `stonith_admin -V -Q <nœud>` : contrôle l'état d'un nœud.
+The `stonith-admin` tool can be used to interact with the `STONITHd` daemon,
+for example:
+
+* `stonith_admin -V --list-registered` : list the configured agents
+* `stonith_admin -V --list-installed` : list the available agents
+* `stonith_admin -V -l <nœud>` : list the agents that can terminate the
+  specified node
+* `stonith_admin -V -Q <nœud>` : controls the state of a device on a node
 
 :::
 
@@ -1552,57 +2047,101 @@ L'outil `stonith-admin` permet d'interagir avec le daemon `STONITHd`, notamment:
 
 ### _Fencing Agent_ (_FA_)
 
-* script permettant de traduire les instructions du _fencer_ vers l'outil de fencing
-* doit assurer que le nœud cible est bien complètement isolé du cluster
-* doit renvoyer des codes retours définis dans l'API des _FA_ en fonction des résultats
-* dix actions disponibles dans l'API, toutes ne sont pas obligatoires
+FR * script permettant de traduire les instructions du _fencer_ vers l'outil de fencing
+FR * doit assurer que le nœud cible est bien complètement isolé du cluster
+FR * doit renvoyer des codes retours définis dans l'API des _FA_ en fonction des résultats
+FR * dix actions disponibles dans l'API, toutes ne sont pas obligatoires
+FR
+* script designed to translate `fencer`'s instruction to the fencing device
+* must guaranty that the target node is isolated from the reste of the cluster
+* must return the approriate return codes as defined in the fencing agent API
+* ten actions are availagble in the API, the are not all mandatory
 
 ::: notes
 
-Attention aux _FA_ qui dépendent du nœud cible !
+FR Attention aux _FA_ qui dépendent du nœud cible !
+FR
+FR Exemple classique : la carte IPMI. Si le serveur a une coupure électrique le
+FR _FA_ (la carte IPMI donc) n'est plus joignable. Pacemaker ne reçoit donc
+FR aucune réponse et ne peut pas savoir si le fencing a fonctionné, ce qui
+FR empêche toute bascule.
+FR
+FR Il est conseillé de chaîner plusieurs _FA_ si la méthode de fencing présente
+FR un _SPoF_: IPMI, rack d'alimentation, switch réseau ou SAN, ...
+FR
+Be wary of _FA_ that depend on the node state !
 
-Exemple classique : la carte IPMI. Si le serveur a une coupure électrique le
-_FA_ (la carte IPMI donc) n'est plus joignable. Pacemaker ne reçoit donc
-aucune réponse et ne peut pas savoir si le fencing a fonctionné, ce qui
-empêche toute bascule.
+<!-- the FA or the fencing device is no longer reachable ? are both terms in
+terchangeable here ? -->
+Example: the IPMI card. If the server as an electrical outage, the _FA_ (the
+IPMI card) is no longer reachable. Pacemaker can't receive feedback from it
+therefore it cannot know if the fencing was successful, which can prevent a
+failover.
 
-Il est conseillé de chaîner plusieurs _FA_ si la méthode de fencing présente
-un _SPoF_: IPMI, rack d'alimentation, switch réseau ou SAN, ...
+In such cases, where the fencing is a _SPoF_ (IMPI, rack power supply, network
+switch or SAN ..), it's a good practice to chaine several _FA_.
 
-Voici les actions disponibles de l'API des FA:
+<!-- reformuler la différence entre status et monitor ? -->
+FR Voici les actions disponibles de l'API des FA:
+FR
+FR * `off`: implémentation obligatoire. Permet d'isoler la ressource ou le serveur
+FR * `on`: libère la ressource ou démarre le serveur
+FR * `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon
+FR   exécute les actions off et on.
+FR * `status`: permet de vérifier la disponibilité de l'agent de fencing et le
+FR   statut du dispositif concerné: on ou off
+FR * `monitor`: permet de vérifier la disponibilité de l'agent de fencing
+FR * `list`: permet de vérifier la disponibilité de l'agent de fencing et de
+FR   lister l'ensemble des dispositifs que l'agent est capable d'isoler (cas d'un
+FR   hyperviseur, d'un PDU, etc)
+FR * `list-status`: comme l'action `list`, mais ajoute le statut de chaque dispositif
+FR * `validate-all`: valide la configuration de la ressource
+FR * `meta-data`: présente les capacités de l'agent au cluster
+FR * `manpage`: nom de la page de manuelle de l'agent de fencing
+FR
 
-* `off`: implémentation obligatoire. Permet d'isoler la ressource ou le serveur
-* `on`: libère la ressource ou démarre le serveur
-* `reboot`: isoler et libérer la ressource. Si non implémentée, le daemon
-  exécute les actions off et on.
-* `status`: permet de vérifier la disponibilité de l'agent de fencing et le
-  statut du dispositif concerné: on ou off
-* `monitor`: permet de vérifier la disponibilité de l'agent de fencing
-* `list`: permet de vérifier la disponibilité de l'agent de fencing et de
-  lister l'ensemble des dispositifs que l'agent est capable d'isoler (cas d'un
-  hyperviseur, d'un PDU, etc)
-* `list-status`: comme l'action `list`, mais ajoute le statut de chaque dispositif
-* `validate-all`: valide la configuration de la ressource
-* `meta-data`: présente les capacités de l'agent au cluster
-* `manpage`: nom de la page de manuelle de l'agent de fencing
+The following action are available in the _FA_ API:
+
+* `off`: mandatory action, enables the isolation of a resource of server
+* `on`: frees a resource or start a server
+* `reboot`: isolate and restart a resource. If the action is not available the
+  daemon will execute the off and on actions
+* `status`: check to see if a local stonith device's port is reachable
+* `monitor`: check to see if a local stonith device is reachable
+* `list`: listing hosts and port assignments from a local stonith device and
+  the fencing agent availability
+* `list-status`: same as `list` but with the status of each assignement
+* `validate-all`: validate the configuration of the resource
+* `meta-data`: displays the capabilities of the agent for the cluster
+* `manpage`: displays the name of the man page for this fencing agent
 
 :::
 
 -----
 
-### TP: Fencing
+### Practical work: Fencing
 
 ::: notes
 
-Au cours de workshop, nous utilisons l'agent de fencing `fence_virsh`. Il ne
-fait pas parti des agents de fencing distribués par défaut et s'installe via le
-paquet `fence-agents-virsh`. Cet agent de fencing est basé sur SSH et la
-commande `virsh`.
+FR Au cours de workshop, nous utilisons l'agent de fencing `fence_virsh`. Il ne
+FR fait pas parti des agents de fencing distribués par défaut et s'installe via le
+FR paquet `fence-agents-virsh`. Cet agent de fencing est basé sur SSH et la
+FR commande `virsh`.
+FR
+FR 1. installer tous les _FA_ ainsi que `fence_virsh`
+FR 2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+FR
+FR Nous abordons la création d'une ressource de fencing plus loin dans le workshop.
+FR
+During this worshop, we will use the fencing agent `fence_virsh`. it's not part
+of the default fencing agent package and can be installed via the package
+`fence-agent-virsh`. This fencing agent is based on SSH and the `virsh`
+command.
 
-1. installer tous les _FA_ ainsi que `fence_virsh`
-2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+1. install all the _FA_ including `fence_virsh`
+2. list the _FA_ with `pcs resource` and `stonith_admin`
 
-Nous abordons la création d'une ressource de fencing plus loin dans le workshop.
+We will delve into fencing resource creation later on.
 
 :::
 
@@ -1612,13 +2151,17 @@ Nous abordons la création d'une ressource de fencing plus loin dans le workshop
 
 ::: notes
 
-1. installer tous les _FA_ ainsi que `fence_virsh`
+FR 1. installer tous les _FA_ ainsi que `fence_virsh`
+FR
+1. install all the _FA_ including `fence_virsh`
 
 ~~~console
 # yum install -y fence-agents-all fence-agents-virsh
 ~~~
 
-2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+FR 2. lister les FA à l'aide de `pcs resource` ou `stonith_admin`
+FR
+2. list the _FA_ with `pcs resource` and `stonith_admin`
 
 ~~~
 # pcs resource agents stonith
@@ -1638,39 +2181,64 @@ fence_apc_snmp
 
 -----
 
-## `LRMd` et _Resources Agent_ - Diagramme global
+## `LRMd` et _Resources Agent_ - Global diagram
 
-![Diagramme LRM et ressources](medias/pcmk-archi-resource.png)
+![LRM and it's resources diagram](medias/pcmk-archi-resource.png)
 
 -----
 
 ### Local Resource Manager (LRM)
 
-* daemon `lrmd`
-* interface entre le `CRMd` et les _resource agents_ (_RA_)
-* capable d'exécuter les différents types de _RA_ supportés (OCF, systemd,
-  LSF, etc) et d'en comprendre la réponse
-* reçoit des commandes du `CRMd` et les passe aux _RA_
-* renvoie le résultat de l'action au `CRMd` de façon homogène, quelque
-  soit le type de _RA_ utilisé
-* est responsable d'exécuter les actions récurrentes en toute autonomie et de
-  prévenir le `CRMd` en cas d'écart avec le résultat attendu
-* renommé _local executor_ depuis la version 2.0 
+FR * daemon `lrmd`
+FR * interface entre le `CRMd` et les _resource agents_ (_RA_)
+FR * capable d'exécuter les différents types de _RA_ supportés (OCF, systemd,
+FR   LSF, etc) et d'en comprendre la réponse
+FR * reçoit des commandes du `CRMd` et les passe aux _RA_
+FR * renvoie le résultat de l'action au `CRMd` de façon homogène, quelque
+FR   soit le type de _RA_ utilisé
+FR * est responsable d'exécuter les actions récurrentes en toute autonomie et de
+FR   prévenir le `CRMd` en cas d'écart avec le résultat attendu
+FR * renommé _local executor_ depuis la version 2.0
+FR
+* `LRMd` daemon
+* interface between `CRMd` and the _resource agent_ (_RA_)
+* can inteface with all the available _RA_ types (OCF, systemd, LSF, etc.) and
+  understand their answers
+* receives `CRMd` commands and feeds them to _RA_
+* resends the result of the action to `CRMd` in a homogenous fashion despite
+  the _RA_ type
+* is responsible for the execution of recurring actions and must warn `CRMd` in
+  case the result of the action is different from the expected one (e.g.
+  monitor)
+* renamed 'local executor' in version 2.0
 
 ::: notes
 
-Lorsqu'une instruction doit être transmise à un agent, le `CRMd` passe
-cette information au `LRMd`, qui se charge de faire exécuter l'action
-appropriée par le _RA_.
+<!-- c'est le CRMd DC qui met a jour la CIB ? avec les codes retour ? -->
+FR Lorsqu'une instruction doit être transmise à un agent, le `CRMd` passe
+FR cette information au `LRMd`, qui se charge de faire exécuter l'action
+FR appropriée par le _RA_.
+FR
+FR Le daemon `LRMd` reçoit un code de retour de l'agent, qu'il transmet au
+FR `CRMd`, lequel mettra à jour la CIB pour que cette information soit
+FR partagée au niveau du cluster.
+FR
+FR Pour les actions dont le paramètre `interval` est supérieur à 0, le
+FR `LRMd` est responsable d'exécuter les actions de façon récurrente
+FR à la période indiquée dans la configuration. Le `LRMd` ne
+FR reviendra vers le `CRMd` que si le code retour de l'action varie.
+FR
+When an instruction must be sent to an agent, `CRMd` sends the information to
+`LRMd` which execute the appropriate action on the _RA_.
 
-Le daemon `LRMd` reçoit un code de retour de l'agent, qu'il transmet au
-`CRMd`, lequel mettra à jour la CIB pour que cette information soit
-partagée au niveau du cluster.
+The `LRMd` daemon receives the return code from the agent and transmits it to
+`CRMd` which is tasked with updating the CIB so that the whole cluster is aware
+of the result.
 
-Pour les actions dont le paramètre `interval` est supérieur à 0, le
-`LRMd` est responsable d'exécuter les actions de façon récurrente
-à la période indiquée dans la configuration. Le `LRMd` ne
-reviendra vers le `CRMd` que si le code retour de l'action varie.
+For action where the `interval` parameter is superior to 0, `LRMd` is
+responsible for their recurring execution once the period specified in the
+configuration has ended. `LRMd` will get back to `CRMd` in case the return code
+is not the expected one.
 
 :::
 
@@ -1678,27 +2246,50 @@ reviendra vers le `CRMd` que si le code retour de l'action varie.
 
 ### _Ressource Agent_ (_RA_)
 
-* applique les instructions du `LRMd` sur la ressource qu'il gère
-* renvoie des codes retours stricts reflétant le statut de sa ressource
-* plusieurs types/API de _ressource agent_ supportés
-* la spécification "OCF" est la plus complète
-* l'API OCF présente au `CRMd` les actions supportées par l'agent
-* `action` et `operation` sont deux termes synonymes
-* chaque opérations a un timeout propre et éventuellement une récurrence
-
+FR * applique les instructions du `LRMd` sur la ressource qu'il gère
+FR * renvoie des codes retours stricts reflétant le statut de sa ressource
+FR * plusieurs types/API de _ressource agent_ supportés
+FR * la spécification "OCF" est la plus complète
+FR * l'API OCF présente au `CRMd` les actions supportées par l'agent
+FR * `action` et `operation` sont deux termes synonymes
+FR * chaque opérations a un timeout propre et éventuellement une récurrence
+FR
+* applies the instruction sent by `LRMd` on the resource it manages
+* resends the return code according to the API specification, in accordance to
+  the resource status
+* several kinds of _resource agent_ supported (with different API)
+* the _OCF_ specification is the most exhaustive
+* the _OCF_ API present the action supported by the agent to `CRMd`
+* `action` and `operation` as synonyms
+* each operation has a specific timeout and might have an inteval for recuring
+  operations
+ 
 ::: notes
 
-Il est possible d'utiliser plusieurs types de _RA_ différents au sein d'un même cluster:
+FR Il est possible d'utiliser plusieurs types de _RA_ différents au sein d'un même cluster:
+FR
+FR * OCF (Open Cluster Framework, type préconisé)
+FR * SYSV
+FR * systemd...
+FR
+FR Vous trouverez la liste des types supportés à l'adresse suivante:
+FR <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-supported.html>
+It's possible to use several kinfs of _RA_ in the same cluster:
 
-* OCF (Open Cluster Framework, type préconisé)
+* OCF (Open ClusterFramework, the advised type)
 * SYSV
-* systemd...
+* Systemd
+* etc..
 
-Vous trouverez la liste des types supportés à l'adresse suivante:
+A list of all available types of _RA_ is available here:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-supported.html>
 
-Dans les spécifications du type OCF, un agent a le choix parmi dix codes retours
-différents pour communiquer l'état de son opération à `LRMd`:
+FR Dans les spécifications du type OCF, un agent a le choix parmi dix codes retours
+FR différents pour communiquer l'état de son opération à `LRMd`:
+FR
+
+In the _OCF_ specification, ten different return codes are available for the
+_RA_ to communicate the state of the action it was tasked with by `LMRd`.
 
 * `OCF_SUCCESS` (0, soft)
 * `OCF_ERR_GENERIC` (1, soft)
@@ -1711,65 +2302,119 @@ différents pour communiquer l'état de son opération à `LRMd`:
 * `OCF_RUNNING_MASTER` (8, soft)
 * `OCF_FAILED_MASTER` (9, soft)
 
-Chaque code retour est associé à un niveau de criticité s'il ne correspond
-à celui attendu par le cluster:
+FR Chaque code retour est associé à un niveau de criticité s'il ne correspond
+FR à celui attendu par le cluster:
+FR
+FR * `soft`: le cluster tente une action corrective sur le même nœud ou déplace
+FR   la ressource ailleurs
+FR * `hard`: la ressource doit être déplacée et ne pas revenir sur l'ancien nœud
+FR   sans intervention humaine
+FR * `fatal`: le cluster ne peut gérer la ressource sur aucun nœud
+FR
+Each return code as a corresponding criticity, which is used when the return
+code is different from the one expected by the cluster:
 
-* `soft`: le cluster tente une action corrective sur le même nœud ou déplace
-  la ressource ailleurs
-* `hard`: la ressource doit être déplacée et ne pas revenir sur l'ancien nœud
-  sans intervention humaine
-* `fatal`: le cluster ne peut gérer la ressource sur aucun nœud
+* `soft`: the cluster will try to make a corrective action on the same node or
+  move the resource elsewhere;
+* `hard`: the resource must be move and cannot return to the old node without
+  human intervention;
+* `fatal`: the cluster cannot  manage the resource on any node.
 
-Voici les opérations disponibles aux agents implémentant la specification OCF:
+FR Voici les opérations disponibles aux agents implémentant la specification OCF:
+FR
+FR * `start`: démarre la ressource
+FR * `stop`: arrête la ressource
+FR * `monitor`: vérifie l'état de la ressource
+FR * `validate-all`: valide la configuration de la ressource
+FR * `meta-data`: présente les capacités de l'agent au cluster
+FR * `promote`: promote la ressource slave en master
+FR * `demote`: démote la ressource master en slave
+FR * `migrate_to`: actions à réaliser pour déplacer une ressource vers un autre nœud
+FR * `migrate_from`: actions à réaliser pour déplacer une ressource vers le nœud local
+FR * `notify`: action à exécuter lorsque le cluster notifie l'agent des actions
+FR   le concernant au sein du cluster
+FR
+These are the available operations for the agent who implement the _OCF_
+specification:
 
-* `start`: démarre la ressource
-* `stop`: arrête la ressource
-* `monitor`: vérifie l'état de la ressource
-* `validate-all`: valide la configuration de la ressource
-* `meta-data`: présente les capacités de l'agent au cluster
-* `promote`: promote la ressource slave en master
-* `demote`: démote la ressource master en slave
-* `migrate_to`: actions à réaliser pour déplacer une ressource vers un autre nœud
-* `migrate_from`: actions à réaliser pour déplacer une ressource vers le nœud local
-* `notify`: action à exécuter lorsque le cluster notifie l'agent des actions
-  le concernant au sein du cluster
+* `start`: start the resource
+* `stop`: stop resource
+* `monitor`: check the state resource
+* `validate-all`: validate the configuration of the resource
+* `meta-data`: displays the capabilities of the _RA_
+* `promote`: promote the slave resource into a master
+* `demote`: demote a master resource to a slave
+* `migrate_to`: required action in order to move the resource to another node
+* `migrate_from`: required action in order to move the resource to the local
+  node
+* `notify`: action to execute when the cluster notifies the _RA_ of the actions
+  it must execute
 
-L'opération `meta-data` permet à l'agent de documenter ses paramètres et
-d'exposer ses capacités au cluster qui adapte donc ses décisions en fonction
-des actions possibles. Par exemple, si les actions `migrate_*` ne sont pas
-disponibles, le cluster utilise les actions `stop` et `start` pour déplacer
-une ressource.
+FR L'opération `meta-data` permet à l'agent de documenter ses paramètres et
+FR d'exposer ses capacités au cluster qui adapte donc ses décisions en fonction
+FR des actions possibles. Par exemple, si les actions `migrate_*` ne sont pas
+FR disponibles, le cluster utilise les actions `stop` et `start` pour déplacer
+FR une ressource.
+FR
+The `meta-data` operation is used by the agent to document it's configuration
+and expose it's capabilities to the cluster. The cluster will then adapt it's
+decision according to the available actions. For example, if the `migrate_*`
+action are not available, the cluster will use the `stop` and `start` actions
+to move a resource.
 
-Les agents systemd ou sysV sont limités aux seules actions `start`, `stop`,
-`monitor`. Dans ces deux cas, les codes retours sont interprétés par `LRMd`
-comme étant ceux définis par la spécification LSB:
+FR Les agents systemd ou sysV sont limités aux seules actions `start`, `stop`,
+FR `monitor`. Dans ces deux cas, les codes retours sont interprétés par `LRMd`
+FR comme étant ceux définis par la spécification LSB:
+FR <http://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html>
+FR
+The systemd and sysV agent are limited to three actions `start`, `stop` and
+`monitor`. With these agents `LRMd` interprets the return codes as described in
+the LSB specification:
 <http://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html>
 
-Un ressource peut gérer un service seul (eg. une vIP) au sein du cluster, un
-ensemble de service cloné (eg. Nginx) ou un ensemble de clone _multi-state_
-pour lesquels un statut `master` et `slave` est géré par le cluster et le _RA_.
+FR Un ressource peut gérer un service seul (eg. une vIP) au sein du cluster, un
+FR ensemble de service cloné (eg. Nginx) ou un ensemble de clone _multi-state_
+FR pour lesquels un statut `master` et `slave` est géré par le cluster et le _RA_.
+FR
+A resource can manage a single service (e.g. a VIP), or a group of cloned
+services (e.g. Nginx) or even a group of _multi-state_ clones where the
+`master` and `slave` state is managed by the cluster and the _RA_.
 
-Les _RA_ qui pilotent des ressources _multi-state_ implémentent obligatoirement
-les actions `promote` et `demote` : une ressource est clonée sur autant de
-nœuds que demandé, démarrée en tant que slave, puis le cluster promeut un ou
-plusieurs `master` parmi les `slave`.
+FR Les _RA_ qui pilotent des ressources _multi-state_ implémentent obligatoirement
+FR les actions `promote` et `demote` : une ressource est clonée sur autant de
+FR nœuds que demandé, démarrée en tant que slave, puis le cluster promeut un ou
+FR plusieurs `master` parmi les `slave`.
+FR
+The _RA_ designed to control _multi-state_ resources must implement the
+`promote` and `demote` actions: the resource will be cloned on as many nodes as
+requested, started as a slave, then the cluster will promote one or several
+`masters` amongst the `slaves`.
 
-Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
-`migrate_to` et `migrate_from` qui ne sont disponibles qu'aux _RA_ non
-_multi-state_ (non implémenté dans Pacemaker pour les ressources multistate).
+FR Le _resource agent_ PAF utilise intensément toutes ces actions, sauf
+FR `migrate_to` et `migrate_from` qui ne sont disponibles qu'aux _RA_ non
+FR _multi-state_ (non implémenté dans Pacemaker pour les ressources multistate).
+FR
+The _resource agent_ PAF uses all theses actions except for `migrate_to` and
+`migrate_from` which are available only for non _multi-state_ _RA_ (it's not
+implemented in Pacemaker for multi state resources).
 
 :::
 
 -----
 
-### TP: _Resource Agents_
+### Practical work: _Resource Agents_
 
 ::: notes
 
-1. installer les _resource agents_
-2. lister les RA installés à l'aide de `pcs`
-3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
-4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+FR 1. installer les _resource agents_
+FR 2. lister les RA installés à l'aide de `pcs`
+FR 3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
+FR 4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+FR
+1. install the _resource agents_
+2. list the available _RA_ with `pcs`
+3. display the information about the `dummy` _RA_ with `pcs`
+4. display the information about the `pgsql` _RA_ with `pcs`
 
 :::
 
@@ -1779,32 +2424,50 @@ _multi-state_ (non implémenté dans Pacemaker pour les ressources multistate).
 
 ::: notes
 
-1. installer les _resource agents_
+FR 1. installer les _resource agents_
+FR
+FR Il est normalement déjà installé comme dépendance de pacemaker.
+FR
+1. install the _resource agents_
 
-Il est normalement déjà installé comme dépendance de pacemaker.
+This package is usually installed as a dependency of Pacemaker.
 
 ~~~
 yum install -y resource-agents
 ~~~
 
-2. lister les RA installés à l'aide de `pcs`
+FR 2. lister les RA installés à l'aide de `pcs`
+FR
+2. list the available _RA_ with `pcs`
 
 ~~~
 pcs resource agents
 ~~~
 
-3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
+FR 3. afficher les informations relatives à l'agent `dummy` à l'aide de `pcs`
+FR
+FR Chaque agent embarque sa propre documentation.
+FR
+3. display the information about the `dummy` _RA_ with `pcs`
 
-Chaque agent embarque sa propre documentation.
+Each _RA_ contains it's own documentation.
 
 ~~~
 pcs resource describe dummy
 ~~~
 
-4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+FR 4. afficher les informations relatives à l'agent `pgsql` à l'aide de `pcs`
+FR
+FR Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de PAF. Vous
+FR pouvez lister l'ensemble de ses options grâce à la commande:
+FR
 
-Le RA `pgsql` livré avec le paquet `resource-agents` n'est **pas** celui de PAF. Vous
-pouvez lister l'ensemble de ses options grâce à la commande:
+4. display the information about the `pgsql` _RA_ with `pcs`
+
+The `pgsql` _RA_ is deployed with the `resource_agents` package is the one
+deployed with PAF.
+
+You can list all it's options with the command :
 
 ~~~
 pcs resource describe pgsql
@@ -1816,172 +2479,285 @@ pcs resource describe pgsql
 
 ## PostgreSQL Automatic Failover (PAF)
 
-* _RA_ spécifique à PostgreSQL pour Pacemaker
-* alternative à l'agent existant
-  * moins complexe et moins intrusif
-  * compatible avec PostgreSQL 9.3 et supérieur
-* Voir: <https://clusterlabs.github.io/PAF/FAQ.html>
+FR * _RA_ spécifique à PostgreSQL pour Pacemaker
+FR * alternative à l'agent existant
+FR   * moins complexe et moins intrusif
+FR   * compatible avec PostgreSQL 9.3 et supérieur
+FR * Voir: <https://clusterlabs.github.io/PAF/FAQ.html>
+FR
+* _RA_ dedicated to PostgreSQL
+* an alternative to the existing one
+  - less complex and intrusive
+  - compatible with PostgreSQL 9.3 and up
+* see: <https://clusterlabs.github.io/PAF/FAQ.html>
 
 ::: notes
 
-PAF se situe entre Pacemaker et PostgreSQL. C'est un _resource agent_
-qui permet au cluster d'administrer pleinement une instance PostgreSQL locale.
+FR PAF se situe entre Pacemaker et PostgreSQL. C'est un _resource agent_
+FR qui permet au cluster d'administrer pleinement une instance PostgreSQL locale.
+FR
+FR Un chapitre entier est dédié à son installation, son fonctionnement et sa
+FR configuration plus loin dans ce workshop.
+FR
+FR ![Schema](medias/pcmk-archi-paf-overview.png)
+FR
+PAF is a component placed between Pacemaker and PostgreSQL. It's a _resource
+agent_ which enables the cluster to administer a local PostgreSQL instance.
 
-Un chapitre entier est dédié à son installation, son fonctionnement et sa
-configuration plus loin dans ce workshop.
+A chapter dedicated to it's installation, inner working and configuration can
+be found later in this workshop.
 
 ![Schema](medias/pcmk-archi-paf-overview.png)
-
 :::
 
 ------
 
-# Paramétrage du cluster
+# Cluster configuration
 
-Attention:
+FR Attention:
+FR
+FR * les paramètres de Pacemaker sont tous sensibles à la casse
+FR * aucune erreur n'est levée en cas de création d'un paramètre inexistant
+FR * les paramètres inconnus sont simplement ignorés par Pacemaker
+FR
+Warning:
 
-* les paramètres de Pacemaker sont tous sensibles à la casse
-* aucune erreur n'est levée en cas de création d'un paramètre inexistant
-* les paramètres inconnus sont simplement ignorés par Pacemaker
+* Pacemaker's parameters are all case sensitive
+* no error is returned when a non existant parameter is created
+* unknown parameters are juste ignored by Pacemaker
 
 -----
 
-## Support du Quorum
+## Quorum support
 
-Paramètre `no-quorum-policy`
+FR Paramètre `no-quorum-policy`
+FR
+FR * `ignore`: désactive la gestion du quorum (déconseillé !)
+FR * `stop`: (par défaut) arrête toutes les ressources
+FR * `freeze`: préserve les ressources encore disponible dans la partition
+FR * `suicide`: fencing des nœuds de la partition
+FR
+The `no-quorum-policy` parameter
 
-* `ignore`: désactive la gestion du quorum (déconseillé !)
-* `stop`: (par défaut) arrête toutes les ressources
-* `freeze`: préserve les ressources encore disponible dans la partition
-* `suicide`: fencing des nœuds de la partition
+* `ignore`: disables quorum management (not recommanded)
+* `stop`: stop the resources (default)
+* `freeze`: keeps the resources that are still available in the partition
+* `suicide`: fence the nodes of the partition
 
 :::notes
 
-Il est fortement déconseillé de désactiver le quorum.
+FR Il est fortement déconseillé de désactiver le quorum.
+FR
+FR La valeur par défaut est le plus souvent la plus adaptée.
+FR
+FR Le cas du `freeze` peut être utile afin de conserver les ressources actives au
+FR sein d'un cluster où il n'y a aucun risque de split brain en cas de partition
+FR réseau, eg. un serveur httpd.
+FR
 
-La valeur par défaut est le plus souvent la plus adaptée.
+It's strongly advised not to disable quorum.
 
-Le cas du `freeze` peut être utile afin de conserver les ressources actives au
-sein d'un cluster où il n'y a aucun risque de split brain en cas de partition
-réseau, eg. un serveur httpd.
+Most of the time, the default value is the most suitable.
+
+The `freeze` value can be useful in order to keep resources active in a cluster
+where there is no risk of split brain in case of network partition (e.g. an
+httpd server).
 
 :::
 
 -----
 
-## Support du Stonith
+## Stonith support
 
-Paramètre `stonith-enabled`
+FR Paramètre `stonith-enabled`
+FR
+FR * `false` : désactive la gestion du fencing (déconseillé !)
+FR * activé par défaut
+FR * aucune ressource ne démarre sans présence de FA
+FR
+The `stonith-enabled` parameter
 
-* `false` : désactive la gestion du fencing (déconseillé !)
-* activé par défaut
-* aucune ressource ne démarre sans présence de FA
+* `false`: disables the fencing (not recommanded)
+* enabled by default
+  - no ressource can start without _FA_
 
 :::notes
 
-Ce paramètre contrôle la gestion du fencing au sein du cluster. Ce dernier
-est activé et il est vivement recommandé de ne pas le désactiver.
+FR Ce paramètre contrôle la gestion du fencing au sein du cluster. Ce dernier
+FR est activé et il est vivement recommandé de ne pas le désactiver.
+FR
+FR Effectivement, il est possible de désactiver le fencing au cas par cas,
+FR ressource par ressource, grâce à leur méta-attribut `requires` (voir
+FR chapitre [Configuration des ressources][]), positionné par défaut à `fencing`.
+FR
+This parameter controls fencing management inside the cluster. It's enabled by
+default. It's not recommanded to disable it.
 
-Effectivement, il est possible de désactiver le fencing au cas par cas,
-ressource par ressource, grâce à leur méta-attribut `requires` (voir
-chapitre [Configuration des ressources][]), positionné par défaut à `fencing`.
+If need be, it's possible to disable fencing peacemeal, one resource at a
+time with their meta attribute `requires` (see the [Resource configuration][]
+chapter). It's default value is `fencing`.
 
+FR Il est techniquement possible de désactiver le [quorum][] ou [fencing][].
+FR
+FR Comme dit précédemment c'est à proscrire hors d'un environnement de test. Sans
+FR ces fonctionnalités, le comportement du cluster est imprévisible en cas de
+FR panne et sa cohérence en péril.
+FR
+FR Dans le cas d'un cluster qui gère une base de donnée cela signifie que l'on encourt le
+FR risque d'avoir plusieurs ressources PostgreSQL disponibles en écriture sur plusieurs
+FR nœuds (conséquence d'un `split brain`).
+FR
+It's possible to disable [quorum][] or [fencing][].
 
-Il est techniquement possible de désactiver le [quorum][] ou [fencing][].
+As explained before, this is not recommanded outside of a test environement.
+Without these mechanisms, the cluster behavior is unpredictable in case of
+outage and it's consistency is at risk.
 
-Comme dit précédemment c'est à proscrire hors d'un environnement de test. Sans
-ces fonctionnalités, le comportement du cluster est imprévisible en cas de
-panne et sa cohérence en péril.
-
-Dans le cas d'un cluster qui gère une base de donnée cela signifie que l'on encourt le
-risque d'avoir plusieurs ressources PostgreSQL disponibles en écriture sur plusieurs
-nœuds (conséquence d'un `split brain`).
-
-:::
-
------
-
-## Cluster symétrique et asymétrique
-
-Paramètre `symmetric-cluster`:
-
-* change l'effet des scores de préférence des ressources
-* `true`: (par défaut) cluster symétrique ou _Opt-Out_. Les ressources
-  peuvent démarrer sur tous les nœuds à moins d'y avoir un score déclaré
-  inférieur à `0`
-* `false`: cluster asymétrique ou _Opt-In_. Les ressources ne peuvent
-  démarrer sur un nœud à moins  d'y avoir un score déclaré supérieur ou
-  égal à `0`
-
-::: notes
-
-Le paramètre `symetric-cluster` permet de changer la façon dont pacemaker choisit
-où démarrer les ressources.
-
-Configuré à `true` (defaut), le cluster est dit symétrique. Les ressources
-peuvent être démarrées sur n'importe quel nœud. Le choix se fait par ordre
-décroissant des valeurs des [contraintes de localisation][Scores etlocalisation].
-Une contrainte de localisation négative empêchera la ressource de démarrer
-sur un nœud.
-
-Configuré à `false`, le cluster est dit asymétrique. Les ressources ne peuvent
-démarrer nulle part. La définition des contraintes de localisation doit définir
-sur quels nœuds les ressources peuvent être démarrées.
-
-La notion de contraintes de localisation est définie dans le chapitre
-[Contraintes de localisation][]
+In case of clusters that manage databases, this means we risk a `split brain`
+situation in case of network partition. Which will result in the same database
+being opened in read/write mode on different nodes.
 
 :::
 
 -----
 
-## Mode maintenance
+## Symetric and asymetric clusters
 
-Paramètre `maintenance-mode`:
+FR Paramètre `symmetric-cluster`:
+FR
+FR * change l'effet des scores de préférence des ressources
+FR * `true`: (par défaut) cluster symétrique ou _Opt-Out_. Les ressources
+FR   peuvent démarrer sur tous les nœuds à moins d'y avoir un score déclaré
+FR   inférieur à `0`
+FR * `false`: cluster asymétrique ou _Opt-In_. Les ressources ne peuvent
+FR   démarrer sur un nœud à moins  d'y avoir un score déclaré supérieur ou
+FR  égal à `0`
+FR
+The `symetric-cluster` parameter
 
-* désactive tout contrôle du cluster
-* plus aucun opération n'est exécutée
-* plus de monitoring des ressources
-* les ressources démarrée sont laissée dans leur état courant (elles ne
-  sont pas arrêtées)
-* toujours tester les transitions avec `crm_simulate` avant de sortir de la
-  maintenance
+* changes the effect of preference scores on resources
+* `true`: the cluster is symetric or _Opt-Out_, this is the default. The
+  resources can start on all nodes except if there is a negative score placed
+  on the node.
+* `false`: the cluster is asymetric or _Opt-In_. The resources cannot start on
+  a node unless a positive score as been placed on the node.
 
 ::: notes
+<!-- Scores etlocalisation mque espace -->
+FR Le paramètre `symetric-cluster` permet de changer la façon dont pacemaker choisit
+FR où démarrer les ressources.
+FR
+FR Configuré à `true` (defaut), le cluster est dit symétrique. Les ressources
+FR peuvent être démarrées sur n'importe quel nœud. Le choix se fait par ordre
+FR décroissant des valeurs des [contraintes de localisation][Scores etlocalisation].
+FR Une contrainte de localisation négative empêchera la ressource de démarrer
+FR sur un nœud.
+FR
+FR Configuré à `false`, le cluster est dit asymétrique. Les ressources ne peuvent
+FR démarrer nulle part. La définition des contraintes de localisation doit définir
+FR sur quels nœuds les ressources peuvent être démarrées.
+FR
+FR La notion de contraintes de localisation est définie dans le chapitre
+FR [Contraintes de localisation][]
+FR
+The `symetric-cluster` parameter changes the way pacemaker choses where to
+start resources.
 
-Le paramètre `maintenance_mode` est utile pour réaliser des opérations de
-maintenance globales à tous les nœuds du cluster. Toutes les opérations
-`monitor` sont désactivées et le cluster ne réagit plus aucun événements.
+The default value is `true`, in this case the cluster is called symetric. The
+resources can start on any node. The choice of the node is made in decreasing
+order of the [location constraints][Scores and location constraints]. A negative location
+constraint prevents a resource to start on the node.
 
-Ce paramètre, comme tous les autres, est préservé lors du redémarrage de
-Pacemaker, sur un ou tous les nœuds. Il est donc possible de redémarrer tout
-le cluster tout en conservant le mode maintenance actif.
+When it is set to `false`, the cluster is said to be `asymetric`. The resource
+cannot start anywhere. Location constraints must be set to define where the
+resource can start.
 
-Attention toutefois aux scores de localisation. D'autant plus que ceux-ci
-peuvent être mis à jour lors du démarrage du cluster sur un nœud par exemple.
-Vérifiez toujours que les ressources sont bien dans l'état attendu sur chaque
-nœud avant de sortir du mode de maintenance afin d'éviter une intervention du
-cluster. Lorsque ce dernier reprend la main, il lance l'action `probe` sur
-toutes les ressources sur tous les nœuds pour détecter leur présence et
-comparer la réalité avec l'état de sa CIB.
+The notion of [location constraints][] is defined in it's own chapter.
 
 :::
 
 -----
 
-## Autres paramètres utiles
+## Maintenance mode
 
-* `stop-all-resources=false`: toutes les ressources sont arrêtées si
-  positionné à `true` 
-* `stonith-watchdog-timeout`: temps d'attente avant qu'un nœud disparu est
-  considéré comme "auto-fencé" par son watchdog si le cluster est configuré
-  avec
-* `cluster-recheck-interval=15min`: intervalle entre deux réveils forcé du
-  `PEngine` pour vérifier l'état du cluster
+FR Paramètre `maintenance-mode`:
+FR
+FR * désactive tout contrôle du cluster
+FR * plus aucun opération n'est exécutée
+FR * plus de monitoring des ressources
+FR * les ressources démarrée sont laissée dans leur état courant (elles ne
+FR   sont pas arrêtées)
+FR * toujours tester les transitions avec `crm_simulate` avant de sortir de la
+FR   maintenance
+FR
+The `maintenace-mode` parameter
+
+* disables all control on the cluster
+* no more action will be executed
+  - no monitoring will be done on resources
+* the started resources will be left in their current state
+* always test the transition with `crm_simulate` when leaving maintenance mode
 
 ::: notes
 
-Pour la liste complète des paramètres globaux du cluster, voir:
+FR Le paramètre `maintenance_mode` est utile pour réaliser des opérations de
+FR maintenance globales à tous les nœuds du cluster. Toutes les opérations
+FR `monitor` sont désactivées et le cluster ne réagit plus aucun événements.
+FR
+FR Ce paramètre, comme tous les autres, est préservé lors du redémarrage de
+FR Pacemaker, sur un ou tous les nœuds. Il est donc possible de redémarrer tout
+FR le cluster tout en conservant le mode maintenance actif.
+FR
+The `maintenance mode` parameter is useful to conduct maintenace operations
+that impact all the nodes of the cluster. All the `monitor` action are disables
+and the cluster doesn't react to any event.
+
+This parameter, like all others, is kept during Pacemaker restarts. It's
+therefore possible to restart all the cluster while keeping the maintenance
+mode active.
+
+FR Attention toutefois aux scores de localisation. D'autant plus que ceux-ci
+FR peuvent être mis à jour lors du démarrage du cluster sur un nœud par exemple.
+FR Vérifiez toujours que les ressources sont bien dans l'état attendu sur chaque
+FR nœud avant de sortir du mode de maintenance afin d'éviter une intervention du
+FR cluster. Lorsque ce dernier reprend la main, il lance l'action `probe` sur
+FR toutes les ressources sur tous les nœuds pour détecter leur présence et
+FR comparer la réalité avec l'état de sa CIB.
+FR
+Be careful to the location scores, they can be updated during cluster restart.
+It's important to verify that all resources are in the correct state on all
+nodes before leaving maintenance mode in order to avoid changes in the cluster
+state.  When the cluster is back in control, it starts a `probe` action on all
+resources of all nodes in order to detect their presence and compare reality
+with the state recorded in the CIB.
+
+:::
+
+-----
+
+## Other usefull parameters
+
+FR * `stop-all-resources=false`: toutes les ressources sont arrêtées si
+FR   positionné à `true`
+FR * `stonith-watchdog-timeout`: temps d'attente avant qu'un nœud disparu est
+FR   considéré comme "auto-fencé" par son watchdog si le cluster est configuré
+FR   avec
+FR * `cluster-recheck-interval=15min`: intervalle entre deux réveils forcé du
+FR   `PEngine` pour vérifier l
+FR   'état du cluster
+FR
+* `stop-all-resources=false`: all resources are stopped if this parameter is
+  set to `true`
+* `stonith-watchdog-timeout`: elapsed time before a failed node is considered
+  "self fenced" by it's watchdog if the cluster has one.
+*  `cluster-recheck-interval=15min`: interval between two forced awakening of
+   the `PEngine` in order to check the cluster state
+
+::: notes
+
+FR Pour la liste complète des paramètres globaux du cluster, voir:
+FR
+A compehensive list of cluster global parameters is available here:
 
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-cluster-options.html>
 
@@ -1989,11 +2765,13 @@ Pour la liste complète des paramètres globaux du cluster, voir:
 
 -----
 
-## TP: paramètres du cluster
+## Practical work: Cluster parameters
 
 ::: notes
 
-1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+FR 1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+FR
+1. display the default values of the following parameters with `pcs property`:
 
   * `no-quorum-policy`
   * `stonith-enabled`
@@ -2004,11 +2782,13 @@ Pour la liste complète des paramètres globaux du cluster, voir:
 
 -----
 
-## Correction: paramètres du cluster
+## Correction: Cluster parameters
 
 ::: notes
 
-1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+FR 1. afficher les valeurs par défaut des paramètres suivants à l'aide de `pcs property`:
+FR
+1. display the default values of the following parameters with `pcs property`:
 
   * `no-quorum-policy`
   * `stonith-enabled`
@@ -2028,169 +2808,273 @@ Pour la liste complète des paramètres globaux du cluster, voir:
 
 -----
 
-# Attributs d'un nœud
+# Node attributes
 
-## Généralité sur les attributs d'un nœud
+## General information about node attributes
 
-* attributs propres à chaque nœud
-* peut être persistant après reboot ou non
-* peut stocker n'importe quelle valeur sous n'importe quel nom
-* eg. `kernel=4.19.0-8-amd64`
+FR * attributs propres à chaque nœud
+FR * peut être persistant après reboot ou non
+FR * peut stocker n'importe quelle valeur sous n'importe quel nom
+FR * eg. `kernel=4.19.0-8-amd64`
+FR
+* node specific attributes
+* can be persistent (survive a reboot or not)
+* can store any value under any name
+  - eg. `kernel=4.19.0-8-amd64`
 
 ::: notes
 
-Il est possible de créer vos propres attributs avec l'outil `crm_attribute`.
+FR Il est possible de créer vos propres attributs avec l'outil `crm_attribute`.
+FR
+FR La persistance de vos attributs se contrôle avec l'argument `--lifetime`:
+FR
+FR * valeur réinitialisée au redémarrage (non persistant) : `--lifetime reboot`
+FR  * note : `--type status` est également accepté. Mentionné dans la
+FR     documentation mais pas dans le manuel de la commande 
+FR * valeur conservée au redémarrage (persistant) : `--lifetime forever`
+FR   * note : `--type nodes` est également accepté. Mentionnée dans la
+FR     documentation mais pas dans le manuel de la commande 
+FR
 
-La persistance de vos attributs se contrôle avec l'argument `--lifetime`:
+It's possible to create your own attributes with the tool `crm_attribute`.
 
-* valeur réinitialisée au redémarrage (non persistant) : `--lifetime reboot`
-  * note : `--type status` est également accepté. Mentionné dans la
-    documentation mais pas dans le manuel de la commande 
-* valeur conservée au redémarrage (persistant) : `--lifetime forever`
-  * note : `--type nodes` est également accepté. Mentionnée dans la
-    documentation mais pas dans le manuel de la commande 
+The lifetime of you attribute is control with the `--lifetime` argument of the
+command:
 
-Exemple pour stocker dans un attribut du nœud nommé `kernel` la version du
-noyau système :
+* `--lifetime reboot`: the value is reset during a restart of the cluster (it's
+  not pesistent)
+  - note: `--type status` is also accepted. It's mentionned in the
+    documentation but not in the command's manual.
+* `--lifetime forever`: the value is persistant across cluster restarts
+  - note: `--type nodes` is also accepted. It's mentionned in the documentation
+    but not in the command's manual.
+
+FR Exemple pour stocker dans un attribut du nœud nommé `kernel` la version du
+FR noyau système :
+FR
+This example shows how to create a `kernel` attribute  with the kernel version
+as a value:
 
 ~~~
 crm_attribute -l forever --node hanode1 --name kernel --update $(uname -r)
 ~~~
 
-Exemple de l'utilisation d'une rule basée sur un attribut de ce type:
+FR Exemple de l'utilisation d'une rule basée sur un attribut de ce type:
+The following link shows an example of how to setup rules based on attributes:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_using_rules_to_determine_resource_location.html#_location_rules_based_on_other_node_properties>
 
-Le _RA_ PAF utilise également les attributs non persistants et très
-transitoires. À l'annonce d'une promotion, chaque esclave renseigne son LSN
-dans un attribut transient. Lors de la promotion, le nœud "élu" compare son LSN
-avec celui des autres nœuds en consultant leur attribut `lsn_location` pour
-s'assurer qu'il est bien le plus avancé. Ces attributs sont détruits une fois
-l'élection terminée.
+FR Le _RA_ PAF utilise également les attributs non persistants et très
+FR transitoires. À l'annonce d'une promotion, chaque esclave renseigne son LSN
+FR dans un attribut transient. Lors de la promotion, le nœud "élu" compare son LSN
+FR avec celui des autres nœuds en consultant leur attribut `lsn_location` pour
+FR s'assurer qu'il est bien le plus avancé. Ces attributs sont détruits une fois
+FR l'élection terminée.
+FR
+The PAF _RA_ also uses non persistant attributes. During a promotion, each
+slave announces it's LSN using a transient attribute. During the promotion, the
+elected node compares it's LSN with the `lsn_location` attribute of the
+resource on each node in order to verify that it's the most up to date. These
+attributes are destroyed once the election is finished.
 
 :::
 
 -----
 
-## Attributs de nœuds spéciaux
+## Spetial node attributes
 
-* plusieurs attributs font office de paramètres de configuration
-* `maintenance`: mode maintenance au niveau du nœud
-* `standby`: migrer toutes les ressources hors du nœud
+FR * plusieurs attributs font office de paramètres de configuration
+FR * `maintenance`: mode maintenance au niveau du nœud
+FR * `standby`: migrer toutes les ressources hors du nœud
+FR
+* several attributes are used as configuration parameters
+* `maintenance`: is the node in maintenance mode
+* `standby`: migrate resource outside of the node
 
 ::: notes
 
-Il existe plusieurs attributs de nœuds spéciaux qui font offices de
-paramétrage. Les deux plus utiles sont `maintenance` et `standby`.
+FR Il existe plusieurs attributs de nœuds spéciaux qui font offices de
+FR paramétrage. Les deux plus utiles sont `maintenance` et `standby`.
+FR
+FR L'attribut `maintenance` a le même effet que le `maintenance_mode` au niveau
+FR du cluster, mais localisé au seul nœud sur lequel il est activé.
+FR
+FR Lorsque l'attribut `standby` est activé, il indique que le nœud ne doit plus
+FR héberger aucune ressource. Elle sont alors migré vers d'autres nœuds ou
+FR arrêté le cas échéant.
+FR
+FR Vous trouverez la liste complète de ces attributs de nœud spéciaux à
+FR l'adresse suivante:
+FR
+Several special node attributes are used as configuration parameters. The two
+most useful are `maintenance` and `standby`.
 
-L'attribut `maintenance` a le même effet que le `maintenance_mode` au niveau
-du cluster, mais localisé au seul nœud sur lequel il est activé.
+The `maintenance` attribute as the same effect as the `maintenance_mode` cluster
+wide parameter, except that it's limited only to the node it's placed on.
 
-Lorsque l'attribut `standby` est activé, il indique que le nœud ne doit plus
-héberger aucune ressource. Elle sont alors migré vers d'autres nœuds ou
-arrêté le cas échéant.
+When the `standby` attribute is activated, it indicates that the node cannot
+host resource anymore. They will be migrated to other nodes ou stopped.
 
-Vous trouverez la liste complète de ces attributs de nœud spéciaux à
-l'adresse suivante:
+A more compehensive list of special node attribute is available a the folling
+address:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_special_node_attributes.html>
 
 :::
 
 -----
 
-## Attributs de nœuds particuliers
+## Other node attribute of interest
 
-Quelques autres attributs particuliers:
+FR Quelques autres attributs particuliers:
+FR
+FR * `fail-count-*`: nombre d'incident par ressource sur le nœud
+FR * `master-*`: _master score_ de la ressource sur le nœud
+FR
+Some other node attributes of interest
 
-* `fail-count-*`: nombre d'incident par ressource sur le nœud
-* `master-*`: _master score_ de la ressource sur le nœud
+* `fail-count-*`: number of incident for a resource on a node
+* `master-*`: the _master score_ of a resouce on a node
 
 ::: notes
 
-Un attribut `fail-count-*` de type non persistant est utilisés pour
-mémoriser le nombre d'erreur de chaque ressources sur chaque nœud. Préférez
-utiliser `crm_failcount` ou `pcs resource failcount` pour accéder à ces
-informations.
+FR Un attribut `fail-count-*` de type non persistant est utilisés pour
+FR mémoriser le nombre d'erreur de chaque ressources sur chaque nœud. Préférez
+FR utiliser `crm_failcount` ou `pcs resource failcount` pour accéder à ces
+FR informations.
+FR
+Non persistent `fail-count-*` attributes are used to memorize the amount of
+errors for each resource on a node. It's a good practice to use `crm_failcount`
+or `pcs resource failcount` to access this information instead of accessible
+the attributes directly.
 
-Enfin, il existe des _master score_ pour les ressources de type _multi-state_
-(primaire/secondaire), permettant d'indiquer où l'instance primaire peut ou
-doit se trouver dans le cluster. Il sont préfixé par `master-*`. PAF positionne
-ces scores comme attributs persistants des nœuds. La position de l'instance
-primaire est ainsi préservée lors du redémarrage du cluster.
-
-Vous pouvez consulter ou modifier les _master score_ à l'aide de l'outil
-`crm_master`. Attention toutefois, ces scores sont positionnés habituellement
-par le _RA_ lui même. À moins de vous trouver dans une situation où le
-cluster ne nomme aucune ressource primaire, vous ne devriez pas vous même
-positionner un _maser score_.
+FR Enfin, il existe des _master score_ pour les ressources de type _multi-state_
+FR  (primaire/secondaire), permettant d'indiquer où l'instance primaire peut ou
+FR doit se trouver dans le cluster. Il sont préfixé par `master-*`. PAF positionne
+FR ces scores comme attributs persistants des nœuds. La position de l'instance
+FR primaire est ainsi préservée lors du redémarrage du cluster.
+FR
+FR Vous pouvez consulter ou modifier les _master score_ à l'aide de l'outil
+FR `crm_master`. Attention toutefois, ces scores sont positionnés habituellement
+FR par le _RA_ lui même. À moins de vous trouver dans une situation où le
+FR cluster ne nomme aucune ressource primaire, vous ne devriez pas vous même
+FR positionner un _maser score_.
+FR
+<!-- primary instance semble assez specifique aux bases de donnée ? -->
+Finally, a _master score_ attribute exists for _multi-state_ resources
+(primary/secondary), it's used to specify where the primary instance can/must
+be placed in the cluster.  They are prefixed with `master-*`. PAF uses theses
+scores as persistent attributes on each node. Unless you want the cluster to be
+unable to chose a primary resource, you shouldn't specify a _maaster score_
+yourself.
 
 :::
 
 -----
 
-# Configuration des ressources
+# Resource configuration
 
-* mécanique interne
-* __tout__ dépend des scores !
-* chapitre organisé dans l'ordre des besoins de configuration
+FR * mécanique interne
+FR * __tout__ dépend des scores !
+FR * chapitre organisé dans l'ordre des besoins de configuration
+FR
+* internal mechanics
+* __everything__ depends on scores !
+* this chapter's organization is based on the order of configuration needs
 
 -----
 
-## Méta-attributs des ressources
+## Resource meta-attributes
 
-* un ensemble de _meta-attributes_ s'appliquent à n'importe quelle ressource:
-  * il est possible de leur positionner une valeur par défaut qui s'applique
-    à toutes les ressources
-  * il est possible de surcharger les valeurs par défaut pour chaque ressource
-* quelques exemple de méta-attributs:
-  * `target-role`: rôle attendu: `Started`, `Stopped`, `Slave`, ou `Master`
-  * `migration-threshold` : combien d'erreurs "soft" avant de déclencher un failover
-  * `failure-timeout` : durée à partir de laquelle les erreurs "soft" sont réinitialisées
-  * `resource-stickiness` : score de maintien d'une ressource sur le nœud courant
-  * `is-managed`: le cluster doit-il agir en cas d'événement ?
+FR * un ensemble de _meta-attributes_ s'appliquent à n'importe quelle ressource:
+FR   * il est possible de leur positionner une valeur par défaut qui s'applique
+FR     à toutes les ressources
+FR   * il est possible de surcharger les valeurs par défaut pour chaque ressource
+FR * quelques exemple de méta-attributs:
+FR   * `target-role`: rôle attendu: `Started`, `Stopped`, `Slave`, ou `Master`
+FR   * `migration-threshold` : combien d'erreurs "soft" avant de déclencher un failover
+FR   * `failure-timeout` : durée à partir de laquelle les erreurs "soft" sont réinitialisées
+FR   * `resource-stickiness` : score de maintien d'une ressource sur le nœud courant
+FR   * `is-managed`: le cluster doit-il agir en cas d'événement ?
+FR
+* a set of _meta-attributes_ can be applied to any resource:
+  - it's possible to set a default value which will be applied to all resources
+  - it's possible to overload all the default values
+* some example of meta attributes:
+  - `target-role`: expected role among: `Started`, `Stopped`, `Slave or
+    `Master`
+  - `migration-threshold`: how many "soft" errors before we start a failover
+  - `failure-timeout`: amount of time elapsed before the "soft" errors are
+    reset
+  - `resource-stickiness`: controls how much a service prefers to stay running
+    where it is
+  - `is-managed`: does the cluster react in case of event ?
 
 ::: notes
 
-Les _meta-attributes_ est un ensemble d'attributs commun à n'importe quelle
-type de ressource. Ils se positionnent ressource par ressource. Il est possible
-de leur créer une valeur par défaut qui sera appliquée automatiquement à toute
-ressource présente dans le cluster.
+FR Les _meta-attributes_ est un ensemble d'attributs commun à n'importe quelle
+FR type de ressource. Ils se positionnent ressource par ressource. Il est possible
+FR de leur créer une valeur par défaut qui sera appliquée automatiquement à toute
+FR ressource présente dans le cluster.
+FR
+FR Par exemple avec `pcs`:
+FR
+_Meta-attributes_ are a set of attributes shared by all types of resources.
+They can be set on a resource per resource basis. It's possible to change their
+default value so that it's applied to all the resources in the cluster.
 
-Par exemple avec `pcs`:
+Exemple using `pcs`:
 
 ~~~
 pcs resource defaults <nom_attribut>=valeur
 ~~~
 
-Le même exemple avec l'outil standard `crm_attribute`:
+FR Le même exemple avec l'outil standard `crm_attribute`:
+FR
+
+The same example using `crm_attribute`:
 
 ~~~
 crm_attribute --type rsc_defaults --name <nom_attribut> --update valeur
 ~~~
 
-La valeur d'un méta attribut positionné au niveau de la ressource elle même
-surcharge la valeur par défaut positionné précédemment.
+FR La valeur d'un méta attribut positionné au niveau de la ressource elle même
+FR surcharge la valeur par défaut positionné précédemment.
+FR
+FR La liste complète des méta-attributs et leur valeur par défaut est disponible à
+FR cette adresse:
+FR
+The value of a meta attribute positionned at the resource level takes priority
+over default values  configures at a higher level.
 
-La liste complète des méta-attributs et leur valeur par défaut est disponible à
-cette adresse:
+A comprehensive list of meta-attributes and their default value is available
+here:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-options.html#_resource_meta_attributes>
 
 :::
 
 -----
 
-### TP: paramétrage par défaut des ressources
+### Practical work: resource default parameters
 
 ::: notes
 
-1. trouver la valeur par défaut du paramètre `migration-threshold`
-2. positionner sa valeur à dix
-3. supprimer la valeur par défaut du paramètre `is-managed`
-4. contrôler que les modifications sont prise en compte avec `pcs config show`
-5. observer les modifications de la CIB dans les logs
+FR 1. trouver la valeur par défaut du paramètre `migration-threshold`
+FR 2. positionner sa valeur à dix
+FR 3. supprimer la valeur par défaut du paramètre `is-managed`
+FR 4. contrôler que les modifications sont prise en compte avec `pcs config show`
+FR 5. observer les modifications de la CIB dans les logs
+FR
+FR Remarque: il existe une propriété du cluster `default-resource-stickiness`.
+FR Cette propriété est dépréciée, il faut utiliser les valeurs par defaut des
+FR ressources à la place.
+FR
+1. find the default value of the parameter `migration-threshold`
+2. set it to a value of 10
+3. remove the default value for the parameter `is-managed`
+4. check that the modification where taken into account with `pcs config show`
+5. look for the CIB modification in the logs
 
-Remarque: il existe une propriété du cluster `default-resource-stickiness`.
-Cette propriété est dépréciée, il faut utiliser les valeurs par defaut des
-ressources à la place.
+Note: the property `default-resource-stickiness` is deprecated. The per
+resource default value should be used instead.
 
 ~~~
 pcs property list --defaults |grep -E "resource-stickiness"
@@ -2201,18 +3085,24 @@ pcs property list --defaults |grep -E "resource-stickiness"
 
 -----
 
-### Correction: paramétrage par défaut des ressources
+### Correction: resource default parameters
 
 ::: notes
 
-1. trouver la valeur par défaut du paramètre `migration-threshold`
+FR 1. trouver la valeur par défaut du paramètre `migration-threshold`
+FR
+FR La valeur par défaut est `INFINITY`. Voir:
+FR
+1. find the default value of the parameter `migration-threshold`
 
-La valeur par défaut est `INFINITY`. Voir:
+The default value is set to `INFINITY`. See:
 
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/s-resource-options.html#_resource_meta_attributes>
 
 2. positionner sa valeur à dix
 
+FR 2. set it to a value of 10
+FR
 ~~~console
 # pcs resource defaults migration-threshold=10
 Warning: Defaults do not apply to resources which override them with their own defined values
@@ -2222,12 +3112,16 @@ migration-threshold: 10
 
 3. supprimer la valeur par défaut du paramètre `is-managed`
 
+FR 3. remove the default value for the parameter `is-managed`
+FR
 ~~~console
 # pcs resource defaults is-managed=
 Warning: Defaults do not apply to resources which override them with their own defined values
 ~~~
 
-4. contrôler que les modifications sont prise en compte avec `pcs config show`
+FR 4. contrôler que les modifications sont prise en compte avec `pcs config show`
+FR
+4. check that the modification where taken into account with `pcs config show`
 
 ~~~
 # pcs config show
@@ -2237,9 +3131,13 @@ Resources Defaults:
 [...]
 ~~~
 
-5. observer les modifications de la CIB dans les logs
+FR 5. observer les modifications de la CIB dans les logs
+FR
+FR NB: les log ont ici été remis en forme.
+FR
+5. look for the CIB modification in the logs
 
-NB: les log ont ici été remis en forme.
+Note: the logs where reformatted to fit the workshop.
 
 ~~~
 cib: info: Forwarding cib_apply_diff operation for section 'all' to all
@@ -2259,91 +3157,158 @@ cib: info: Completed cib_apply_diff operation for section 'all': OK
 
 -----
 
-## Configuration du fencing
+## Fencing configuration
 
-* les _FA_ sont gérés comme des ressources classiques
-* les _FA_ ont un certain nombre de paramètres en commun: `pcmk_*`
-* les autres paramètres sont propres à chaque _FA_, eg. `port`, `identity_file`, `username`, ...
-* chaque _FA_ configuré peut être appelé de n'importe quel nœud
+FR * les _FA_ sont gérés comme des ressources classiques
+FR * les _FA_ ont un certain nombre de paramètres en commun: `pcmk_*`
+FR * les autres paramètres sont propres à chaque _FA_, eg. `port`, `identity_file`, `username`, ...
+FR * chaque _FA_ configuré peut être appelé de n'importe quel nœud
+FR
+* _FA_ are handled like regular resources
+* _FA_ have a bunch of: `pcmk_*` parameters
+* other parameters exist and are _FA_ specific, eg. `port`, `identity_file`,
+  `username`, ...
+* each configured _FA_ can be called from any node
 
 ::: notes
 
-Pour chaque agent de fencing configuré, un certain nombre de méta attributs
-définissent les capacités de l'agent auprès du cluster. Quelque exemples
-notables:
+FR Pour chaque agent de fencing configuré, un certain nombre de méta attributs
+FR définissent les capacités de l'agent auprès du cluster. Quelque exemples
+FR notables:
+FR
+FR * `pcmk_reboot_action`: détermine quelle action exécuter pour isoler un nœud.
+FR   Par exemple `reboot` ou `off`. L'action indiquée dépend de ce que supporte
+FR   l'agent
+FR * `pcmk_host_check`: détermine si l'agent doit interroger l'équipement pour
+FR   établir la liste des nœuds qu'il peut isoler, ou s'il doit se reposer sur
+FR   le paramètre `pcmk_host_list`
+FR * `pcmk_host_list`: liste des nœuds que peut isoler l'agent de fencing
+FR * `pcmk_delay_base`: temps d'attente minimum avant de lancer l'action de
+FR   fencing. Pratique dans les cluster à deux nœuds pour privilégier un des
+FR   nœuds
+FR
+FR Vous trouverez la liste complète à l'adresse suivante:
 
-* `pcmk_reboot_action`: détermine quelle action exécuter pour isoler un nœud.
-  Par exemple `reboot` ou `off`. L'action indiquée dépend de ce que supporte
-  l'agent
-* `pcmk_host_check`: détermine si l'agent doit interroger l'équipement pour
-  établir la liste des nœuds qu'il peut isoler, ou s'il doit se reposer sur
-  le paramètre `pcmk_host_list`
-* `pcmk_host_list`: liste des nœuds que peut isoler l'agent de fencing
-* `pcmk_delay_base`: temps d'attente minimum avant de lancer l'action de
-  fencing. Pratique dans les cluster à deux nœuds pour privilégier un des
-  nœuds
+For each configured fencing agent, a few meta attributes define the
+capabilities of the agent to the cluster. Some notable examples:
 
-Vous trouverez la liste complète à l'adresse suivante:
+* `pcmk_reboot_action`: determines which action to execute in order to isolate
+  a node. For example `reboot` or `off`. the action provided depends upon what
+  the agent supports.
+* `pcmk_host_check`: determines if the agent must ask the equipment for a list
+  of nodes it can isolate, or if it must rely on the `pcmk_host_list`
+  parameter.
+* `pcmk_host_list`: list the nodes that the _FA_ can isolate
+* `pcmk_delay_base`: minimum elapsed time before starting the fencing action.
+  It's useful in two node cluster to favor one node over the other.
+
+The full list can be found here:
 <https://clusterlabs.org/pacemaker/doc/en-US/Pacemaker/2.0/html/Pacemaker_Explained/_special_options_for_fencing_resources.html>
 
-Tous les paramètres ne débutants pas par `pcmk_*` sont propres à chaque
-_fencing agent_. Dans le cadre de notre workshop, nous utiliserons l'agent
-`fence_virsh` qui nécessite des paramètres de connexion SSH ainsi que le nom
-de la machine virtuelle à interrompre.
+FR Tous les paramètres ne débutants pas par `pcmk_*` sont propres à chaque
+FR _fencing agent_. Dans le cadre de notre workshop, nous utiliserons l'agent
+FR `fence_virsh` qui nécessite des paramètres de connexion SSH ainsi que le nom
+FR de la machine virtuelle à interrompre.
+FR
+All the parameters who dont start with `pcmk_*` are specific to each _fencing
+agent_. In this workshop, we will use the fencing agent `fence_virsh`. It
+requires several specific parameters for the SSH connexion like the name of the
+virtual machine to stop.
 
-Une fois paramétrés, Pacemaker s'assure que les _FA_ restent disponibles en
-exécutant à intervalle régulier l'action `monitor`, positionnée par défaut
-à une minute. À cause de cette action récurrente, les _FA_ apparaissent au
-sein du cluster au même titre que les autres ressources. Mais notez qu'une
-ressource de fencing ne démarre pas sur les nœud du cluster, ces équipement
-sont actifs _ailleurs_ dans votre architecture.
+FR Une fois paramétrés, Pacemaker s'assure que les _FA_ restent disponibles en
+FR exécutant à intervalle régulier l'action `monitor`, positionnée par défaut
+FR à une minute. À cause de cette action récurrente, les _FA_ apparaissent au
+FR sein du cluster au même titre que les autres ressources. Mais notez qu'une
+FR ressource de fencing ne démarre pas sur les nœud du cluster, ces équipement
+FR sont actifs _ailleurs_ dans votre architecture.
+FR
+Once configured, Pacemaker will make sure the _FA_ are available at all times
+with the execution of a regular `monitor` action. The default interval is set
+to a minute. Because of the  recuring actions, the _FA_ appear in the cluster
+the same way as other resources do. Please note that the fencing resource is
+not started on the cluster nodes, it's equipments are active somewhere else in
+the architecture.
 
-Lorsqu'une action de fencing commandée par Pacemaker, celle-ci sera déclenchée
-en priorité depuis le nœud d'où la ressource est supervisée. Si le nœud ou
-la ressource de fencing sont devenus indisponibles depuis la dernière action de
-monitor, n'importe quel autre nœud du cluster peut être utilisé pour
-exécuter la commande.
+FR Lorsqu'une action de fencing commandée par Pacemaker, celle-ci sera déclenchée
+FR en priorité depuis le nœud d'où la ressource est supervisée. Si le nœud ou
+FR la ressource de fencing sont devenus indisponibles depuis la dernière action de
+FR monitor, n'importe quel autre nœud du cluster peut être utilisé pour
+FR exécuter la commande.
+FR
+When a fencing action is requested by Pacemaker, it will be executed in
+priority on the node where the resource is supervised. If the node or the
+fencing resource are unavailable since the last monitor, any other node of the
+cluster can be used to execute the command.  
 
 :::
 
 -----
 
-### TP: Fencing Agent
+### Practical work: Fencing Agent
 
 ::: notes
 
-Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
-fencing configuré.
+FR Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
+FR fencing configuré.
+FR
+Reminder: the default behavior for the cluster is to refuse to start any
+resource if there is no fencing configured.
 
 ~~~console
 # crm_verify --verbose --live-check
 ~~~
 
-1. afficher la description de l'agent de fencing `fence_virsh`
+FR 1. afficher la description de l'agent de fencing `fence_virsh`
+FR
+FR Nous allons utiliser les paramètres suivants:
+FR
+FR * `ipaddr`: adresse de l'hyperviseur sur lequel se connecter en SSH
+FR * `login`: utilisateur SSH pour se connecter à l'hyperviseur
+FR * `identity_file`: chemin vers la clé privée SSH à utiliser pour l'authentification
+FR * `login_timeout`: timeout du login SSH
+FR * `port`: nom de la VM à isoler dans libvirtd
+FR
+FR Les autres paramètres sont décrits dans le slide précédent.
+FR
+FR Bien s'assurer que chaque nœud peut se connecter en SSH sans mot de passe à
+FR l'hyperviseur.
+FR
+1. display the desciption of the _FA_ `fence_virsh`
 
-Nous allons utiliser les paramètres suivants:
+We will use the following parameters:
 
-* `ipaddr`: adresse de l'hyperviseur sur lequel se connecter en SSH
-* `login`: utilisateur SSH pour se connecter à l'hyperviseur
-* `identity_file`: chemin vers la clé privée SSH à utiliser pour l'authentification
-* `login_timeout`: timeout du login SSH
-* `port`: nom de la VM à isoler dans libvirtd
+* `ipaddr`: address of the hypervisor on which we will connect with SSH
+* `login`: user for the SSH connection to the hypervisor
+* `identity_file`: path to the SSH private key used for authentication
+* `login_timeout`: timeout for the SSH login
+* `port`: name of the VM to isolate in libvirtd
 
-Les autres paramètres sont décrits dans le slide précédent.
+The other parameters are described in the previous slides.
 
-Bien s'assurer que chaque nœud peut se connecter en SSH sans mot de passe à
-l'hyperviseur.
+It's important to check that passwordless authentication is configured between
+the nodes and the hypervisor.
 
-2. créer une ressource de fencing pour chaque nœud du cluster
+FR 2. créer une ressource de fencing pour chaque nœud du cluster
+FR
+FR Les agents de fencing sont des ressources en HA prises en charge par le
+FR cluster. Dans le cadre de ce TP, nous créons une ressource par nœud,
+FR chacune responsable d'isoler un nœud.
+FR
+2. create a fencing resource for each node in the cluster
 
-Les agents de fencing sont des ressources en HA prises en charge par le
-cluster. Dans le cadre de ce TP, nous créons une ressource par nœud,
-chacune responsable d'isoler un nœud.
+The fencing agents are HA resources managed by the cluster. In this exercise,
+we will create one resource per node each one will be responsible for fencing a
+node.
 
-3. vérifier que le cluster ne présente plus d'erreur
-4. vérifier que ces ressources ont bien été créées et démarrées
-5. afficher la configuration des agents de fencing
-6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+FR 3. vérifier que le cluster ne présente plus d'erreur
+FR 4. vérifier que ces ressources ont bien été créées et démarrées
+FR 5. afficher la configuration des agents de fencing
+FR 6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+FR
+3. verify that the cluster doesn't have any error
+4. verify that the resources have been created and started
+5. display the configuration of the fencing agents
+6. verify that the resources are supervized by `LRMd` in the logs
 
 :::
 
@@ -2353,8 +3318,11 @@ chacune responsable d'isoler un nœud.
 
 ::: notes
 
-Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
-fencing configuré.
+FR Rappel: par défaut le cluster refuse de prendre en charge des ressources en HA sans
+FR fencing configuré.
+FR
+Reminder: the default behavior for the cluster is to refuse to start any
+resource if there is no fencing configured.
 
 ~~~console
 # crm_verify --verbose --live-check
@@ -2364,16 +3332,21 @@ fencing configuré.
 Errors found during check: config not valid
 ~~~
 
-
-1. afficher la description de l'agent de fencing `fence_virsh`
+FR 1. afficher la description de l'agent de fencing `fence_virsh`
+FR
+1. display the desciption of the _FA_ `fence_virsh`
 
 ~~~
 # pcs resource describe stonith:fence_virsh
 ~~~
 
-2. créer une ressource de fencing pour chaque nœud du cluster
+FR 2. créer une ressource de fencing pour chaque nœud du cluster
+FR
+FRAdapter `pcmk_host_list`, `ipaddr`, `login` et `port` à votre environnement.
+FR
+2. create a fencing resource for each node in the cluster
 
-Adapter `pcmk_host_list`, `ipaddr`, `login` et `port` à votre environnement.
+Adapt `pcmk_host_list`, `ipaddr`, `login` and `port` to your environnment.
 
 ~~~console
 # pcs stonith create fence_vm_hanode1 fence_virsh pcmk_host_check="static-list" \
@@ -2392,7 +3365,9 @@ port="centos7_hanode3" pcmk_reboot_action="reboot"                              
 identity_file="/root/.ssh/id_rsa" login_timeout=15
 ~~~
 
-3. vérifier que le cluster ne présente plus d'erreur
+FR 3. vérifier que le cluster ne présente plus d'erreur
+FR
+3. verify that the cluster doesn't have any error
 
 ~~~console
 # crm_verify -VL
@@ -2400,7 +3375,9 @@ identity_file="/root/.ssh/id_rsa" login_timeout=15
 0
 ~~~
 
-4. vérifier que ces ressources ont bien été créées et démarrées
+FR 4. vérifier que ces ressources ont bien été créées et démarrées
+FR
+4. verify that the resources have been created and started
 
 ~~~console
 # pcs status
@@ -2418,7 +3395,9 @@ Full list of resources:
 [...]
 ~~~
 
-5. afficher la configuration des agents de fencing
+FR 5. afficher la configuration des agents de fencing
+FR
+5. display the configuration of the fencing agents
 
 ~~~
 # pcs stonith show --full
@@ -2433,9 +3412,13 @@ Full list of resources:
   Operations: monitor interval=60s (fence_vm_hanode3-monitor-interval-60s)
 ~~~
 
-6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+FR 6. vérifier dans les log que ces ressources sont bien surveillée par `LRMd`
+FR
+FR Les log ont été remis en forme.
+FR
+6. verify that the resources are supervized by `LRMd` in the logs
 
-Les log ont été remis en forme.
+Note: These logs have been reformatted.
 
 ~~~
 lrmd: debug: executing - rsc:fence_vm_hanode1 action:monitor call_id:7
@@ -2447,46 +3430,83 @@ crmd:  info: Result of monitor operation for fence_vm_hanode1 on hanode1: 0 (ok)
 
 -----
 
-## Scores et contrainte localisation
+## Scores and location constraints
 
-* pondération interne d'une ressource sur un nœud
-* peut définir une exclusion si le score est négatif
-* `stickiness` : score de maintien en place d'une ressource sur son nœud
-  actuel
-* éviter d'exclure un agent de fencing de son propre nœud définitivement
-* scores accessibles grâce à `crm_simulate`
+FR * pondération interne d'une ressource sur un nœud
+FR * peut définir une exclusion si le score est négatif
+FR * `stickiness` : score de maintien en place d'une ressource sur son nœud
+FR  actuel
+FR * éviter d'exclure un agent de fencing de son propre nœud définitivement
+FR * scores accessibles grâce à `crm_simulate`
+FR
+* internal weighting of a resource on a node
+* can be used to define an exclusion if the score is negative
+* `stickiness`: controls how much a service prefers to stay running
+    where it is
+* avoid the definitive exclusion of a fencing agent from it's own node
+* scores are accessible via `crm_simulate`
 
 ::: notes
 
-Pacemaker se base sur la configuration et les scores des ressources pour
-calculer l'état idéal du cluster. Le cluster choisi le nœud où une ressource à
-le score le plus haut pour l'y placer.
+FR Pacemaker se base sur la configuration et les scores des ressources pour
+FR calculer l'état idéal du cluster. Le cluster choisi le nœud où une ressource à
+FR le score le plus haut pour l'y placer.
+FR
+Pacemaker uses the configuration and the scores of the resources to infer the
+ideal state of the cluster. The cluster choses the node where the resource has
+the hightest score to host it.
 
-Les scores peuvent être positionnés comme:
+FR Les scores peuvent être positionnés comme:
+FR
+FR * contraintes de localisation ;
+FR * [contraintes de colocation][Contraintes de colocation] ;
+FR * attributs:
+FR   * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
+FR     ressources ;
+FR   * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
+FR
+The score can be positionned as:
 
-* contraintes de localisation ;
-* [contraintes de colocation][Contraintes de colocation] ;
-* attributs:
-  * [`resource-stickiness`][Méta-attributs des ressources] du cluster ou des
-    ressources ;
-  * [`symetric-cluster`][Cluster symétrique et asymétrique] du cluster ;
+* location constraints;
+* [colocation constraints][Colocation constraints];
+* attributes:
+  - ['resource-stickiness`][Resource meta-attributes] of the cluster or
+    resources;
+  - [`symetric-clustre`][Symetric and asymetric clusters] of the cluster.
 
-Ils sont aussi être manipulés tout au long de la vie du cluster. Eg.:
+FR Ils sont aussi être manipulés tout au long de la vie du cluster. Eg.:
+FR
+FR * [bascule][Détail d'un switchover] effectuée par l'administrateur :
+FR   * ban : place un score de localisation de `-INFINITY` sur le nœud courant ;
+FR   * move : place un score de localisation de `+INFINITY` sur le nœud cible ;
+FR * les ressources agents pour désigner l'instance primaire grâce à un score de
+FR   localisation du rôle `master`.
+FR
+They are also changed during the cluster normal operation:
 
-* [bascule][Détail d'un switchover] effectuée par l'administrateur :
-  * ban : place un score de localisation de `-INFINITY` sur le nœud courant ;
-  * move : place un score de localisation de `+INFINITY` sur le nœud cible ;
-* les ressources agents pour désigner l'instance primaire grâce à un score de
-  localisation du rôle `master`.
+* [switchover][Details of a switchover]:
+  - `ban`: places a `-INFINITY` location score on the current node;
+  - `move`: places a `+INFINITY` location score on the target node;
+* multi-state resource agent chose the primary instance thanks to a location
+  score for the `master` role.
 
-Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le
-même score alors pacemaker tente de répartir équitablement les ressources parmi
-les nœuds candidats. Ce comportement peut placer vos ressource de façon plus ou
-moins aléatoire. Un score négatif empêche le placement d'une ressource sur un nœud.
+FR Si pacemaker n'a pas d'instruction ou si les contraintes de localisation ont le
+FR même score alors pacemaker tente de répartir équitablement les ressources parmi
+FR les nœuds candidats. Ce comportement peut placer vos ressource de façon plus ou
+FR moins aléatoire. Un score négatif empêche le placement d'une ressource sur un nœud.
+FR
+If pacemaker as no instruction or if the location constraints have the same
+score then Pacemaker tries to allocate the resource equally between the
+candidate nodes. A negative score prevents the placement of a resource on a
+node.
 
-Les scores `+INFINITY` et `-INFINITY` permettent de forcer une ressource à
-rejoindre ou quitter un nœud de manière inconditionnelle. Voici l'arithmétique
-utilisée avec `INFINITY`:
+FR Les scores `+INFINITY` et `-INFINITY` permettent de forcer une ressource à
+FR rejoindre ou quitter un nœud de manière inconditionnelle. Voici l'arithmétique
+FR utilisée avec `INFINITY`:
+FR
+The `+INFINITY` and `-INFINITY` scores are used to force a resource to join or
+quit a node unconditionnally. The arithmetic rules for score involving
+`INFINITY` are:
 
 ~~~
 INFINITY =< 1000000
@@ -2495,62 +3515,103 @@ Any value - INFINITY = -INFINITY
 INFINITY - INFINITY = -INFINITY
 ~~~
 
-Si un nœud est sorti momentanément du cluster, par défaut ses ressources sont
-déplacées vers d'autres nœuds. Lors de sa réintroduction, les contraintes de
-localisation définies peuvent provoquer une nouvelle bascule des ressources si
-les scores y sont supérieurs ou égaux à ceux présents sur les autres nœuds. La
-plus part du temps, il est préférable d'éviter de déplacer des ressources qui
-fonctionnent correctement. C'est particulièrement vrai pour les base de données
-dont le temps de bascule peut prendre plusieurs secondes.
+FR Si un nœud est sorti momentanément du cluster, par défaut ses ressources sont
+FR déplacées vers d'autres nœuds. Lors de sa réintroduction, les contraintes de
+FR localisation définies peuvent provoquer une nouvelle bascule des ressources si
+FR les scores y sont supérieurs ou égaux à ceux présents sur les autres nœuds. La
+FR plus part du temps, il est préférable d'éviter de déplacer des ressources qui
+FR fonctionnent correctement. C'est particulièrement vrai pour les base de données
+FR dont le temps de bascule peut prendre plusieurs secondes.
+FR
+If a node is momentarily excluded from a cluster, by default it's resource are
+moved to nother node. During it's reintroduction, the location contraints of
+the node can provoque another switchover of the resources if they are higher or
+equal to those present on the other nodes. Most of the time, it's preferable to
+avoid moving resources who are in are working properly. It's especially true
+for databases where the switchover can last for several seconds.
 
-Le paramètre `stickiness` permet d'indiquer à pacemaker à quel point une
-ressource en bonne santé préfère rester où elle se trouve. Pour cela la valeur
-du paramètre `stickiness` est additionnée au score de localisation de la
-ressource sur le nœud courant et comparé aux scores sur les autres nœuds pour
-déterminer le nœud "idéal". Ce paramètre peut être défini globalement ou par
-ressource.
+FR Le paramètre `stickiness` permet d'indiquer à pacemaker à quel point une
+FR ressource en bonne santé préfère rester où elle se trouve. Pour cela la valeur
+FR du paramètre `stickiness` est additionnée au score de localisation de la
+FR ressource sur le nœud courant et comparé aux scores sur les autres nœuds pour
+FR déterminer le nœud "idéal". Ce paramètre peut être défini globalement ou par
+FR ressource.
+FR
+The `stickiness` parameter is designed to tell Pacemaker how much a resource in
+good health prefers to stay where she is running. To archive this effect, the
+valeur of the `stickiness` parameter is added to the location score of the
+resource on the current node and compared to the scores og the other nodes to
+infer the ideal node. This parameter can be set cluster wide or for a per
+resource
 
-Les scores de localisation sont aussi utilisés pour positionner les ressources
-de fencing. Vous pouvez les empêcher d'être exécutées depuis un nœud en
-utilisant un score d'exclusion de `-INFINITY`. Cette ressource ne sera alors ni
-supervisée, ni exécutée depuis ce nœud. Une telle configuration est souvent
-utilisée pour empêcher une ressource de fencing d'être priorisée ou déclenchée
-depuis le nœud qu'elle doit isoler. Néanmoins, il n'est pas recommandé
-d'empêcher ce comporter à tout prix. Un score négatif reste une bonne
-pratique, mais il est préférable d'autoriser le fencing d'un nœud depuis lui
-même, en dernier recours.
+FR Les scores de localisation sont aussi utilisés pour positionner les ressources
+FR de fencing. Vous pouvez les empêcher d'être exécutées depuis un nœud en
+FR utilisant un score d'exclusion de `-INFINITY`. Cette ressource ne sera alors ni
+FR supervisée, ni exécutée depuis ce nœud. Une telle configuration est souvent
+FR utilisée pour empêcher une ressource de fencing d'être priorisée ou déclenchée
+FR depuis le nœud qu'elle doit isoler. Néanmoins, il n'est pas recommandé
+FR d'empêcher ce comporter à tout prix. Un score négatif reste une bonne
+FR pratique, mais il est préférable d'autoriser le fencing d'un nœud depuis lui
+FR même, en dernier recours.
+FR
+FR Enfin, les scores sont consultables grâce à l'outil `crm_simulate`.
+FR
 
-Enfin, les scores sont consultables grâce à l'outil `crm_simulate`.
+The location constraints are also used to position the fencing resources. It's
+possible to forbid them from being executed from a node with an exclusion score
+of `-INFINITY`. In that case the resource will no be supervised or executed on
+the node. Such a configuration is often used to prevent a fencing resource
+from being chosen or used from the node it's supposed to isolate. Nevertheless,
+it's not recommended to forbid this behavior at all cost. A negative score is
+still an accepted practice, event if it's advise to let a fencing agent run on
+the node it's tasked to fence.
+
+Finally, these scores are visible thanks to the `crm_simulate` tool.
+
 :::
 
 -----
 
-### TP: création des contraintes de localisation
+### Practical work: Location constraint creation
 
 ::: notes
 
-1. afficher les scores au sein du cluster
+FR 1. afficher les scores au sein du cluster
+FR
+FR Noter quel nœud est responsable de chaque ressource de fencing
+FR
+FR 2. positionner les stickiness de toutes les ressources à `1`
+FR 3. comparer l'évolution des scores
+FR 4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
+FR    évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
+FR    contraintes.
+FR 5. observer les changements de placement et de score par rapport à l'état
+FR    précédent
+FR 6. afficher les contraintes existantes à l'aide de `pcs`
+FR
+1. display the score
 
-Noter quel nœud est responsable de chaque ressource de fencing
+Check which node is responsible for each fencing resource.
 
-2. positionner les stickiness de toutes les ressources à `1`
-3. comparer l'évolution des scores
-4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
-   évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
-   contraintes.
-5. observer les changements de placement et de score par rapport à l'état
-   précédent
-6. afficher les contraintes existantes à l'aide de `pcs`
+2. configure the stickiness of all resources to value of `1`
+3. compare the evolution of the scores
+4. add exclusion constraits to prevent each fencing resource from running on
+   the node it's tasked to fence. Use a weight of 100 for these constraints.
+5. watch out for the modification of the placement and score compared to the
+   previous state
+6. display the existing constraints with `pcs`
 
 :::
 
 -----
 
-### Correction: création des contraintes de localisation
+### Correction: Location constraint creation
 
 ::: notes
 
-1. afficher les scores au sein du cluster
+FR 1. afficher les scores au sein du cluster
+FR
+1. display the score
 
 ~~~console
 # crm_simulate --show-scores --live-check
@@ -2576,17 +3637,23 @@ native_color: fence_vm_hanode3 allocation score on hanode3: 0
 Transition Summary:
 ~~~
 
-Ici, `fence_vm_hanode1` est surveillé depuis `hanode1`, `fence_vm_hanode2`
-depuis `hanode2` et `fence_vm_hanode3` depuis `hanode3`.
+FR Ici, `fence_vm_hanode1` est surveillé depuis `hanode1`, `fence_vm_hanode2`
+FR depuis `hanode2` et `fence_vm_hanode3` depuis `hanode3`.
+FR
+Here, `fence_vm_hanode1` is monitored from `hanode1`, `fence_vm_hanode2` from
+`hanode2` and `fence_vm_hanode3` from `hanode3`.
 
-2. positionner les stickiness de toutes les ressources à `1`
+FR 2. positionner les stickiness de toutes les ressources à `1`
+FR
+2. configure the stickiness of all resources to value of `1`
 
 ~~~console
 # pcs resource defaults resource-stickiness=1
 ~~~
 
-3. comparer l'évolution des scores
-
+FR 3. comparer l'évolution des scores
+FR
+3. compare the evolution of the scores
 ~~~console
 # crm_simulate -sL
 [...]
@@ -2602,12 +3669,17 @@ native_color: fence_vm_hanode3 allocation score on hanode2: 0
 native_color: fence_vm_hanode3 allocation score on hanode3: 1
 ~~~
 
-Le score de chaque ressource a augmenté de `1` pour le nœud sur lequel 
-elle est "démarrée".
+FR Le score de chaque ressource a augmenté de `1` pour le nœud sur lequel 
+FR elle est "démarrée".
+FR
+The score for each resource is increased by `1` on the node where it's started.
 
-4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
-   évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
-   contraintes.
+FR 4. ajouter des contraintes d'exclusion pour que chaque ressource de fencing
+FR   évite le nœud dont il est responsable. Utiliser un poids de 100 pour ces
+FR   contraintes.
+FR
+4. add exclusion constraits to prevent each fencing resource from running on
+   the node it's tasked to fence. Use a weight of 100 for these constraints.
 
 ~~~console
 # pcs constraint location fence_vm_hanode1 avoids hanode1=100
@@ -2615,15 +3687,21 @@ elle est "démarrée".
 # pcs constraint location fence_vm_hanode3 avoids hanode3=100
 ~~~
 
-Notez que les deux syntaxes proposées sont équivalentes du point de vue du
-résultat dans la CIB.
+FR Notez que les deux syntaxes proposées sont équivalentes du point de vue du
+FR résultat dans la CIB.
+FR
+Note that the two syntaxes are equivalent from the point of view of the result
+in the CIB.
 
 ~~~
 # cibadmin -Q --xpath='//rsc_location'
 ~~~
 
-5. observer les changements de placement et de score par rapport à l'état
-   précédent
+FR 5. observer les changements de placement et de score par rapport à l'état
+FR   précédent
+FR
+5. watch out for the modification of the placement and score compared to the
+   previous state
 
 ~~~console
 # crm_simulate -sL
@@ -2649,13 +3727,20 @@ native_color: fence_vm_hanode3 allocation score on hanode3: -100
 Transition Summary:
 ~~~
 
-Chaque ressource a changé de nœud afin de ne plus résider sur celui qu'elle
-doit éventuellement isoler.
+FR Chaque ressource a changé de nœud afin de ne plus résider sur celui qu'elle
+FR doit éventuellement isoler.
+FR
+FR Un score négatif de `-100` correspondant à la contrainte créée est positionné
+FR pour chaque ressource sur le nœud qu'elle doit éventuellement isoler.
+FR
 
-Un score négatif de `-100` correspondant à la contrainte créée est positionné
-pour chaque ressource sur le nœud qu'elle doit éventuellement isoler.
+Each resource has changed node in order to avoid being hosted on the node they are
+tasked to isolate. A negative score of `-100` corresponding to the constraint
+is positionned for each resource on the relevant node.
 
-6. afficher les contraintes existantes à l'aide de `pcs`
+FR 6. afficher les contraintes existantes à l'aide de `pcs`
+FR
+6. display the existing constraints with `pcs`
 
 ~~~console
 # pcs constraint location show

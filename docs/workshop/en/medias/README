@@ -1,0 +1,14 @@
+Diagrams have been generated using draw.io from https://www.draw.io/.
+
+To modify it, go to the website and "Open Existing Diagram" or install draw.io
+localy.
+
+Select the .xml source file.
+
+Do your modification and Save.
+
+To generate the png and svg files, select "Export as" or use the Makefile.
+Eg.:
+
+  make DRAWIO_HOME=$HOME/git/drawio-desktop all
+
