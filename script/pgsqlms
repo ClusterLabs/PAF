@@ -64,6 +64,7 @@ my $start_opts   = $ENV{'OCF_RESKEY_start_opts'} || $start_opts_default;
 my $maxlag       = $ENV{'OCF_RESKEY_maxlag'} || $maxlag_default;
 my $recovery_tpl = $ENV{'OCF_RESKEY_recovery_template'}
     || "$pgdata/recovery.conf.pcmk";
+my $ocf_check_level = $ENV{'OCF_CHECK_LEVEL'} || 0;
 
 
 # PostgreSQL commands path
@@ -1323,24 +1324,26 @@ sub pgsql_validate_all {
         return $OCF_ERR_INSTALLED;
     }
 
-    # check notify=true
-    unless ( defined $ENV{'OCF_RESKEY_CRM_meta_notify'}
-        and lc($ENV{'OCF_RESKEY_CRM_meta_notify'}) =~ /^true$|^on$|^yes$|^y$|^1$/ ) {
-        ocf_exit_reason(
-            'You must set meta parameter notify=true for your "master" resource'
-        );
-        return $OCF_ERR_INSTALLED;
-    }
+    if ( $ocf_check_level == 10 ) {
+        # check notify=true
+        unless ( defined $ENV{'OCF_RESKEY_CRM_meta_notify'}
+            and lc($ENV{'OCF_RESKEY_CRM_meta_notify'}) =~ /^true$|^on$|^yes$|^y$|^1$/ ) {
+            ocf_exit_reason(
+                'You must set meta parameter notify=true for your "master" resource'
+            );
+            return $OCF_ERR_INSTALLED;
+        }
 
-    # check master-max=1
-    unless (
-        defined $ENV{'OCF_RESKEY_CRM_meta_master_max'}
-            and $ENV{'OCF_RESKEY_CRM_meta_master_max'} eq '1'
-    ) {
-        ocf_exit_reason(
-            'You must set meta parameter master-max=1 for your "master" resource'
-        );
-        return $OCF_ERR_INSTALLED;
+        # check master-max=1
+        unless (
+            defined $ENV{'OCF_RESKEY_CRM_meta_master_max'}
+                and $ENV{'OCF_RESKEY_CRM_meta_master_max'} eq '1'
+        ) {
+            ocf_exit_reason(
+                'You must set meta parameter master-max=1 for your "master" resource'
+            );
+            return $OCF_ERR_INSTALLED;
+        }
     }
 
     if ( $PGVERNUM >= $PGVER_12 ) {
@@ -1365,12 +1368,14 @@ sub pgsql_validate_all {
             return $OCF_ERR_ARGS;
         }
 
-        $guc = qx{ $POSTGRES -C primary_conninfo -D "$pgdata" $start_opts};
-        unless ($guc =~ /\bapplication_name='?$nodename'?\b/) {
-            ocf_exit_reason(
-                q{Parameter "primary_conninfo" MUST contain 'application_name=%s'. }.
-                q{It is currently set to '%s'}, $nodename, $guc );
-            return $OCF_ERR_ARGS;
+        if ( $ocf_check_level == 10 ) {
+            $guc = qx{ $POSTGRES -C primary_conninfo -D "$pgdata" $start_opts};
+            unless ($guc =~ /\bapplication_name='?$nodename'?\b/) {
+                ocf_exit_reason(
+                    q{Parameter "primary_conninfo" MUST contain 'application_name=%s'. }.
+                    q{It is currently set to '%s'}, $nodename, $guc );
+                return $OCF_ERR_ARGS;
+            }
         }
     }
     else {
@@ -2271,6 +2276,9 @@ $PGVERNUM = _get_pg_version();
 # Set current node name.
 $nodename = ocf_local_nodename();
 
+if ( $__OCF_ACTION ne 'validate-all' ) {
+    $ocf_check_level = 10;
+}
 $exit_code = pgsql_validate_all();
 
 exit $exit_code if $exit_code != $OCF_SUCCESS or $__OCF_ACTION eq 'validate-all';
