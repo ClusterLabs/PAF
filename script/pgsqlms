@@ -2107,7 +2107,7 @@ sub pgsql_notify_pre_promote {
     # It means that the LSN is the starting point of the last WAL segment in the local pg_wal folder.
     if ($node_lsn_hexadecimal =~ /$WAL_SEGMENT_START$/) {
         ocf_log( 'info', 'the LSN "%s" is not accurate', $node_lsn_hexadecimal);
-        $node_last_replayed_lsn = _get_last_replay_lsn( 'in decimal' );
+        my $node_last_replayed_lsn = _get_last_replay_lsn( 'in decimal' );
         if ($node_last_replayed_lsn > $node_lsn) {
             ocf_log( 'info', 'Using the last replayed LSN "%s" as the value for LSN location.', $node_last_replayed_lsn);
             $node_lsn = $node_last_replayed_lsn;
