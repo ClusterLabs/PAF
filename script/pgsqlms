@@ -207,6 +207,41 @@ sub _get_last_received_lsn {
     return undef;
 }
 
+# Get the last write-ahead log location that has been replayed during recovery on a standby
+# if the first argument is true, returns the value as decimal
+# if the first argument is false, returns the value as LSN
+# Returns undef if query failed
+sub _get_last_replay_lsn {
+    my ( $dec ) = @_;
+    my $pg_last_wal_replay_lsn = 'pg_last_wal_replay_lsn()';
+    my $pg_wal_lsn_diff         = 'pg_wal_lsn_diff';
+    my $query;
+    my $rc;
+    my @rs;
+
+    if ( $PGVERNUM < $PGVER_10  ) {
+        $pg_last_wal_receive_lsn = 'pg_last_xlog_replay_location()';
+        $pg_wal_lsn_diff         = 'pg_xlog_location_diff';
+    }
+
+    if ( $dec ) {
+        $query = "SELECT $pg_wal_lsn_diff( $pg_last_wal_replay_lsn, '0/0' )";
+    }
+    else {
+        $query = "SELECT $pg_last_wal_replay_lsn";
+    }
+
+    $rc = _query( $query, \@rs );
+
+    return $rs[0][0] if $rc == 0 and $rs[0][0];
+
+    ocf_log( 'err', 'Could not query last replayed LSN (%s)', $rc ) if $rc != 0;
+    ocf_log( 'err', 'No values for last replayed LSN' )
+        if $rc == 0 and not $rs[0][0];
+
+    return undef;
+}
+
 # Get the master score for each connected standby
 # Returns directly the result set of the query or exit with an error.
 # Exits with OCF_ERR_GENERIC if the query failed
@@ -2060,6 +2095,24 @@ sub pgsql_notify_pre_promote {
     _query( q{ CHECKPOINT }, {} );
     %cdata    = _get_controldata();
     $node_lsn = _get_last_received_lsn( 'in decimal' );
+    # Checking if the current LSN are accurate
+    # In most cases, the pg_last_wal_receive_lsn() can accurately retrieve the last received LSN location
+    # When Postgres is started as a standby, the value obtained by this function is the starting point of the last
+    # WAL segment in the local pg_wal folder.
+    # After executing stream replication from primary, this value will be correctly updated.
+    my $WAL_SEGMENT_START = '000000';
+    # Convert LSN to hexadecimal
+    my $node_lsn_hexadecimal = sprintf("%X", $node_lsn);
+    # If the last three bytes (or six hexadecimal digits) of the LSN are zeros,
+    # It means that the LSN is the starting point of the last WAL segment in the local pg_wal folder.
+    if ($node_lsn_hexadecimal =~ /$WAL_SEGMENT_START$/) {
+        ocf_log( 'info', 'the LSN "%s" is not accurate', $node_lsn_hexadecimal);
+        my $node_last_replayed_lsn = _get_last_replay_lsn( 'in decimal' );
+        if ($node_last_replayed_lsn > $node_lsn) {
+            ocf_log( 'info', 'Using the last replayed LSN "%s" as the value for LSN location.', $node_last_replayed_lsn);
+            $node_lsn = $node_last_replayed_lsn;
+        }
+    }
 
     unless ( defined $node_lsn ) {
         ocf_log( 'warning', 'Unknown current node LSN' );
