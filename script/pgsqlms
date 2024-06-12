@@ -36,7 +36,7 @@ use OCF_ReturnCodes;
 use OCF_Directories;
 use OCF_Functions;
 
-our $VERSION = 'v2.3.0';
+our $VERSION = '2.3.0';
 our $PROGRAM = 'pgsqlms';
 
 # OCF environment
@@ -1099,8 +1099,8 @@ is not in the data directory (PGDATA), eg.:
 sub ocf_meta_data {
     print qq{<?xml version="1.0"?>
         <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
-        <resource-agent name="pgsqlms">
-          <version>$VERSION</version>
+        <resource-agent name="pgsqlms" version="$VERSION">
+          <version>1.0</version>
 
           <longdesc lang="en">
             Resource script for PostgreSQL in replication. It manages PostgreSQL
@@ -1317,7 +1317,7 @@ sub pgsql_validate_all {
         ocf_version_cmp( $ENV{"OCF_RESKEY_crm_feature_set"}, '3.0.9' ) == 2
     ) {
         ocf_exit_reason(
-            'PAF %s is compatible with Pacemaker 1.1.13 and greater',
+            'PAF v%s is compatible with Pacemaker 1.1.13 and greater',
             $VERSION
         );
         return $OCF_ERR_INSTALLED;
